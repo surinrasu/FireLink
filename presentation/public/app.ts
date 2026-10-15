@@ -25,6 +25,8 @@ let live = false;
 let generation = 0;
 let frameURL: string | null = null;
 let inputBusy = false;
+let frameTimer: ReturnType<typeof setTimeout> | undefined;
+let frameRequest: AbortController | null = null;
 const theme = (): Theme => (media.matches ? "dark" : "light");
 function paintTheme() {
   document.body.className = theme();
@@ -98,6 +100,8 @@ async function activate(next = index) {
   if (busy || !scenes.length) return;
   const desiredTheme = theme();
   busy = true;
+  clearTimeout(frameTimer);
+  frameRequest?.abort();
   index = Math.max(0, Math.min(next, scenes.length - 1));
   generation++;
   revision = null;
@@ -121,15 +125,21 @@ async function activate(next = index) {
     setControls();
     if (revision !== null && desiredTheme !== theme())
       queueMicrotask(() => activate());
+    else void loop();
   }
 }
 async function frames() {
   if (!busy && revision !== null && !document.hidden) {
     const token = generation,
       expected = revision;
+    const controller = new AbortController();
+    frameRequest = controller;
     try {
       const response = await fetch(`/api/demo/frame?revision=${expected}`, {
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(15000),
+        ]),
         cache: "no-store",
       });
       if (!response.ok) throw new Error("正在同步应用画面");
@@ -158,16 +168,20 @@ async function frames() {
       $("connection").textContent = "";
       setControls();
     } catch (e) {
-      if (token === generation && !busy) {
+      if (!controller.signal.aborted && token === generation && !busy) {
         cover("实时画面已中断", "正在尝试重新连接；也可以重置本页。", true);
         $("connection").textContent = errorMessage(e);
       }
+    } finally {
+      if (frameRequest === controller) frameRequest = null;
     }
   }
 }
 async function loop() {
+  clearTimeout(frameTimer);
+  const token = generation;
   await frames();
-  setTimeout(loop, 450);
+  if (token === generation) frameTimer = setTimeout(loop, 450);
 }
 async function input(action: DemoInput) {
   if (busy || !live || inputBusy) return;
@@ -292,6 +306,7 @@ setInterval(async () => {
         render();
         cover("准备演示场景");
         history.replaceState(null, "", `#${status.scene}`);
+        void loop();
       } else cover("场景未就绪", status.error || "请重置本页", true);
     }
   } catch {
@@ -307,4 +322,3 @@ try {
   cover("无法读取演示", errorMessage(e), true);
   $("retry").onclick = () => location.reload();
 }
-loop();

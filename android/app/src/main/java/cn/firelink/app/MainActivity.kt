@@ -19,13 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
@@ -41,16 +44,17 @@ class MainActivity : ComponentActivity() {
             val dark = isSystemInDarkTheme()
             MaterialTheme(
                 colorScheme =
-                    if (dark) darkColorScheme(
-                        primary = Color(0xFFFFB4A1),
-                        secondary = Color(0xFFB8CCAC),
-                        background = Color(0xFF1B1C19),
-                        surface = Color(0xFF1B1C19),
-                        surfaceContainer = Color(0xFF2B2D27),
-                        surfaceContainerLow = Color(0xFF23251F),
-                        secondaryContainer = Color(0xFF50372D),
-                        onSecondaryContainer = Color(0xFFFFDBCE),
-                    )
+                    if (dark)
+                        darkColorScheme(
+                            primary = Color(0xFFFFB4A1),
+                            secondary = Color(0xFFB8CCAC),
+                            background = Color(0xFF1B1C19),
+                            surface = Color(0xFF1B1C19),
+                            surfaceContainer = Color(0xFF2B2D27),
+                            surfaceContainerLow = Color(0xFF23251F),
+                            secondaryContainer = Color(0xFF50372D),
+                            onSecondaryContainer = Color(0xFFFFDBCE),
+                        )
                     else
                         lightColorScheme(
                             primary = Color(0xFFB73D25),
@@ -66,7 +70,9 @@ class MainActivity : ComponentActivity() {
                 FireLink(
                     initialRoute =
                         if (BuildConfig.DEMO_MODE) intent.getStringExtra("demoRoute") ?: "home"
-                        else "home"
+                        else "home",
+                    demoReadyToken =
+                        if (BuildConfig.DEMO_MODE) intent.getStringExtra("demoReadyToken") else null,
                 )
             }
         }
@@ -75,17 +81,49 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FireLink(model: AppModel = viewModel(), initialRoute: String = "home") {
+fun FireLink(
+    model: AppModel = viewModel(),
+    initialRoute: String = "home",
+    demoReadyToken: String? = null,
+) {
     val strings = localizedResources()
     LaunchedEffect(strings.apiLanguage()) { model.load() }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
     var demoNavigated by remember { mutableStateOf(false) }
+    var demoContentRoute by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(model.loading, model.incidents) {
-        if (BuildConfig.DEMO_MODE && !demoNavigated && !model.loading && model.incidents.isNotEmpty()) {
+        if (
+            BuildConfig.DEMO_MODE &&
+                !demoNavigated &&
+                !model.loading &&
+                model.incidents.isNotEmpty()
+        ) {
             demoNavigated = true
             if (initialRoute != "home") nav.navigate(initialRoute) { launchSingleTop = true }
+        }
+    }
+    val view = LocalView.current
+    val dark = isSystemInDarkTheme()
+    val resolvedRoute = route.replace("{id}", entry?.arguments?.getString("id").orEmpty())
+    val contentReady =
+        !route.startsWith("task/") && !route.startsWith("apply/") ||
+            demoContentRoute == initialRoute
+    val demoReady =
+        demoNavigated &&
+            !model.loading &&
+            model.error == null &&
+            resolvedRoute == initialRoute &&
+            contentReady
+    LaunchedEffect(demoReadyToken, demoReady, entry, dark) {
+        val destination = entry
+        if (BuildConfig.DEMO_MODE && demoReadyToken != null && demoReady && destination != null) {
+            destination.lifecycle.currentStateFlow.first { it == Lifecycle.State.RESUMED }
+            // Let the composition containing the loaded content finish before
+            // requesting a committed frame (including the navigation transition).
+            withFrameNanos {}
+            DemoMode.reportReady(view, demoReadyToken, initialRoute, dark)
         }
     }
     var pending by rememberSaveable { mutableStateOf("profile") }
@@ -208,7 +246,14 @@ fun FireLink(model: AppModel = viewModel(), initialRoute: String = "home") {
                 }
             }
             composable("task/{id}") {
-                TaskScreen(entry?.arguments?.getString("id") ?: "", model, ::requireLogin, ::go)
+                val id = it.arguments?.getString("id") ?: ""
+                TaskScreen(
+                    id,
+                    model,
+                    ::requireLogin,
+                    ::go,
+                    onLoaded = { demoContentRoute = "task/$id" },
+                )
             }
             composable("article/{id}") {
                 val article = model.articles.find { it.id == entry?.arguments?.getString("id") }
@@ -240,7 +285,8 @@ fun FireLink(model: AppModel = viewModel(), initialRoute: String = "home") {
             composable("settings") { SettingsScreen(model) { requireLogin("passkeys") } }
             composable("passkeys") { PasskeySettingsScreen(model) }
             composable("apply/{id}") {
-                ApplyScreen(entry?.arguments?.getString("id") ?: "", model) {
+                val id = it.arguments?.getString("id") ?: ""
+                ApplyScreen(id, model, onLoaded = { demoContentRoute = "apply/$id" }) {
                     nav.popBackStack()
                     go("history")
                 }
@@ -567,12 +613,19 @@ fun displayTime(value: String): String =
         .getOrDefault(value.take(16))
 
 @Composable
-fun TaskScreen(id: String, model: AppModel, requireLogin: (String) -> Unit, go: (String) -> Unit) {
+fun TaskScreen(
+    id: String,
+    model: AppModel,
+    requireLogin: (String) -> Unit,
+    go: (String) -> Unit,
+    onLoaded: () -> Unit = {},
+) {
     val strings = localizedResources()
     var task by remember(id) { mutableStateOf<RescueTask?>(null) }
     var failure by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableIntStateOf(0) }
     var showContacts by remember { mutableStateOf(false) }
+    LaunchedEffect(task) { if (task != null) onLoaded() }
     LaunchedEffect(id, retry) {
         try {
             task = model.api.get("/v1/tasks/$id")
@@ -703,7 +756,7 @@ fun ContentBlocks(blocks: List<ContentBlock>) {
 }
 
 @Composable
-fun ApplyScreen(id: String, model: AppModel, done: () -> Unit) {
+fun ApplyScreen(id: String, model: AppModel, onLoaded: () -> Unit = {}, done: () -> Unit) {
     val strings = localizedResources()
     val scope = rememberCoroutineScope()
     var task by remember { mutableStateOf<RescueTask?>(null) }
@@ -711,6 +764,7 @@ fun ApplyScreen(id: String, model: AppModel, done: () -> Unit) {
     var contacts by remember { mutableStateOf(setOf<String>()) }
     var consent by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(task) { if (task != null) onLoaded() }
     LaunchedEffect(id) {
         try {
             val t: RescueTask = model.api.get("/v1/tasks/$id")

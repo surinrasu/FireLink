@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import type { DemoStatus, Theme } from "./types.ts";
 import type { DemoState } from "./state.ts";
 import { SCENES, TOKEN } from "./scenes.ts";
+import { createBridge } from "./adb.ts";
 const base = `http://127.0.0.1:${process.env.DEMO_PORT || 4173}`;
 const out = new URL("./.artifacts/verification/", import.meta.url);
 await mkdir(out, { recursive: true });
@@ -12,6 +13,7 @@ const headers = {
   Authorization: `Bearer ${TOKEN}`,
 };
 async function scene(id: string, theme: Theme) {
+  const started = performance.now();
   const response = await fetch(base + "/api/demo/scene", {
     method: "POST",
     headers,
@@ -22,10 +24,17 @@ async function scene(id: string, theme: Theme) {
   const frame = await fetch(`${base}/api/demo/frame?revision=${data.revision}`);
   assert.equal(frame.status, 200);
   const png = Buffer.from(await frame.arrayBuffer());
+  const elapsed = Math.round(performance.now() - started);
   assert.equal(png.readUInt32BE(0), 0x89504e47);
   assert.equal(png.readUInt32BE(16), 1080);
   assert.equal(png.readUInt32BE(20), 1920);
   await writeFile(new URL(`${id}-${theme}.png`, out), png);
+  // Readiness callbacks optimize the runtime path. Verify the actual destination
+  // independently so an early callback cannot silently pass this check.
+  const hierarchy = await createBridge({ serial: data.device }).hierarchy();
+  for (const text of SCENES.find((item) => item.id === id)!.expected)
+    assert.ok(hierarchy.includes(text), `${id}: missing ${text}`);
+  console.log(`  首帧 ${elapsed} ms`);
   return data;
 }
 for (const theme of ["light", "dark"] as const)

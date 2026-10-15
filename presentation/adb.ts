@@ -4,6 +4,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { DemoInput, Scene, Theme } from "./types.ts";
 import { PACKAGE } from "./scenes.ts";
 
+export interface SceneReadiness {
+  token: string;
+  wait(): Promise<boolean>;
+}
+
 export interface Bridge {
   serial: string;
   activate(
@@ -11,6 +16,7 @@ export interface Bridge {
     theme: Theme,
     port: number,
     reset: () => void,
+    readiness?: SceneReadiness,
   ): Promise<void>;
   frame(): Promise<Buffer>;
   input(input: DemoInput): Promise<void>;
@@ -35,7 +41,7 @@ export function createBridge({
     ).stdout;
   return {
     serial,
-    async activate(scene, theme, port, reset) {
+    async activate(scene, theme, port, reset, readiness) {
       await run("get-state");
       await run("reverse", "tcp:4173", `tcp:${port}`);
       await run("shell", "am", "force-stop", PACKAGE);
@@ -61,7 +67,10 @@ export function createBridge({
         "--es",
         "demoRoute",
         scene.route,
+        ...(readiness ? ["--es", "demoReadyToken", readiness.token] : []),
       );
+      if (readiness && (await readiness.wait())) return;
+      // Older APKs or a lost readiness notification still use the verified UI fallback.
       const deadline = Date.now() + 25000;
       let last = "";
       while (Date.now() < deadline) {

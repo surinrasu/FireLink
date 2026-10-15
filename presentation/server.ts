@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import { transform } from "esbuild";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Bridge } from "./adb.ts";
 import type { DemoInput, DemoStatus, Theme } from "./types.ts";
 import { createState, api } from "./state.ts";
-import { SCENES } from "./scenes.ts";
+import { SCENES, TOKEN } from "./scenes.ts";
 import { createBridge } from "./adb.ts";
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const types: Record<string, string> = {
@@ -73,6 +74,13 @@ export function createDemoServer({
   let error: string | null = null;
   let frame: Buffer | null = null;
   let capturedAt: string | null = null;
+  let firstFrame = false;
+  let pendingReady: {
+    token: string;
+    route: string;
+    theme: Theme;
+    resolve(): void;
+  } | null = null;
   let queue = Promise.resolve();
   const session = randomUUID();
   const exclusive = (fn: () => Promise<void>) => {
@@ -129,6 +137,20 @@ export function createDemoServer({
         return json(res, 200, SCENES);
       if (pathname === "/api/demo/status" && method === "GET")
         return json(res, 200, status());
+      if (pathname === "/api/demo/ready" && method === "POST") {
+        if (req.headers.authorization !== `Bearer ${TOKEN}`)
+          return json(res, 401, { error: "需要演示应用认证" });
+        const body = await readBody(req);
+        if (
+          !pendingReady ||
+          body.token !== pendingReady.token ||
+          body.route !== pendingReady.route ||
+          body.theme !== pendingReady.theme
+        )
+          return json(res, 409, { error: "场景已切换" });
+        pendingReady.resolve();
+        return json(res, 200, { ok: true });
+      }
       if (pathname === "/api/demo/scene" && method === "POST") {
         const body = await readBody(req);
         const nextTheme = body.theme;
@@ -139,15 +161,40 @@ export function createDemoServer({
         busy = true;
         error = null;
         frame = null;
+        firstFrame = false;
         capturedAt = null;
         revision++;
         try {
           await exclusive(async () => {
             theme = nextTheme;
-            await bridge.activate(scene, theme, port, () => {
-              state = createState(scene.id);
+            const token = randomUUID();
+            const ready = new Promise<void>((resolve) => {
+              pendingReady = { token, route: scene.route, theme, resolve };
             });
+            await bridge.activate(
+              scene,
+              theme,
+              port,
+              () => {
+                state = createState(scene.id);
+              },
+              {
+                token,
+                async wait() {
+                  const timeout = new AbortController();
+                  try {
+                    return await Promise.race([
+                      ready.then(() => true),
+                      sleep(1500, false, { signal: timeout.signal }),
+                    ]);
+                  } finally {
+                    timeout.abort();
+                  }
+                },
+              },
+            );
             frame = await bridge.frame();
+            firstFrame = true;
             capturedAt = new Date().toISOString();
             current = scene.id;
           });
@@ -158,6 +205,7 @@ export function createDemoServer({
           frame = null;
           throw e;
         } finally {
+          pendingReady = null;
           busy = false;
         }
       }
@@ -167,8 +215,13 @@ export function createDemoServer({
           return json(res, 409, { error: "画面正在准备" });
         await exclusive(async () => {
           if (busy || requested !== revision) return;
-          frame = await bridge.frame();
-          capturedAt = new Date().toISOString();
+          // Activation already captured a verified frame. Consume it once, then
+          // resume fresh captures so interaction never freezes on a cached image.
+          if (!firstFrame) {
+            frame = await bridge.frame();
+            capturedAt = new Date().toISOString();
+          }
+          firstFrame = false;
         });
         if (busy || requested !== revision)
           return json(res, 409, { error: "画面已切换" });
@@ -185,7 +238,10 @@ export function createDemoServer({
           return json(res, 409, { error: "请等待画面就绪" });
         if (!validInput(input)) return json(res, 400, { error: "无效操作" });
         await exclusive(async () => {
-          if (!busy && input.revision === revision) await bridge.input(input);
+          if (!busy && input.revision === revision) {
+            firstFrame = false;
+            await bridge.input(input);
+          }
         });
         return json(res, 200, { ok: true });
       }
