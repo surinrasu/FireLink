@@ -89,7 +89,24 @@ data class Profile(
     val body: String,
     val equipment: List<String>,
     val contacts: Contacts,
+    val equipmentDetails: Map<String, String> = emptyMap(),
+    val equipmentDescription: String? = null,
+    val vehicles: Map<String, Int> = emptyMap(),
 ) {
+    fun equipmentText(label: (String) -> String): String =
+        equipmentDescription
+            ?: equipment.joinToString("\n") { key ->
+                val fields =
+                    if (key == "vehicle") listOf("vehiclePassengers", "vehicleCargo")
+                    else listOf(key)
+                val text =
+                    fields
+                        .mapNotNull { equipmentDetails[it] }
+                        .filter { it.isNotEmpty() }
+                        .joinToString("；")
+                if (text.isEmpty()) label(key) else "${label(key)}：$text"
+            }
+
     val age: Int
         get() =
             Period.between(
@@ -172,17 +189,26 @@ val fieldLabels =
         "region" to R.string.region,
         "body" to R.string.physical_information,
         "equipment" to R.string.equipment,
+        "vehicles" to R.string.vehicles,
         "skills" to R.string.skills,
         "phone" to R.string.phone,
         "wechat" to R.string.wechat,
         "email" to R.string.email,
     )
-val equipmentLabels =
-    linkedMapOf(
+val legacyEquipmentLabels =
+    mapOf(
         "vehicle" to R.string.vehicle,
         "firstAid" to R.string.first_aid,
         "tools" to R.string.tools,
         "protective" to R.string.protective_equipment,
+    )
+val vehicleLabels =
+    linkedMapOf(
+        "motorcycle" to R.string.vehicle_motorcycle,
+        "cargoTricycle" to R.string.vehicle_cargo_tricycle,
+        "sedan" to R.string.vehicle_sedan,
+        "offRoad" to R.string.vehicle_off_road,
+        "cargoVan" to R.string.vehicle_cargo_van,
     )
 
 enum class IncidentSort(val label: Int) {

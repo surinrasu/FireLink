@@ -130,7 +130,7 @@
 "region_placeholder" = "省 / 市 / 区县";
 "region_example" = "例如：浙江省 杭州市 西湖区";
 "region_hint" = "用于了解你方便活动的范围。报名时可以选择是否向组织者提供。";
-"optional_physical_information" = "身体信息（自愿填写）";
+"optional_physical_information" = "身体信息（可选）";
 "physical_information_hint" = "大致身体状况、体力或活动限制";
 "not_provided" = "未填写";
 "equipment_count" = "%1$@ 项";
@@ -147,7 +147,6 @@
 "identity_verification" = "实名认证";
 "verifying_identity" = "认证中…";
 "confirm_verification" = "确认认证";
-"equipment_save_hint" = "返回个人信息页后点击保存。";
 "certificate_name" = "证书名称，例如：驾驶证";
 "uploading" = "正在上传…";
 "choose_upload" = "选择证明文件并上传";
@@ -174,3 +173,18 @@
 "gender_male" = "男";
 "gender_female" = "女";
 "list_separator" = "、";
+"region_province" = "省 / 直辖市";
+"region_city" = "市";
+"region_district" = "区 / 县";
+"region_any" = "不限（可选）";
+"region_existing" = "当前区域：%1$@。可通过上方下拉重新选择。";
+"region_clear" = "清除区域";
+"vehicles" = "载具";
+"vehicle_motorcycle" = "摩托车";
+"vehicle_cargo_tricycle" = "三轮货车";
+"vehicle_sedan" = "轿车";
+"vehicle_off_road" = "越野车";
+"vehicle_cargo_van" = "厢式货车";
+"vehicle_decrease" = "减少%1$@数量";
+"vehicle_increase" = "增加%1$@数量";
+"equipment_text_hint" = "可自由填写你能提供的工具、装备或其他物资";

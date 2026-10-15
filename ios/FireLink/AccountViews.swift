@@ -193,26 +193,60 @@ struct ProfileView: View {
         TextField(L10n.text("optional_pronouns"), text: $profile.pronouns)
       }
       Section {
-        TextField(L10n.text("region_placeholder"), text: $profile.region)
-        Text(L10n.text("region_example")).font(.caption).foregroundStyle(.secondary)
+        RegionPicker(
+          region: Binding(
+            get: { profile.region },
+            set: {
+              profile.region = $0
+              saved = false
+            }))
       } header: {
         Text(L10n.text("region"))
       } footer: {
         Text(L10n.text("region_hint"))
       }
-      Section(L10n.text("optional_physical_information")) {
-        TextField(L10n.text("physical_information_hint"), text: $profile.body, axis: .vertical)
-          .lineLimit(3...6)
-      }
-      Section {
-        NavigationLink {
-          EquipmentView(selected: $profile.equipment)
-        } label: {
-          LabeledContent(
-            L10n.text("equipment"),
-            value: profile.equipment.isEmpty
-              ? L10n.text("not_provided") : L10n.text("equipment_count", profile.equipment.count))
+      Section(L10n.text("vehicles")) {
+        ForEach(vehicleTypes, id: \.0) { key, label in
+          let count = profile.vehicles?[key] ?? 0
+          HStack {
+            Text(L10n.text(label))
+            Spacer()
+            Button {
+              setVehicle(key, count - 1)
+            } label: {
+              Image(systemName: "minus")
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .disabled(count == 0)
+            .accessibilityLabel(L10n.text("vehicle_decrease", L10n.text(label)))
+            .accessibilityIdentifier("vehicle-minus-\(key)")
+            Text("\(count)").monospacedDigit().frame(minWidth: 30)
+              .accessibilityIdentifier("vehicle-count-\(key)")
+            Button {
+              setVehicle(key, count + 1)
+            } label: {
+              Image(systemName: "plus")
+            }
+            .frame(minWidth: 44, minHeight: 44)
+            .disabled(count >= 999)
+            .accessibilityLabel(L10n.text("vehicle_increase", L10n.text(label)))
+            .accessibilityIdentifier("vehicle-plus-\(key)")
+          }.buttonStyle(.borderless)
         }
+      }
+      Section(L10n.text("equipment")) {
+        TextField(
+          L10n.text("equipment_text_hint"),
+          text: Binding(
+            get: { profile.equipmentText },
+            set: {
+              profile.equipmentDescription = $0
+              saved = false
+            }
+          ), axis: .vertical
+        )
+        .lineLimit(4...8)
+        .accessibilityIdentifier("equipment-description")
       }
       Section(L10n.text("identity_information")) {
         LabeledContent(L10n.text("real_name"), value: profile.realName)
@@ -240,6 +274,11 @@ struct ProfileView: View {
       Button(busy ? L10n.text("saving") : L10n.text("save")) { Task { await save() } }.disabled(
         busy)
     }
+    .onAppear {
+      if profile.equipmentDescription == nil {
+        profile.equipmentDescription = profile.equipmentText
+      }
+    }
     .sheet(isPresented: $reverify) {
       NavigationStack {
         IdentityVerificationView { result in
@@ -250,7 +289,14 @@ struct ProfileView: View {
       }
     }
   }
+  func setVehicle(_ key: String, _ count: Int) {
+    var vehicles = profile.vehicles ?? [:]
+    vehicles[key] = min(999, max(0, count))
+    profile.vehicles = vehicles
+    saved = false
+  }
   func save() async {
+    saved = false
     busy = true
     defer { busy = false }
     do {
@@ -307,30 +353,6 @@ struct IdentityVerificationView: View {
         } catch { failure = error.localizedDescription }
       }
     }
-  }
-}
-struct EquipmentView: View {
-  @Binding var selected: [String]
-  var body: some View {
-    Form {
-      Section {
-        ForEach(["vehicle", "firstAid", "tools", "protective"], id: \.self) { key in
-          Toggle(
-            equipmentLabels[key] ?? key,
-            isOn: Binding(
-              get: { selected.contains(key) },
-              set: {
-                if $0 {
-                  if !selected.contains(key) { selected.append(key) }
-                } else {
-                  selected.removeAll { $0 == key }
-                }
-              }))
-        }
-      } footer: {
-        Text(L10n.text("equipment_save_hint"))
-      }
-    }.navigationTitle(L10n.text("equipment"))
   }
 }
 struct SkillsView: View {

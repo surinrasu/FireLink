@@ -75,7 +75,7 @@
         "updatedAt": "2026-10-15T07:30:00Z",
         "requiredFields": [
           "realName",
-          "equipment",
+          "vehicles",
           "skills"
         ],
         "contactFields": [
@@ -207,7 +207,7 @@
         "updatedAt": "2026-10-15T07:30:00Z",
         "requiredFields": [
           "realName",
-          "equipment",
+          "vehicles",
           "skills"
         ],
         "contactFields": [

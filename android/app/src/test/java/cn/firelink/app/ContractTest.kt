@@ -6,6 +6,31 @@ import org.junit.Test
 
 class ContractTest {
     @Test
+    fun vehiclesAndEquipmentPreserveLegacyTextAndRoundTrip() {
+        val legacy =
+            """{"id":"test","username":"Test","pronouns":"","realName":"Test","birthDate":"2000-01-01","gender":"","verified":true,"region":"","body":"","equipment":["vehicle"],"contacts":{"phone":"13800000000","wechat":"","email":""}}"""
+        val profile = Json.decodeFromString<Profile>(legacy)
+        assertTrue(profile.equipmentDetails.isEmpty())
+        val updated =
+            profile.copy(
+                equipmentDetails = mapOf("vehiclePassengers" to "4 人", "vehicleCargo" to "500 升"),
+                vehicles = mapOf("motorcycle" to 2, "sedan" to 1),
+            )
+        assertEquals(
+            updated.equipmentDetails,
+            Json.decodeFromString<Profile>(Json.encodeToString(updated)).equipmentDetails,
+        )
+        assertTrue(updated.equipmentText { it }.contains("4 人"))
+        assertTrue(updated.equipmentText { it }.contains("500 升"))
+        assertTrue(profile.vehicles.isEmpty())
+        val freeText = updated.copy(equipmentDescription = "帐篷、手套\n任意内容")
+        val restored = Json.decodeFromString<Profile>(Json.encodeToString(freeText))
+        assertEquals(freeText.equipmentDescription, restored.equipmentText { it })
+        assertEquals(freeText.vehicles, restored.vehicles)
+        assertEquals("", updated.copy(equipmentDescription = "").equipmentText { it })
+    }
+
+    @Test
     fun sharedApplicationContractPreservesDisclosureStates() {
         val payload =
             javaClass.classLoader!!

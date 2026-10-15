@@ -44,6 +44,20 @@ export function errorMessage(language: Language, key?: string): string {
   );
 }
 
+export function fieldError(
+  language: Language,
+  key: MessageKey,
+  fields: string[],
+): string {
+  const labels = fields.map((field) => {
+    const label = `field_${field}`;
+    return Object.hasOwn(messages, label)
+      ? translate(language, label as MessageKey)
+      : field;
+  });
+  return `${translate(language, key)}: ${labels.join(language === "en" ? ", " : "、")}`;
+}
+
 /** Only translate text produced by the application-result trigger; preserve authored replies. */
 export function notificationText(
   language: Language,

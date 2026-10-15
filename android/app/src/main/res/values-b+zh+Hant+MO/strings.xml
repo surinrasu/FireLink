@@ -113,7 +113,7 @@
     <string name="public_name">"公開稱呼"</string>
     <string name="optional_pronouns">"稱呼代詞（選填）"</string>
     <string name="region_placeholder">"省 / 市 / 區縣"</string>
-    <string name="optional_physical_information">"身體資料（自願填寫）"</string>
+    <string name="optional_physical_information">"身體資料（可選）"</string>
     <string name="physical_information_hint">"大致身體狀況、體力或活動限制"</string>
     <string name="not_provided">"未填寫"</string>
     <string name="age_years">"%1$d 歲"</string>
@@ -171,7 +171,6 @@
     <string name="region_example_hint">"例如：浙江省 杭州市 西湖區。用於配對方便參與的區域。"</string>
     <string name="contacts_consent_hint">"填寫在檔案中不會自動公開，需在每次報名時單獨授權。"</string>
     <string name="save_profile">"儲存個人資料"</string>
-    <string name="confirm_save_profile">"確認後請儲存個人資料。"</string>
     <string name="file_read_failed">"無法讀取檔案"</string>
     <string name="qualifications_hint">"新增與你的技能相關的證書或資格"</string>
     <string name="notification_preferences">"通知偏好"</string>
@@ -186,4 +185,19 @@
     <string name="gender_male">"男"</string>
     <string name="gender_female">"女"</string>
     <string name="list_separator">"、"</string>
+    <string name="region_province">"省 / 直轄市"</string>
+    <string name="region_city">"市"</string>
+    <string name="region_district">"區 / 縣"</string>
+    <string name="region_any">"不限（可選）"</string>
+    <string name="region_existing">"目前區域：%1$s。可透過上方選單重新選擇。"</string>
+    <string name="region_clear">"清除區域"</string>
+    <string name="vehicles">"載具"</string>
+    <string name="vehicle_motorcycle">"電單車"</string>
+    <string name="vehicle_cargo_tricycle">"三輪貨車"</string>
+    <string name="vehicle_sedan">"私家車"</string>
+    <string name="vehicle_off_road">"越野車"</string>
+    <string name="vehicle_cargo_van">"客貨車"</string>
+    <string name="vehicle_decrease">"減少%1$s數量"</string>
+    <string name="vehicle_increase">"增加%1$s數量"</string>
+    <string name="equipment_text_hint">"可自由填寫你能提供的工具、裝備或其他物資"</string>
 </resources>

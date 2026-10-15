@@ -171,7 +171,6 @@
     <string name="region_example_hint">"For example: Xihu District, Hangzhou, Zhejiang. Used to find opportunities in your area."</string>
     <string name="contacts_consent_hint">"These details stay private until you authorize sharing for each application."</string>
     <string name="save_profile">"Save personal information"</string>
-    <string name="confirm_save_profile">"Save your personal information after confirming."</string>
     <string name="file_read_failed">"Could not read the file."</string>
     <string name="qualifications_hint">"Add certificates or qualifications related to your skills."</string>
     <string name="notification_preferences">"Notification preferences"</string>
@@ -186,4 +185,19 @@
     <string name="gender_male">"Male"</string>
     <string name="gender_female">"Female"</string>
     <string name="list_separator">", "</string>
+    <string name="region_province">"Province / municipality"</string>
+    <string name="region_city">"City"</string>
+    <string name="region_district">"District / county"</string>
+    <string name="region_any">"Any (optional)"</string>
+    <string name="region_existing">"Current region: %1$s. Choose a region above to replace it."</string>
+    <string name="region_clear">"Clear region"</string>
+    <string name="vehicles">"Vehicles"</string>
+    <string name="vehicle_motorcycle">"Motorcycle"</string>
+    <string name="vehicle_cargo_tricycle">"Cargo tricycle"</string>
+    <string name="vehicle_sedan">"Sedan"</string>
+    <string name="vehicle_off_road">"Off-road vehicle"</string>
+    <string name="vehicle_cargo_van">"Cargo van"</string>
+    <string name="vehicle_decrease">"Decrease %1$s count"</string>
+    <string name="vehicle_increase">"Increase %1$s count"</string>
+    <string name="equipment_text_hint">"Describe any tools, equipment, or supplies you can provide."</string>
 </resources>
