@@ -1,0 +1,242 @@
+{
+  "invalid_phone": {
+    "en": "Enter a mainland China mobile number.",
+    "zh-Hans": "请输入中国大陆手机号",
+    "zh-Hant": "請輸入中國大陸手機號碼",
+    "zh-Hant-HK": "請輸入中國內地手機號碼"
+  },
+  "missing_name": {
+    "en": "Enter your full name.",
+    "zh-Hans": "请输入姓名",
+    "zh-Hant": "請輸入姓名",
+    "zh-Hant-HK": "請輸入姓名"
+  },
+  "invalid_id": {
+    "en": "Enter an 18-character mainland China ID number.",
+    "zh-Hans": "请输入 18 位身份证号",
+    "zh-Hant": "請輸入 18 位中國大陸身分證號碼",
+    "zh-Hant-HK": "請輸入 18 位中國內地身份證號碼"
+  },
+  "empty_request": {
+    "en": "The request body is empty.",
+    "zh-Hans": "请求内容为空",
+    "zh-Hant": "請求內容為空",
+    "zh-Hant-HK": "請求內容為空"
+  },
+  "request_too_large": {
+    "en": "The request is too large.",
+    "zh-Hans": "请求内容过长",
+    "zh-Hant": "請求內容過長",
+    "zh-Hant-HK": "請求內容過長"
+  },
+  "invalid_json": {
+    "en": "The request must contain valid JSON.",
+    "zh-Hans": "请求必须是有效 JSON",
+    "zh-Hant": "請求必須是有效 JSON",
+    "zh-Hant-HK": "請求必須是有效 JSON"
+  },
+  "invalid_input": {
+    "en": "Check your information and try again.",
+    "zh-Hans": "输入不正确",
+    "zh-Hant": "輸入不正確",
+    "zh-Hant-HK": "輸入不正確"
+  },
+  "service_unavailable": {
+    "en": "Service is temporarily unavailable. Please try again later.",
+    "zh-Hans": "服务暂时不可用，请稍后重试",
+    "zh-Hant": "服務暫時無法使用，請稍後重試",
+    "zh-Hant-HK": "服務暫時無法使用，請稍後重試"
+  },
+  "not_found": {
+    "en": "Content not found.",
+    "zh-Hans": "未找到内容",
+    "zh-Hant": "找不到內容",
+    "zh-Hant-HK": "找不到內容"
+  },
+  "attachment_too_large": {
+    "en": "Attachments must be 8 MB or smaller.",
+    "zh-Hans": "附件不能超过 8 MB",
+    "zh-Hant": "附件不能超過 8 MB",
+    "zh-Hant-HK": "附件不能超過 8 MB"
+  },
+  "identity_unavailable": {
+    "en": "Identity verification is temporarily unavailable. Please try again later.",
+    "zh-Hans": "认证服务暂时不可用，请稍后重试",
+    "zh-Hant": "認證服務暫時無法使用，請稍後重試",
+    "zh-Hant-HK": "認證服務暫時無法使用，請稍後重試"
+  },
+  "too_many_requests": {
+    "en": "Too many requests. Please try again later.",
+    "zh-Hans": "请求过于频繁，请稍后再试",
+    "zh-Hant": "請求過於頻繁，請稍後再試",
+    "zh-Hant-HK": "請求過於頻繁，請稍後再試"
+  },
+  "code_sent": {
+    "en": "Verification code sent.",
+    "zh-Hans": "验证码已发送",
+    "zh-Hant": "驗證碼已傳送",
+    "zh-Hant-HK": "驗證碼已傳送"
+  },
+  "invalid_code": {
+    "en": "The verification code is invalid or expired. Request a new code.",
+    "zh-Hans": "验证码无效或已过期，请重新获取",
+    "zh-Hant": "驗證碼無效或已過期，請重新取得",
+    "zh-Hant-HK": "驗證碼無效或已過期，請重新獲取"
+  },
+  "identity_mismatch": {
+    "en": "The name and ID number do not match. Check them and try again.",
+    "zh-Hans": "姓名与身份证号不匹配，请核对后重试",
+    "zh-Hant": "姓名與身分證號碼不符，請核對後重試",
+    "zh-Hant-HK": "姓名與身份證號碼不符，請核對後重試"
+  },
+  "registration_expired": {
+    "en": "Your registration session has expired. Please sign in again.",
+    "zh-Hans": "注册凭证已过期，请重新登录",
+    "zh-Hant": "註冊憑證已過期，請重新登入",
+    "zh-Hant-HK": "註冊憑證已過期，請重新登入"
+  },
+  "new_volunteer": {
+    "en": "New volunteer",
+    "zh-Hans": "新志愿者",
+    "zh-Hant": "新志工",
+    "zh-Hant-HK": "新義工"
+  },
+  "phone_registered": {
+    "en": "This number already has an account. Please sign in again.",
+    "zh-Hans": "该手机号已有账号，请重新登录",
+    "zh-Hant": "此手機號碼已有帳號，請重新登入",
+    "zh-Hant-HK": "此手機號碼已有帳戶，請重新登入"
+  },
+  "task_not_found": {
+    "en": "Task not found.",
+    "zh-Hans": "任务不存在",
+    "zh-Hant": "任務不存在",
+    "zh-Hant-HK": "任務不存在"
+  },
+  "sign_in_required": {
+    "en": "Please sign in first.",
+    "zh-Hans": "请先登录",
+    "zh-Hant": "請先登入",
+    "zh-Hant-HK": "請先登入"
+  },
+  "session_expired": {
+    "en": "Your session has expired. Please sign in again.",
+    "zh-Hans": "登录已过期，请重新登录",
+    "zh-Hant": "登入已過期，請重新登入",
+    "zh-Hant-HK": "登入已過期，請重新登入"
+  },
+  "attachment_required": {
+    "en": "Choose an attachment.",
+    "zh-Hans": "请选择附件",
+    "zh-Hant": "請選擇附件",
+    "zh-Hant-HK": "請選擇附件"
+  },
+  "empty_file": {
+    "en": "The file is empty.",
+    "zh-Hans": "文件为空",
+    "zh-Hant": "檔案為空",
+    "zh-Hant-HK": "檔案為空"
+  },
+  "file_type_mismatch": {
+    "en": "The file content does not match its type.",
+    "zh-Hans": "文件内容与类型不符",
+    "zh-Hant": "檔案內容與類型不符",
+    "zh-Hant-HK": "檔案內容與類型不符"
+  },
+  "attachment_not_found": {
+    "en": "Attachment not found.",
+    "zh-Hans": "附件不存在",
+    "zh-Hant": "附件不存在",
+    "zh-Hant-HK": "附件不存在"
+  },
+  "applications_closed": {
+    "en": "This task is not accepting applications.",
+    "zh-Hans": "任务当前不接受报名",
+    "zh-Hant": "此任務目前不接受報名",
+    "zh-Hant-HK": "此任務目前不接受報名"
+  },
+  "missing_consent": {
+    "en": "Provide the required information and consent to sharing contact details.",
+    "zh-Hans": "请提供任务要求的资料和联系方式授权",
+    "zh-Hant": "請提供任務要求的資料和聯絡方式授權",
+    "zh-Hant-HK": "請提供任務要求的資料和聯絡方式授權"
+  },
+  "incomplete_profile": {
+    "en": "Complete the personal information required for this task first.",
+    "zh-Hans": "请先完善任务要求的个人资料",
+    "zh-Hant": "請先完善任務要求的個人資料",
+    "zh-Hant-HK": "請先完善任務要求的個人資料"
+  },
+  "incomplete_contacts": {
+    "en": "Complete the selected contact details in your profile first.",
+    "zh-Hans": "请先在个人信息中完善所选联系方式",
+    "zh-Hant": "請先在個人資料中完善所選聯絡方式",
+    "zh-Hant-HK": "請先在個人資料中完善所選聯絡方式"
+  },
+  "already_applied": {
+    "en": "You have already applied, or this task has closed.",
+    "zh-Hans": "已报名该任务，或任务已关闭",
+    "zh-Hant": "已報名此任務，或任務已關閉",
+    "zh-Hant-HK": "已報名此任務，或任務已關閉"
+  },
+  "withdraw_pending_only": {
+    "en": "Only pending applications can be withdrawn.",
+    "zh-Hans": "仅待审核申请可以撤回",
+    "zh-Hant": "僅待審核申請可以撤回",
+    "zh-Hant-HK": "僅待審核申請可以撤回"
+  },
+  "passkey_not_configured": {
+    "en": "Passkeys are not configured for this service.",
+    "zh-Hans": "通行密钥尚未配置关联域名",
+    "zh-Hant": "通行金鑰尚未設定關聯網域",
+    "zh-Hant-HK": "通行密鑰尚未設定關聯網域"
+  },
+  "passkey_expired": {
+    "en": "Passkey verification has expired.",
+    "zh-Hans": "通行密钥验证已过期",
+    "zh-Hant": "通行金鑰驗證已過期",
+    "zh-Hant-HK": "通行密鑰驗證已過期"
+  },
+  "passkey_invalid": {
+    "en": "Passkey verification failed.",
+    "zh-Hans": "通行密钥验证失败",
+    "zh-Hant": "通行金鑰驗證失敗",
+    "zh-Hant-HK": "通行密鑰驗證失敗"
+  },
+  "passkey_verify_failed": {
+    "en": "Could not verify the passkey. Please try again.",
+    "zh-Hans": "无法验证通行密钥，请重试",
+    "zh-Hant": "無法驗證通行金鑰，請重試",
+    "zh-Hant-HK": "無法驗證通行密鑰，請重試"
+  },
+  "passkey_invalid_or_expired": {
+    "en": "Passkey verification failed or expired.",
+    "zh-Hans": "通行密钥验证失败或已过期",
+    "zh-Hant": "通行金鑰驗證失敗或已過期",
+    "zh-Hant-HK": "通行密鑰驗證失敗或已過期"
+  },
+  "sign_in_again": {
+    "en": "Please sign in again.",
+    "zh-Hans": "请重新登录",
+    "zh-Hant": "請重新登入",
+    "zh-Hant-HK": "請重新登入"
+  },
+  "application_accepted": {
+    "en": "Application accepted",
+    "zh-Hans": "报名已通过",
+    "zh-Hant": "報名已通過",
+    "zh-Hant-HK": "報名已通過"
+  },
+  "application_rejected": {
+    "en": "Application not accepted",
+    "zh-Hans": "报名未通过",
+    "zh-Hant": "報名未通過",
+    "zh-Hant-HK": "報名未通過"
+  },
+  "application_updated": {
+    "en": "The organizer has updated your application result.",
+    "zh-Hans": "组织者已更新你的申请结果",
+    "zh-Hant": "組織者已更新你的申請結果",
+    "zh-Hant-HK": "組織者已更新你的申請結果"
+  }
+}

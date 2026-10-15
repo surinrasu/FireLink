@@ -1,0 +1,24 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+[tools]
+bun = "1.4.3"
+# Wrangler still requires Node.js; package management and tests use Bun.
+node = "24.21.0"
+
+[tasks.install]
+run = "bun install --frozen-lockfile"
+[tasks.types]
+run = ["bun run wrangler types --strict-vars=false", "bun scripts/normalize-types.ts"]
+[tasks.migrate]
+run = "bun run wrangler d1 migrations apply firelink-dev --local"
+[tasks.dev]
+depends = ["migrate"]
+run = "bun run dev --ip 0.0.0.0"
+[tasks.check]
+run = ["bun run wrangler types --strict-vars=false --check", "bun run check", "bun run format:check"]
+[tasks.test]
+run = "bun run test"
+[tasks.deploy]
+run = "bun run wrangler deploy --env staging"
+
+[tasks.format]
+run = "bun run format"

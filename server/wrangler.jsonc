@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "firelink-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "APP_ENV": "local",
+    "MOCK_AUTH": "true",
+    "RP_ID": "localhost",
+    "PASSKEY_ORIGINS": "http://localhost:8787",
+    "APPLE_APP_ID": "",
+    "ANDROID_SHA256": "",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "firelink-dev",
+      "database_id": "local-firelink",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "firelink-dev-files" }],
+  "env": {
+    "staging": {
+      "name": "firelink-staging",
+      "vars": {
+        "APP_ENV": "staging",
+        "MOCK_AUTH": "true",
+        "RP_ID": "",
+        "PASSKEY_ORIGINS": "",
+        "APPLE_APP_ID": "",
+        "ANDROID_SHA256": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "firelink-staging",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "r2_buckets": [
+        { "binding": "FILES", "bucket_name": "firelink-staging-files" },
+      ],
+    },
+    "production": {
+      "name": "firelink-production",
+      "vars": {
+        "APP_ENV": "production",
+        "MOCK_AUTH": "false",
+        "RP_ID": "",
+        "PASSKEY_ORIGINS": "",
+        "APPLE_APP_ID": "",
+        "ANDROID_SHA256": "",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "firelink-production",
+          "migrations_dir": "migrations",
+        },
+      ],
+      "r2_buckets": [
+        { "binding": "FILES", "bucket_name": "firelink-production-files" },
+      ],
+    },
+  },
+}

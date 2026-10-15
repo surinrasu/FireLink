@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "organizations": [
+    {
+      "id": "org-demo",
+      "name": "青禾志愿服务中心",
+      "verified": true,
+      "contacts": [
+        {
+          "type": "phone",
+          "label": "服务电话",
+          "value": "01000000000"
+        },
+        {
+          "type": "wechat",
+          "label": "微信",
+          "value": "qinghe_support"
+        },
+        {
+          "type": "email",
+          "label": "电子邮箱",
+          "value": "coordination@example.com"
+        }
+      ]
+    }
+  ],
+  "incidents": [
+    {
+      "id": "incident-hangzhou",
+      "title": "杭州西湖区 · 安置协助",
+      "region": "浙江省 杭州市 西湖区",
+      "latitude": 30.2741,
+      "longitude": 120.1551,
+      "status": "active",
+      "updatedAt": "2026-10-15T08:40:00Z"
+    },
+    {
+      "id": "incident-nanjing",
+      "title": "南京鼓楼区 · 社区支援",
+      "region": "江苏省 南京市 鼓楼区",
+      "latitude": 32.0603,
+      "longitude": 118.7969,
+      "status": "active",
+      "updatedAt": "2026-10-14T16:20:00Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-supply",
+      "incidentId": "incident-hangzhou",
+      "organizerId": "org-demo",
+      "title": "安置点物资整理",
+      "summary": "协助清点、分类及登记生活物资，招募 8 名志愿者。",
+      "status": "open",
+      "updatedAt": "2026-10-15T08:40:00Z",
+      "requiredFields": [
+        "realName",
+        "region"
+      ],
+      "contactFields": [
+        "phone"
+      ],
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "一起做好安置点的后勤支持"
+        },
+        {
+          "type": "paragraph",
+          "text": "工作范围为安置点物资分类和登记，具体时间及安排在报名通过后由组织者联系确认。"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "事项",
+              "说明"
+            ],
+            [
+              "工作地点",
+              "杭州 · 西湖区"
+            ],
+            [
+              "预计时长",
+              "半天"
+            ],
+            [
+              "装备建议",
+              "舒适衣物、饮水"
+            ]
+          ]
+        },
+        {
+          "type": "map",
+          "text": "集合区域",
+          "latitude": 30.2741,
+          "longitude": 120.1551
+        },
+        {
+          "type": "paragraph",
+          "text": "请根据自身情况报名。申请通过后，将按你的授权开放联系方式。"
+        }
+      ]
+    },
+    {
+      "id": "task-transport",
+      "incidentId": "incident-hangzhou",
+      "organizerId": "org-demo",
+      "title": "物资运输协助",
+      "summary": "招募持有有效驾驶资质、可提供车辆的志愿者。",
+      "status": "open",
+      "updatedAt": "2026-10-15T07:30:00Z",
+      "requiredFields": [
+        "realName",
+        "equipment",
+        "skills"
+      ],
+      "contactFields": [
+        "phone"
+      ],
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "把物资送到需要的地方"
+        },
+        {
+          "type": "paragraph",
+          "text": "协助日用品运输。报名时请提供装备情况和驾驶资质证明，路线及安排由组织者与你直接确认。"
+        }
+      ]
+    },
+    {
+      "id": "task-support",
+      "incidentId": "incident-nanjing",
+      "organizerId": "org-demo",
+      "title": "临时服务点信息登记",
+      "summary": "协助登记物资需求，为到访居民提供信息指引。",
+      "status": "open",
+      "updatedAt": "2026-10-14T16:20:00Z",
+      "requiredFields": [
+        "realName"
+      ],
+      "contactFields": [
+        "phone",
+        "wechat"
+      ],
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "耐心倾听，准确记录"
+        },
+        {
+          "type": "paragraph",
+          "text": "协助服务点做好信息登记，具备沟通和基本电子表格使用能力即可报名。"
+        }
+      ]
+    }
+  ],
+  "articles": [
+    {
+      "id": "article-start",
+      "title": "第一次参加志愿服务，从这里开始",
+      "summary": "完善档案、读懂任务，再做出适合自己的选择。",
+      "category": "入门指南",
+      "minutes": 3,
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "先了解，再报名"
+        },
+        {
+          "type": "paragraph",
+          "text": "阅读任务说明，确认工作内容、地点、时间和所需能力。FireLink 帮助你与发布者建立联系，具体安排由双方沟通确认。"
+        },
+        {
+          "type": "heading",
+          "text": "准备好你的资料"
+        },
+        {
+          "type": "paragraph",
+          "text": "在个人信息中填写常活动的区域、装备和技能证明。报名时逐项选择愿意提供的资料，留意哪些联系方式会在通过后自动开放。"
+        }
+      ]
+    },
+    {
+      "id": "article-privacy",
+      "title": "报名时，我的信息会提供给谁？",
+      "summary": "了解资料选择、审核结果与联系方式的开放时机。",
+      "category": "使用指南",
+      "minutes": 2,
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "你选择的报名资料只供对应任务的组织者审核。联系方式在报名时单独授权，审核通过后自动开放。未通过或撤回的申请不会开放联系方式。"
+        },
+        {
+          "type": "paragraph",
+          "text": "个人档案的修改不会自动替换已经提交的申请资料。可以在报名记录中查看提交时的内容和回应。"
+        }
+      ]
+    }
+  ]
+}

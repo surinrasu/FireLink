@@ -1,0 +1,229 @@
+[
+  {
+    "id": "incident-hangzhou",
+    "title": "杭州西湖区 · 安置协助",
+    "region": "浙江省 杭州市 西湖区",
+    "latitude": 30.2741,
+    "longitude": 120.1551,
+    "status": "active",
+    "updatedAt": "2026-10-15T08:40:00Z",
+    "tasks": [
+      {
+        "id": "task-supply",
+        "incidentId": "incident-hangzhou",
+        "organizerId": "org-demo",
+        "title": "安置点物资整理",
+        "summary": "协助清点、分类及登记生活物资，招募 8 名志愿者。",
+        "status": "open",
+        "updatedAt": "2026-10-15T08:40:00Z",
+        "requiredFields": [
+          "realName",
+          "region"
+        ],
+        "contactFields": [
+          "phone"
+        ],
+        "blocks": [
+          {
+            "type": "heading",
+            "text": "一起做好安置点的后勤支持"
+          },
+          {
+            "type": "paragraph",
+            "text": "工作范围为安置点物资分类和登记，具体时间及安排在报名通过后由组织者联系确认。"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "事项",
+                "说明"
+              ],
+              [
+                "工作地点",
+                "杭州 · 西湖区"
+              ],
+              [
+                "预计时长",
+                "半天"
+              ],
+              [
+                "装备建议",
+                "舒适衣物、饮水"
+              ]
+            ]
+          },
+          {
+            "type": "map",
+            "text": "集合区域",
+            "latitude": 30.2741,
+            "longitude": 120.1551
+          },
+          {
+            "type": "paragraph",
+            "text": "请根据自身情况报名。申请通过后，将按你的授权开放联系方式。"
+          }
+        ]
+      },
+      {
+        "id": "task-transport",
+        "incidentId": "incident-hangzhou",
+        "organizerId": "org-demo",
+        "title": "物资运输协助",
+        "summary": "招募持有有效驾驶资质、可提供车辆的志愿者。",
+        "status": "open",
+        "updatedAt": "2026-10-15T07:30:00Z",
+        "requiredFields": [
+          "realName",
+          "equipment",
+          "skills"
+        ],
+        "contactFields": [
+          "phone"
+        ],
+        "blocks": [
+          {
+            "type": "heading",
+            "text": "把物资送到需要的地方"
+          },
+          {
+            "type": "paragraph",
+            "text": "协助日用品运输。报名时请提供装备情况和驾驶资质证明，路线及安排由组织者与你直接确认。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "incident-nanjing",
+    "title": "南京鼓楼区 · 社区支援",
+    "region": "江苏省 南京市 鼓楼区",
+    "latitude": 32.0603,
+    "longitude": 118.7969,
+    "status": "active",
+    "updatedAt": "2026-10-14T16:20:00Z",
+    "tasks": [
+      {
+        "id": "task-support",
+        "incidentId": "incident-nanjing",
+        "organizerId": "org-demo",
+        "title": "临时服务点信息登记",
+        "summary": "协助登记物资需求，为到访居民提供信息指引。",
+        "status": "open",
+        "updatedAt": "2026-10-14T16:20:00Z",
+        "requiredFields": [
+          "realName"
+        ],
+        "contactFields": [
+          "phone",
+          "wechat"
+        ],
+        "blocks": [
+          {
+            "type": "heading",
+            "text": "耐心倾听，准确记录"
+          },
+          {
+            "type": "paragraph",
+            "text": "协助服务点做好信息登记，具备沟通和基本电子表格使用能力即可报名。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "incident-closed",
+    "title": "杭州西湖区 · 安置协助",
+    "region": "浙江省 杭州市 西湖区",
+    "latitude": 30.2741,
+    "longitude": 120.1551,
+    "status": "active",
+    "updatedAt": "2026-10-15T08:40:00Z",
+    "tasks": [
+      {
+        "id": "task-supply",
+        "incidentId": "incident-hangzhou",
+        "organizerId": "org-demo",
+        "title": "安置点物资整理",
+        "summary": "协助清点、分类及登记生活物资，招募 8 名志愿者。",
+        "status": "closed",
+        "updatedAt": "2026-10-15T08:40:00Z",
+        "requiredFields": [
+          "realName",
+          "region"
+        ],
+        "contactFields": [
+          "phone"
+        ],
+        "blocks": [
+          {
+            "type": "heading",
+            "text": "一起做好安置点的后勤支持"
+          },
+          {
+            "type": "paragraph",
+            "text": "工作范围为安置点物资分类和登记，具体时间及安排在报名通过后由组织者联系确认。"
+          },
+          {
+            "type": "table",
+            "rows": [
+              [
+                "事项",
+                "说明"
+              ],
+              [
+                "工作地点",
+                "杭州 · 西湖区"
+              ],
+              [
+                "预计时长",
+                "半天"
+              ],
+              [
+                "装备建议",
+                "舒适衣物、饮水"
+              ]
+            ]
+          },
+          {
+            "type": "map",
+            "text": "集合区域",
+            "latitude": 30.2741,
+            "longitude": 120.1551
+          },
+          {
+            "type": "paragraph",
+            "text": "请根据自身情况报名。申请通过后，将按你的授权开放联系方式。"
+          }
+        ]
+      },
+      {
+        "id": "task-transport",
+        "incidentId": "incident-hangzhou",
+        "organizerId": "org-demo",
+        "title": "物资运输协助",
+        "summary": "招募持有有效驾驶资质、可提供车辆的志愿者。",
+        "status": "closed",
+        "updatedAt": "2026-10-15T07:30:00Z",
+        "requiredFields": [
+          "realName",
+          "equipment",
+          "skills"
+        ],
+        "contactFields": [
+          "phone"
+        ],
+        "blocks": [
+          {
+            "type": "heading",
+            "text": "把物资送到需要的地方"
+          },
+          {
+            "type": "paragraph",
+            "text": "协助日用品运输。报名时请提供装备情况和驾驶资质证明，路线及安排由组织者与你直接确认。"
+          }
+        ]
+      }
+    ]
+  }
+]

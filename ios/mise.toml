@@ -1,0 +1,21 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+[tools]
+xcodegen = "2.45.3"
+
+[tasks.generate]
+run = "xcodegen generate"
+[tasks.build]
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLink -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build"
+[tasks.test]
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLink -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath build CODE_SIGNING_ALLOWED=NO test"
+[tasks.doctor]
+run = "xcodebuild -version"
+
+[tasks."test:ui"]
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkUI -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath build CODE_SIGNING_ALLOWED=NO test"
+
+[tasks.format]
+run = "xcrun swift-format format -i -r FireLink FireLinkTests FireLinkUITests"

@@ -1,0 +1,13 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+[tools]
+java = "temurin-17.0.18+8"
+gradle = "8.11.1"
+
+[tasks.build]
+run = "gradle :app:assembleDebug"
+[tasks.test]
+run = "gradle :app:testDebugUnitTest :app:lintDebug"
+[tasks.install]
+run = "gradle :app:installDebug"
+[tasks.doctor]
+run = "java -version"

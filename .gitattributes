@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+# Store normalized LF in Git, but keep Windows launchers as CRLF on checkout.
+*.bat text eol=crlf

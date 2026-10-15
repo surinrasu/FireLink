@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="FireLink 应用演示：发现任务、授权报名、连接善意。"
+    />
+    <title>FireLink</title>
+    <link rel="icon" href="/firelink.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/vendor/beer.min.css" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/vendor/beer.min.js"></script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body class="light">
+    <div class="presentation">
+      <main class="stage" aria-label="应用演示">
+        <section class="story" aria-live="polite" aria-atomic="true">
+          <a class="brand" href="#welcome" aria-label="FireLink 演示首页"
+            >FireLink</a
+          >
+          <h1 id="headline">让每一份善意，<br /><em>都有去处。</em></h1>
+          <p id="description" class="description">
+            FireLink，让志愿者与需要帮助的地方相遇。
+          </p>
+          <ul id="points" class="points"></ul>
+        </section>
+        <section class="demo-stage" aria-label="真实 Android 应用画面">
+          <div class="phone-wrap">
+            <div class="phone">
+              <picture id="screen-preview" aria-hidden="true">
+                <source
+                  id="preview-dark"
+                  media="(prefers-color-scheme: dark)"
+                  srcset="/screenshots/welcome-dark.png"
+                />
+                <img
+                  id="preview-light"
+                  src="/screenshots/welcome-light.png"
+                  alt=""
+                  draggable="false"
+                />
+              </picture>
+              <img
+                id="screen"
+                hidden
+                alt="FireLink Android 应用实时画面，可点击和滑动"
+                draggable="false"
+                tabindex="0"
+                aria-label="实时应用画面，可点击或滑动；方向键用于翻页"
+              />
+              <div id="screen-cover" class="screen-cover" role="status">
+                <div class="loading-status">
+                  <progress class="circle"></progress>
+                  <strong id="screen-message">准备演示场景</strong>
+                  <small id="screen-detail" hidden></small>
+                  <button id="retry" class="border round" hidden>
+                    <i aria-hidden="true">refresh</i><span>重新连接</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="device-controls">
+            <button id="back" class="small transparent round" title="应用返回">
+              <i aria-hidden="true">arrow_back</i><span>返回</span>
+            </button>
+            <button
+              id="reset"
+              class="small transparent round"
+              title="恢复本页初始状态 · R"
+            >
+              <i aria-hidden="true">restart_alt</i><span>重置本页</span>
+            </button>
+          </div>
+          <p id="connection" class="connection" aria-live="polite"></p>
+        </section>
+      </main>
+      <footer class="deck-footer">
+        <div class="paging">
+          <button id="previous" class="circle border" aria-label="上一页">
+            <i aria-hidden="true">arrow_back</i
+            ><span id="previous-label" hidden>上一页</span></button
+          ><button id="next" class="round">
+            <span>下一页</span><i aria-hidden="true">arrow_forward</i>
+          </button>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
