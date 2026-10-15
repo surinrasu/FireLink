@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["./worker-configuration.d.ts", "bun"],
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["test/**/*.ts", "scripts/**/*.ts", "worker-configuration.d.ts"]
+}

@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  javascript:
+    name: Backend and presentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check whitespace in the entire tracked tree
+        run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.3.13
+          working_directory: server
+          install: false
+      - name: Install toolchain and locked dependencies
+        run: |
+          mise -C server install
+          mise -C server run install
+          mise -C server exec -- npm --prefix ../presentation ci
+      - name: Check backend
+        run: mise run check:server
+      - name: Check presentation
+        run: mise run check:presentation
+
+  android:
+    name: Android tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.3.13
+          working_directory: android
+          install: false
+      - name: Install toolchain
+        run: mise -C android install
+      - name: Install Android SDK components
+        # The runner provides the SDK, but sdkmanager may not be on PATH.
+        run: mise -C android exec -- "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - name: Check Android
+        run: mise run check:android
+
+  ios:
+    name: iOS build and tests
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: 2026.3.13
+          working_directory: ios
+          install: false
+      - name: Install toolchain
+        run: mise -C ios install
+      - name: Check iOS
+        run: mise run check:ios

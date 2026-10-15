@@ -1,0 +1,1771 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FireLink Volunteer API",
+    "version": "0.1.0",
+    "description": "中国大陆志愿者客户端；当前短信和实名为模拟服务。所有日期按 UTC ISO 8601 传输，地图坐标为 WGS84。"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8787",
+      "description": "本地开发"
+    }
+  ],
+  "paths": {
+    "/v1/config": {
+      "get": {
+        "summary": "服务能力与模拟标记",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mockAuth": {
+                      "type": "boolean"
+                    },
+                    "passkeys": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string"
+                    },
+                    "consentVersion": {
+                      "type": "integer"
+                    },
+                    "mockIdentity": {
+                      "type": "object",
+                      "description": "仅本地/测试开启 mockAuth 时提供，客户端通过本地通知送达",
+                      "properties": {
+                        "realName": {
+                          "type": "string"
+                        },
+                        "idNumber": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "realName",
+                        "idNumber"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mockAuth",
+                    "passkeys",
+                    "region",
+                    "consentVersion"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/sms": {
+      "post": {
+        "summary": "发送模拟短信验证码",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challengeId": {
+                      "type": "string"
+                    },
+                    "mockCode": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "challengeId",
+                    "mockCode",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "phone"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "summary": "验证验证码；新用户返回注册凭证",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Session"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "registrationToken": {
+                          "type": "string"
+                        },
+                        "needsRegistration": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "registrationToken",
+                        "needsRegistration"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "challengeId",
+                  "code"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/register": {
+      "post": {
+        "summary": "确认注册并使用模拟实名",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "registrationToken": {
+                    "type": "string"
+                  },
+                  "consent": {
+                    "const": true
+                  },
+                  "realName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idNumber": {
+                    "type": "string",
+                    "pattern": "^[0-9]{17}[0-9Xx]$",
+                    "description": "本地仅接受 config.mockIdentity 中的虚构资料；不存储身份证号"
+                  }
+                },
+                "required": [
+                  "registrationToken",
+                  "consent",
+                  "realName",
+                  "idNumber"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/incidents": {
+      "get": {
+        "summary": "按最近更新时间倒序列出火情及任务",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tasks/{id}": {
+      "get": {
+        "summary": "任务详情及发布者身份",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/articles": {
+      "get": {
+        "summary": "教程及内容块",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Article"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "summary": "读取本人档案",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "更新可编辑的完整档案字段",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/reverify": {
+      "post": {
+        "summary": "重新模拟实名认证",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "realName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idNumber": {
+                    "type": "string",
+                    "pattern": "^[0-9]{17}[0-9Xx]$",
+                    "description": "本地仅接受 config.mockIdentity 中的虚构资料；不存储身份证号"
+                  }
+                },
+                "required": [
+                  "realName",
+                  "idNumber"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/logout": {
+      "post": {
+        "summary": "撤销当前会话",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/credentials": {
+      "get": {
+        "summary": "本人证明文件列表",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Credential"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "上传私有技能证明（最大 8 MiB）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Certificate-Title",
+            "in": "header",
+            "required": true,
+            "description": "UTF-8 百分号编码",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-File-Name",
+            "in": "header",
+            "required": true,
+            "description": "UTF-8 百分号编码",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/credentials/{id}/file": {
+      "get": {
+        "summary": "仅本人可读取资质附件",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/applications": {
+      "get": {
+        "summary": "本人报名记录与回应",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Application"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "按选定字段和联系方式授权报名",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "const": "pending"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "taskId": {
+                    "type": "string"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "username",
+                        "pronouns",
+                        "realName",
+                        "age",
+                        "gender",
+                        "region",
+                        "body",
+                        "equipment",
+                        "skills"
+                      ]
+                    }
+                  },
+                  "contactFields": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        "phone",
+                        "wechat",
+                        "email"
+                      ]
+                    }
+                  },
+                  "consentVersion": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "taskId",
+                  "fields",
+                  "contactFields",
+                  "consentVersion"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/applications/{id}/withdraw": {
+      "post": {
+        "summary": "撤回本人的待审核申请",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/notifications": {
+      "get": {
+        "summary": "本人的结果通知",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notice"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/{id}/read": {
+      "post": {
+        "summary": "标记本人通知已读",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/auth/passkeys/options": {
+      "post": {
+        "summary": "生成通行密钥挑战（需配置域名）",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challengeId": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "challengeId",
+                    "options"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/passkeys/verify": {
+      "post": {
+        "summary": "验证 WebAuthn 响应",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  },
+                  "response": {
+                    "type": "object",
+                    "description": "标准 WebAuthn RegistrationResponseJSON / AuthenticationResponseJSON"
+                  }
+                },
+                "required": [
+                  "challengeId",
+                  "response"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys/options": {
+      "post": {
+        "summary": "生成通行密钥挑战（需配置域名）",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challengeId": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "challengeId",
+                    "options"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys/verify": {
+      "post": {
+        "summary": "验证 WebAuthn 响应",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challengeId": {
+                    "type": "string"
+                  },
+                  "response": {
+                    "type": "object",
+                    "description": "标准 WebAuthn RegistrationResponseJSON / AuthenticationResponseJSON"
+                  }
+                },
+                "required": [
+                  "challengeId",
+                  "response"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys": {
+      "get": {
+        "summary": "列出本人通行密钥",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys/{id}": {
+      "delete": {
+        "summary": "删除本人通行密钥",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OK"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "请求失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "OK": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "Contacts": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "pattern": "^1[3-9][0-9]{9}$"
+          },
+          "wechat": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone",
+          "wechat",
+          "email"
+        ]
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "pronouns": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vehicle",
+                "firstAid",
+                "tools",
+                "protective"
+              ]
+            }
+          },
+          "contacts": {
+            "$ref": "#/components/schemas/Contacts"
+          }
+        },
+        "required": [
+          "username",
+          "pronouns",
+          "region",
+          "body",
+          "equipment",
+          "contacts"
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "realName": {
+            "type": "string"
+          },
+          "birthDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          },
+          "pronouns": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "vehicle",
+                "firstAid",
+                "tools",
+                "protective"
+              ]
+            }
+          },
+          "contacts": {
+            "$ref": "#/components/schemas/Contacts"
+          }
+        },
+        "required": [
+          "id",
+          "realName",
+          "birthDate",
+          "gender",
+          "verified",
+          "username",
+          "pronouns",
+          "region",
+          "body",
+          "equipment",
+          "contacts"
+        ]
+      },
+      "ContentBlock": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "heading",
+              "paragraph",
+              "image",
+              "video",
+              "map",
+              "table"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "TaskSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "incidentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "incidentId",
+          "title",
+          "summary",
+          "status",
+          "updatedAt"
+        ]
+      },
+      "Organizer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizerContact"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "verified",
+          "contacts"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "incidentId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "organizer": {
+            "$ref": "#/components/schemas/Organizer"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentBlock"
+            }
+          },
+          "requiredFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contactFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "incidentId",
+          "title",
+          "summary",
+          "status",
+          "updatedAt",
+          "organizer",
+          "blocks",
+          "requiredFields",
+          "contactFields"
+        ]
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSummary"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "region",
+          "latitude",
+          "longitude",
+          "status",
+          "updatedAt",
+          "tasks"
+        ]
+      },
+      "Article": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "integer"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentBlock"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "category",
+          "minutes",
+          "blocks"
+        ]
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "taskTitle": {
+            "type": "string"
+          },
+          "organizerName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "profileSnapshot": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "contactFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contactsReleased": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "response": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "taskTitle",
+          "organizerName",
+          "status",
+          "profileSnapshot",
+          "contactFields",
+          "contactsReleased",
+          "createdAt",
+          "updatedAt",
+          "response"
+        ]
+      },
+      "Credential": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploaded",
+              "verified"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "filename",
+          "status",
+          "createdAt"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          }
+        },
+        "required": [
+          "token",
+          "profile"
+        ]
+      },
+      "Notice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "readAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "applicationId",
+          "createdAt",
+          "readAt"
+        ]
+      },
+      "OrganizerContact": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "phone",
+              "wechat",
+              "email"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "label",
+          "value"
+        ]
+      }
+    }
+  }
+}

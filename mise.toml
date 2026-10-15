@@ -1,0 +1,46 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+
+[settings]
+lockfile = true
+
+[tasks."server:dev"]
+run = "mise -C server run dev"
+
+[tasks."server:test"]
+run = "mise -C server run test"
+
+[tasks."android:build"]
+run = "mise -C android run build"
+
+[tasks."ios:build"]
+run = "mise -C ios run build"
+
+[tasks.demo]
+description = "启动中文演示幻灯片、本地后端和专用 AVD"
+dir = "presentation"
+run = "node start.ts"
+raw = true
+
+[tasks.check]
+description = "检查后端、演示程序和移动端（完整检查需要 macOS、Xcode 和 Android SDK）"
+depends = ["check:whitespace", "check:server", "check:presentation", "check:android", "check:ios"]
+
+[tasks."check:whitespace"]
+description = "检查工作区及暂存区的空白错误"
+run = ["git diff --check", "git diff --cached --check"]
+
+[tasks."check:server"]
+description = "后端生成类型、TypeScript、格式和 API 测试"
+run = ["mise -C server run check", "mise -C server run test"]
+
+[tasks."check:presentation"]
+description = "演示程序类型检查和测试，复用后端固定的 Node.js 版本"
+run = ["mise -C server exec -- npm --prefix ../presentation run check", "mise -C server exec -- npm --prefix ../presentation test"]
+
+[tasks."check:android"]
+description = "Android 单元测试和 lint"
+run = "mise -C android run test"
+
+[tasks."check:ios"]
+description = "iOS 模拟器构建和单元测试"
+run = ["mise -C ios run build", "mise -C ios run test"]
