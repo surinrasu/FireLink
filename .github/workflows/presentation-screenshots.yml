@@ -21,6 +21,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Free disk space for Android emulator
+        # This job does not use the runner's preinstalled .NET, Haskell or Swift.
+        # Android 35's userdata image alone needs more than 7 GiB of free space.
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          sudo rm -rf -- /usr/share/dotnet /usr/local/.ghcup /usr/share/swift
+          df -h "$GITHUB_WORKSPACE"
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           version: 2026.3.13
@@ -45,10 +52,20 @@ jobs:
             "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" \
             "system-images;android-35;google_apis;x86_64"
       - name: Capture every scene in both themes
-        run: mise -C server exec -- npm --prefix ../presentation run screenshots:update
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          # Leave room for the Gradle build as well as the emulator's userdata.
+          available_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR == 2 {print $4}')
+          if (( available_kib < 12 * 1024 * 1024 )); then
+            echo "::error::At least 12 GiB of free disk space is required for the Android build and emulator."
+            exit 1
+          fi
+          mise -C server exec -- npm --prefix ../presentation run screenshots:update
       - name: Show emulator diagnostics on failure
         if: failure()
-        run: tail -n 100 presentation/.artifacts/emulator.log || true
+        run: |
+          df -h "$GITHUB_WORKSPACE"
+          tail -n 100 presentation/.artifacts/emulator.log || true
       - name: Commit updated screenshots
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
