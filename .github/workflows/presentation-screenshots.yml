@@ -30,6 +30,8 @@ jobs:
         run: |
           mise -C server install
           mise -C android install
+          # Presentation imports backend domain schemas and their dependencies.
+          mise -C server run install
           mise -C server exec -- npm --prefix ../presentation ci
       - name: Enable Android hardware acceleration
         # https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/
