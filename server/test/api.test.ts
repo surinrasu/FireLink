@@ -158,6 +158,85 @@ test("SMS challenges and registration grants are single use", async () => {
   assert.equal((await call("/v1/auth/register", register)).status, 201);
   assert.equal((await call("/v1/auth/register", register)).status, 400);
 });
+test("profile validation identifies every invalid field and preserves saved data", async () => {
+  const user = await account("13900000088");
+  const missing = await call(
+    "/v1/applications",
+    {
+      taskId: "task-supply",
+      fields: ["realName", "region"],
+      contactFields: ["phone", "email"],
+      consentVersion: 1,
+    },
+    user.token,
+    "POST",
+    "zh-Hans",
+  );
+  assert.equal(missing.status, 400);
+  assert.ok(missing.data.error.includes("活动区域"), missing.data.error);
+  assert.ok(missing.data.error.includes("电子邮箱"), missing.data.error);
+  const invalid = await call(
+    "/v1/me",
+    {
+      ...user.profile,
+      username: " ",
+      pronouns: "字".repeat(21),
+      contacts: {
+        phone: "123",
+        wechat: "x".repeat(61),
+        email: "invalid-email",
+      },
+    },
+    user.token,
+    "PATCH",
+    "zh-Hans",
+  );
+  assert.equal(invalid.status, 400);
+  for (const message of [
+    "用户名需为 1–30 个字符",
+    "称呼代词不能超过 20 个字符",
+    "联系电话须为有效的中国大陆手机号",
+    "微信号不能超过 60 个字符",
+    "电子邮箱格式不正确，请填写有效邮箱或留空",
+  ])
+    assert.ok(invalid.data.error.includes(message), invalid.data.error);
+  assert.equal(invalid.data.error.split("\n").length, 5);
+  const unchanged = await call<Profile>("/v1/me", null, user.token);
+  assert.deepEqual(unchanged.data, user.profile);
+
+  const valid = await call<Profile>(
+    "/v1/me",
+    {
+      ...user.profile,
+      username: "字".repeat(30),
+      pronouns: "字".repeat(20),
+      region: "浙江省 杭州市 西湖区",
+      contacts: {
+        phone: "+86 139-0000-0088",
+        wechat: "x".repeat(60),
+        email: "",
+      },
+    },
+    user.token,
+    "PATCH",
+  );
+  assert.equal(valid.status, 200);
+  assert.equal(valid.data.region, "浙江省 杭州市 西湖区");
+  assert.equal(valid.data.contacts.phone, "13900000088");
+
+  for (const language of ["en", "zh-Hant", "zh-Hant-HK"]) {
+    const result = await call(
+      "/v1/me",
+      { ...valid.data, username: "x".repeat(31) },
+      user.token,
+      "PATCH",
+      language,
+    );
+    assert.equal(result.status, 400);
+    assert.ok(result.data.error.includes("30"));
+    assert.ok(!result.data.error.includes("invalid_username"));
+  }
+});
 test("authorization snapshots, organization isolation and result notification", async () => {
   const user = await account("13800000002");
   const other = await account("13800000003");
@@ -255,6 +334,154 @@ test("authorization snapshots, organization isolation and result notification", 
   );
   assert.equal(records.data[0].contactsReleased, true);
 });
+test("vehicle counts and free-form equipment persist and are shared independently", async () => {
+  const user = await account("13900000089");
+  const base = {
+    ...user.profile,
+    region: "浙江省 杭州市 西湖区",
+    contacts: { ...user.profile.contacts, wechat: "vehicle-test" },
+  };
+  for (const [key, label] of [
+    ["motorcycle", "摩托车"],
+    ["cargoTricycle", "三轮货车"],
+    ["sedan", "轿车"],
+    ["offRoad", "越野车"],
+    ["cargoVan", "厢式货车"],
+  ]) {
+    for (const count of [-1, 0.5, 1000, "1"]) {
+      const invalid = await call(
+        "/v1/me",
+        { ...base, vehicles: { [key]: count } },
+        user.token,
+        "PATCH",
+        "zh-Hans",
+      );
+      assert.equal(invalid.status, 400);
+      assert.ok(invalid.data.error.includes(label), invalid.data.error);
+    }
+  }
+  const unknown = await call(
+    "/v1/me",
+    { ...base, vehicles: { unknown: 1 } },
+    user.token,
+    "PATCH",
+    "zh-Hans",
+  );
+  assert.equal(unknown.status, 400);
+  assert.ok(unknown.data.error.includes("载具"));
+  const description =
+    "自由填写：帐篷、对讲机、手套 🧤\n数量、用途都可自己写。" +
+    "装备".repeat(200);
+  const vehicles = {
+    motorcycle: 2,
+    cargoTricycle: 1,
+    sedan: 0,
+    offRoad: 1,
+    cargoVan: 3,
+  };
+  const saved = await call<Profile>(
+    "/v1/me",
+    { ...base, equipmentDescription: description, vehicles },
+    user.token,
+    "PATCH",
+  );
+  assert.equal(saved.status, 200);
+  const loaded = await call<Profile>("/v1/me", null, user.token);
+  assert.equal(loaded.data.equipmentDescription, description);
+  assert.deepEqual(loaded.data.vehicles, vehicles);
+
+  const vehicleApplication = await call<CreatedApplication>(
+    "/v1/applications",
+    {
+      taskId: "task-supply",
+      fields: ["realName", "region", "vehicles"],
+      contactFields: ["phone"],
+      consentVersion: 1,
+    },
+    user.token,
+  );
+  assert.equal(vehicleApplication.status, 201);
+  const vehicleSnapshot = (
+    await requiredApplication(vehicleApplication.data.id)
+  ).profile;
+  assert.deepEqual(vehicleSnapshot.vehicles, vehicles);
+  assert.ok(!Object.hasOwn(vehicleSnapshot, "equipment"));
+  assert.ok(!Object.hasOwn(vehicleSnapshot, "equipmentDetails"));
+
+  const equipmentApplication = await call<CreatedApplication>(
+    "/v1/applications",
+    {
+      taskId: "task-support",
+      fields: ["realName", "equipment"],
+      contactFields: ["phone", "wechat"],
+      consentVersion: 1,
+    },
+    user.token,
+  );
+  assert.equal(equipmentApplication.status, 201);
+  const equipmentSnapshot = (
+    await requiredApplication(equipmentApplication.data.id)
+  ).profile;
+  assert.equal(equipmentSnapshot.equipment, description);
+  assert.ok(!Object.hasOwn(equipmentSnapshot, "vehicles"));
+
+  const cleared = await call<Profile>(
+    "/v1/me",
+    { ...base, equipmentDescription: "", vehicles: { motorcycle: 0 } },
+    user.token,
+    "PATCH",
+  );
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.data.equipmentDescription, "");
+  const transport = await call(
+    "/v1/applications",
+    {
+      taskId: "task-transport",
+      fields: ["realName", "vehicles", "skills"],
+      contactFields: ["phone"],
+      consentVersion: 1,
+    },
+    user.token,
+    "POST",
+    "zh-Hans",
+  );
+  assert.equal(transport.status, 400);
+  assert.ok(transport.data.error.includes("载具"), transport.data.error);
+  assert.deepEqual(
+    (await requiredApplication(vehicleApplication.data.id)).profile.vehicles,
+    vehicles,
+  );
+});
+
+test("legacy equipment descriptions migrate once and never override deliberately cleared text", async () => {
+  const user = await account("13900000090");
+  const { equipmentDescription: _, vehicles: __, ...legacy } = user.profile;
+  const input = {
+    ...legacy,
+    equipment: ["vehicle", "firstAid"],
+    equipmentDetails: {
+      vehiclePassengers: "4 人",
+      vehicleCargo: "500 升",
+      firstAid: "急救包 1 套",
+    },
+  };
+  const migrated = await call<Profile>("/v1/me", input, user.token, "PATCH");
+  assert.equal(migrated.status, 200);
+  for (const text of ["4 人", "500 升", "急救包 1 套"])
+    assert.ok(migrated.data.equipmentDescription.includes(text));
+  assert.deepEqual(migrated.data.vehicles, {});
+  assert.deepEqual(migrated.data.equipment, []);
+  assert.deepEqual(migrated.data.equipmentDetails, {});
+  const cleared = await call<Profile>(
+    "/v1/me",
+    { ...input, equipmentDescription: "" },
+    user.token,
+    "PATCH",
+  );
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.data.equipmentDescription, "");
+});
+
 test("withdrawn and rejected applications never expose contacts", async () => {
   for (const [phone, status] of [
     ["13800000004", "withdrawn"],

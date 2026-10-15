@@ -77,7 +77,20 @@ struct Profile: Codable {
   var region: String
   var body: String
   var equipment: [String]
+  var equipmentDetails: [String: String]?
+  var equipmentDescription: String?
+  var vehicles: [String: Int]?
   var contacts: Contacts
+  var equipmentText: String {
+    if let equipmentDescription { return equipmentDescription }
+    return equipment.map { key in
+      let fields = key == "vehicle" ? ["vehiclePassengers", "vehicleCargo"] : [key]
+      let text = fields.compactMap { equipmentDetails?[$0] }.filter { !$0.isEmpty }.joined(
+        separator: "；")
+      let label = legacyEquipmentLabels[key] ?? key
+      return text.isEmpty ? label : "\(label)：\(text)"
+    }.joined(separator: "\n")
+  }
   var age: Int {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
@@ -150,16 +163,22 @@ var fieldLabels: [String: String] {
     "username": L10n.text("username"), "pronouns": L10n.text("pronouns"),
     "realName": L10n.text("real_name"), "age": L10n.text("age"), "gender": L10n.text("gender"),
     "region": L10n.text("region"), "body": L10n.text("physical_information"),
-    "equipment": L10n.text("equipment"), "skills": L10n.text("skills"), "phone": L10n.text("phone"),
+    "equipment": L10n.text("equipment"), "vehicles": L10n.text("vehicles"),
+    "skills": L10n.text("skills"), "phone": L10n.text("phone"),
     "wechat": L10n.text("wechat"), "email": L10n.text("email"),
   ]
 }
-var equipmentLabels: [String: String] {
+private var legacyEquipmentLabels: [String: String] {
   [
     "vehicle": L10n.text("vehicle"), "firstAid": L10n.text("first_aid"),
-    "tools": L10n.text("tools"), "protective": L10n.text("protective_equipment"),
+    "protective": L10n.text("protective_equipment"), "tools": L10n.text("tools"),
   ]
 }
+
+let vehicleTypes = [
+  ("motorcycle", "vehicle_motorcycle"), ("cargoTricycle", "vehicle_cargo_tricycle"),
+  ("sedan", "vehicle_sedan"), ("offRoad", "vehicle_off_road"), ("cargoVan", "vehicle_cargo_van"),
+]
 
 enum IncidentSort: String, CaseIterable, Identifiable {
   case updated = "sort_updated"

@@ -147,7 +147,6 @@
 "identity_verification" = "Identity verification";
 "verifying_identity" = "Verifying…";
 "confirm_verification" = "Confirm verification";
-"equipment_save_hint" = "Return to personal information and tap Save.";
 "certificate_name" = "Certificate name, e.g. driver’s license";
 "uploading" = "Uploading…";
 "choose_upload" = "Choose and upload a document";
@@ -174,3 +173,18 @@
 "gender_male" = "Male";
 "gender_female" = "Female";
 "list_separator" = ", ";
+"region_province" = "Province / municipality";
+"region_city" = "City";
+"region_district" = "District / county";
+"region_any" = "Any (optional)";
+"region_existing" = "Current region: %1$@. Choose a region above to replace it.";
+"region_clear" = "Clear region";
+"vehicles" = "Vehicles";
+"vehicle_motorcycle" = "Motorcycle";
+"vehicle_cargo_tricycle" = "Cargo tricycle";
+"vehicle_sedan" = "Sedan";
+"vehicle_off_road" = "Off-road vehicle";
+"vehicle_cargo_van" = "Cargo van";
+"vehicle_decrease" = "Decrease %1$@ count";
+"vehicle_increase" = "Increase %1$@ count";
+"equipment_text_hint" = "Describe any tools, equipment, or supplies you can provide.";

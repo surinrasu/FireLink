@@ -20,7 +20,10 @@ targets:
   FireLink:
     type: application
     platform: iOS
-    sources: [FireLink]
+    sources:
+      - FireLink
+      - path: ../shared/regions.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cn.firelink.volunteer

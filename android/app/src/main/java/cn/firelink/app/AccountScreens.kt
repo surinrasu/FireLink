@@ -271,8 +271,16 @@ fun NavigationRow(title: String, description: String, onClick: () -> Unit) {
 @Composable
 fun ProfileScreen(model: AppModel, initial: Profile) {
     val strings = localizedResources()
-    var p by remember { mutableStateOf(initial) }
-    var gear by remember { mutableStateOf(false) }
+    var p by remember {
+        mutableStateOf(
+            initial.copy(
+                equipmentDescription =
+                    initial.equipmentText { key ->
+                        legacyEquipmentLabels[key]?.let(strings::getString) ?: key
+                    }
+            )
+        )
+    }
     var verify by remember { mutableStateOf(false) }
     var realName by remember { mutableStateOf("") }
     var idNumber by remember { mutableStateOf("") }
@@ -293,7 +301,7 @@ fun ProfileScreen(model: AppModel, initial: Profile) {
             saved = false
         }
         SectionTitle(strings.getString(R.string.region))
-        EditField(strings.getString(R.string.region_placeholder), p.region) {
+        RegionPicker(p.region) {
             p = p.copy(region = it)
             saved = false
         }
@@ -301,27 +309,54 @@ fun ProfileScreen(model: AppModel, initial: Profile) {
             strings.getString(R.string.region_example_hint),
             style = MaterialTheme.typography.bodySmall,
         )
-        SectionTitle(strings.getString(R.string.optional_physical_information))
+        SectionTitle(strings.getString(R.string.vehicles))
+        vehicleLabels.forEach { (key, label) ->
+            val count = p.vehicles[key] ?: 0
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(strings.getString(label), Modifier.weight(1f))
+                IconButton(
+                    enabled = count > 0,
+                    onClick = {
+                        p = p.copy(vehicles = p.vehicles + (key to (count - 1)))
+                        saved = false
+                    },
+                ) {
+                    Icon(
+                        Icons.Outlined.Remove,
+                        strings.getString(R.string.vehicle_decrease, strings.getString(label)),
+                    )
+                }
+                Text(
+                    count.toString(),
+                    modifier = Modifier.widthIn(min = 30.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                IconButton(
+                    enabled = count < 999,
+                    onClick = {
+                        p = p.copy(vehicles = p.vehicles + (key to (count + 1)))
+                        saved = false
+                    },
+                ) {
+                    Icon(
+                        Icons.Outlined.Add,
+                        strings.getString(R.string.vehicle_increase, strings.getString(label)),
+                    )
+                }
+            }
+        }
+        SectionTitle(strings.getString(R.string.equipment))
         OutlinedTextField(
-            p.body,
-            {
-                p = p.copy(body = it)
+            value = p.equipmentDescription.orEmpty(),
+            onValueChange = {
+                p = p.copy(equipmentDescription = it)
                 saved = false
             },
-            label = { Text(strings.getString(R.string.physical_information_hint)) },
+            placeholder = { Text(strings.getString(R.string.equipment_text_hint)) },
             modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
+            minLines = 4,
+            maxLines = 8,
         )
-        NavigationRow(
-            strings.getString(R.string.equipment),
-            if (p.equipment.isEmpty()) strings.getString(R.string.not_provided)
-            else
-                p.equipment.joinToString(strings.getString(R.string.list_separator)) {
-                    equipmentLabels[it]?.let(strings::getString) ?: it
-                },
-        ) {
-            gear = true
-        }
         SectionTitle(strings.getString(R.string.identity_information))
         InfoRow(strings.getString(R.string.real_name), p.realName)
         InfoRow(strings.getString(R.string.age), strings.getString(R.string.age_years, p.age))
@@ -369,6 +404,7 @@ fun ProfileScreen(model: AppModel, initial: Profile) {
             onClick = {
                 scope.launch {
                     busy = true
+                    saved = false
                     try {
                         model.saveProfile(p)
                         saved = true
@@ -389,33 +425,6 @@ fun ProfileScreen(model: AppModel, initial: Profile) {
         if (saved)
             Text(strings.getString(R.string.saved), color = MaterialTheme.colorScheme.secondary)
     }
-    if (gear)
-        AlertDialog(
-            onDismissRequest = { gear = false },
-            title = { Text(strings.getString(R.string.equipment)) },
-            text = {
-                Column {
-                    equipmentLabels.forEach { (key, label) ->
-                        CheckRow(strings.getString(label), key in p.equipment) { checked ->
-                            p =
-                                p.copy(
-                                    equipment =
-                                        if (checked) (p.equipment + key).distinct()
-                                        else p.equipment - key
-                                )
-                            saved = false
-                        }
-                    }
-                    Text(
-                        strings.getString(R.string.confirm_save_profile),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { gear = false }) { Text(strings.getString(R.string.done)) }
-            },
-        )
     if (verify)
         AlertDialog(
             onDismissRequest = { if (!verifying) verify = false },

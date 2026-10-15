@@ -3,6 +3,24 @@ import XCTest
 @testable import FireLink
 
 final class ModelTests: XCTestCase {
+  func testVehiclesAndEquipmentPreserveLegacyTextAndRoundTrip() throws {
+    let legacy =
+      #"{"id":"test","username":"Test","pronouns":"","realName":"Test","birthDate":"2000-01-01","gender":"","verified":true,"region":"","body":"","equipment":["vehicle"],"contacts":{"phone":"13800000000","wechat":"","email":""}}"#
+    var profile = try JSONDecoder().decode(Profile.self, from: Data(legacy.utf8))
+    XCTAssertNil(profile.equipmentDetails)
+    profile.equipmentDetails = ["vehiclePassengers": "4 人", "vehicleCargo": "500 升"]
+    XCTAssertTrue(profile.equipmentText.contains("4 人"))
+    XCTAssertTrue(profile.equipmentText.contains("500 升"))
+    XCTAssertNil(profile.vehicles)
+    profile.equipmentDescription = "帐篷、手套\n任意内容"
+    profile.vehicles = ["motorcycle": 2, "sedan": 1]
+    let restored = try JSONDecoder().decode(Profile.self, from: JSONEncoder().encode(profile))
+    XCTAssertEqual(restored.equipmentDetails, profile.equipmentDetails)
+    XCTAssertEqual(restored.equipmentText, "帐篷、手套\n任意内容")
+    XCTAssertEqual(restored.vehicles, profile.vehicles)
+    profile.equipmentDescription = ""
+    XCTAssertEqual(profile.equipmentText, "")
+  }
   func testSharedApplicationContractPreservesDisclosureStates() throws {
     let url = try XCTUnwrap(
       Bundle(for: Self.self).url(forResource: "application-results", withExtension: "json"))

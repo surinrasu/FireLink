@@ -126,11 +126,74 @@ final class VolunteerFlowTests: XCTestCase {
     app.navigationBars.buttons.element(boundBy: 0).tap()
     XCTAssertTrue(app.buttons["个人信息"].waitForExistence(timeout: 10))
     app.buttons["个人信息"].tap()
-    let region = app.textFields["省 / 市 / 区县"]
-    XCTAssertTrue(region.waitForExistence(timeout: 5))
-    region.tap()
-    region.typeText("Hangzhou")
+    let province = app.buttons["region_province"]
+    XCTAssertTrue(province.waitForExistence(timeout: 5))
+    XCTAssertFalse(app.textFields["大致身体状况、体力或活动限制"].exists)
+    province.tap()
+    let zhejiang = app.buttons["浙江省"]
+    for _ in 0..<6 {
+      if zhejiang.isHittable { break }
+      app.swipeUp()
+    }
+    zhejiang.tap()
+    app.buttons["region_city"].tap()
+    app.buttons["杭州市"].tap()
+    app.buttons["region_district"].tap()
+    app.buttons["西湖区"].tap()
+    for key in ["motorcycle", "cargoTricycle", "sedan", "offRoad", "cargoVan"] {
+      let plus = app.buttons["vehicle-plus-\(key)"]
+      let minus = app.buttons["vehicle-minus-\(key)"]
+      for _ in 0..<6 {
+        if plus.isHittable { break }
+        app.swipeUp()
+      }
+      XCTAssertFalse(minus.isEnabled)
+      plus.tap()
+      plus.tap()
+      minus.tap()
+      XCTAssertEqual(app.staticTexts["vehicle-count-\(key)"].label, "1")
+    }
+    let equipment = app.descendants(matching: .any).matching(identifier: "equipment-description")
+      .firstMatch
+    for _ in 0..<6 {
+      if equipment.isHittable { break }
+      app.swipeUp()
+    }
+    equipment.tap()
+    equipment.typeText("Jack, gloves, any supplies\nFree-form notes")
+    let profileScreenshot = XCTAttachment(screenshot: app.screenshot())
+    profileScreenshot.name = "profile-region-dropdowns"
+    profileScreenshot.lifetime = .keepAlways
+    add(profileScreenshot)
     app.buttons["保存"].tap()
+    for _ in 0..<5 {
+      if app.staticTexts["已保存"].exists { break }
+      app.swipeUp()
+    }
+    XCTAssertTrue(app.staticTexts["已保存"].waitForExistence(timeout: 5))
+    app.navigationBars.buttons.element(boundBy: 0).tap()
+    app.buttons["个人信息"].tap()
+    for key in ["motorcycle", "cargoTricycle", "sedan", "offRoad", "cargoVan"] {
+      let count = app.staticTexts["vehicle-count-\(key)"]
+      for _ in 0..<6 {
+        if count.exists { break }
+        app.swipeUp()
+      }
+      XCTAssertEqual(count.label, "1")
+    }
+    let restoredEquipment = app.descendants(matching: .any).matching(
+      identifier: "equipment-description"
+    ).firstMatch
+    for _ in 0..<6 {
+      if restoredEquipment.exists { break }
+      app.swipeUp()
+    }
+    XCTAssertEqual(
+      restoredEquipment.value as? String, "Jack, gloves, any supplies\nFree-form notes")
+    let equipmentScreenshot = XCTAttachment(screenshot: app.screenshot())
+    equipmentScreenshot.name = "vehicles-and-equipment"
+    equipmentScreenshot.lifetime = .keepAlways
+    add(equipmentScreenshot)
     app.navigationBars.buttons.element(boundBy: 0).tap()
     app.tabBars.buttons["状况"].tap()
     let incident = app.buttons["incident-incident-hangzhou"]

@@ -351,7 +351,8 @@ struct ApplyView: View {
       Section(L10n.text("profile_shared_now")) {
         ForEach(
           [
-            "username", "pronouns", "realName", "age", "gender", "region", "body", "equipment",
+            "username", "pronouns", "realName", "age", "gender", "region", "body", "vehicles",
+            "equipment",
             "skills",
           ], id: \.self
         ) { field in

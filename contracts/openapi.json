@@ -776,6 +776,7 @@
                         "gender",
                         "region",
                         "body",
+                        "vehicles",
                         "equipment",
                         "skills"
                       ]
@@ -1274,17 +1275,24 @@
           "equipment": {
             "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "vehicle",
-                "firstAid",
-                "tools",
-                "protective"
-              ]
-            }
+              "type": "string"
+            },
+            "deprecated": true,
+            "description": "Legacy category selections; migrated into equipmentDescription on save."
           },
           "contacts": {
             "$ref": "#/components/schemas/Contacts"
+          },
+          "equipmentDetails": {
+            "$ref": "#/components/schemas/EquipmentDetails",
+            "deprecated": true
+          },
+          "equipmentDescription": {
+            "type": "string",
+            "description": "Free-form equipment and supplies description. May be empty."
+          },
+          "vehicles": {
+            "$ref": "#/components/schemas/Vehicles"
           }
         },
         "required": [
@@ -1292,7 +1300,6 @@
           "pronouns",
           "region",
           "body",
-          "equipment",
           "contacts"
         ]
       },
@@ -1330,17 +1337,24 @@
           "equipment": {
             "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "vehicle",
-                "firstAid",
-                "tools",
-                "protective"
-              ]
-            }
+              "type": "string"
+            },
+            "deprecated": true,
+            "description": "Legacy category selections; migrated into equipmentDescription on save."
           },
           "contacts": {
             "$ref": "#/components/schemas/Contacts"
+          },
+          "equipmentDetails": {
+            "$ref": "#/components/schemas/EquipmentDetails",
+            "deprecated": true
+          },
+          "equipmentDescription": {
+            "type": "string",
+            "description": "Free-form equipment and supplies description. May be empty."
+          },
+          "vehicles": {
+            "$ref": "#/components/schemas/Vehicles"
           }
         },
         "required": [
@@ -1353,7 +1367,6 @@
           "pronouns",
           "region",
           "body",
-          "equipment",
           "contacts"
         ]
       },
@@ -1765,6 +1778,45 @@
           "label",
           "value"
         ]
+      },
+      "EquipmentDetails": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "deprecated": true,
+        "description": "Legacy category details; migrated into equipmentDescription on save."
+      },
+      "Vehicles": {
+        "type": "object",
+        "properties": {
+          "motorcycle": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "cargoTricycle": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "sedan": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "offRoad": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "cargoVan": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

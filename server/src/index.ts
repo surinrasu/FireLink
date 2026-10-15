@@ -12,6 +12,7 @@ import {
   matchIdentity,
   phoneSchema,
   profileSchema,
+  equipmentText,
   randomToken,
   timestamp,
   type Profile,
@@ -21,6 +22,7 @@ import {
   resolveLanguage,
   translate,
   errorMessage,
+  fieldError,
   notificationText,
   type Language,
   type MessageKey,
@@ -77,7 +79,15 @@ app.use("*", async (c, next) => {
 app.onError((e, c) => {
   if (e instanceof ZodError)
     return c.json(
-      { error: errorMessage(c.get("language"), e.issues[0]?.message) },
+      {
+        error: [
+          ...new Set(
+            e.issues.map((issue) =>
+              errorMessage(c.get("language"), issue.message),
+            ),
+          ),
+        ].join("\n"),
+      },
       400,
     );
   if (e instanceof HTTPException)
@@ -207,6 +217,9 @@ app.post("/v1/auth/register", async (c) => {
     region: "",
     body: "",
     equipment: [],
+    equipmentDetails: {},
+    equipmentDescription: "",
+    vehicles: {},
     contacts: { phone: row.subject, wechat: "", email: "" },
   };
   const inserted = await c.env.DB.prepare(
@@ -430,15 +443,24 @@ app.post("/v1/applications", async (c) => {
   if (row.status !== "open" || !row.verified) fail(409, "applications_closed");
   const required = asJSON<string[]>(row.required_fields),
     contacts = asJSON<string[]>(row.contact_fields);
-  if (
-    !required.every((f) =>
-      choice.fields.includes(f as (typeof choice.fields)[number]),
-    ) ||
-    !contacts.every((f) =>
-      choice.contactFields.includes(f as (typeof choice.contactFields)[number]),
-    )
-  )
-    fail(400, "missing_consent");
+  const missingConsent = [
+    ...required.filter(
+      (f) => !choice.fields.includes(f as (typeof choice.fields)[number]),
+    ),
+    ...contacts.filter(
+      (f) =>
+        !choice.contactFields.includes(
+          f as (typeof choice.contactFields)[number],
+        ),
+    ),
+  ];
+  if (missingConsent.length)
+    return c.json(
+      {
+        error: fieldError(c.get("language"), "missing_consent", missingConsent),
+      },
+      400,
+    );
   const p = c.get("user");
   const skills = (
     await c.env.DB.prepare(
@@ -447,17 +469,45 @@ app.post("/v1/applications", async (c) => {
       .bind(p.id)
       .all()
   ).results;
-  const all: Record<string, unknown> = { ...p, age: age(p.birthDate), skills };
+  const all: Record<string, unknown> = {
+    ...p,
+    equipment: equipmentText(p),
+    vehicles: p.vehicles ?? {},
+    age: age(p.birthDate),
+    skills,
+  };
+  const missingProfile = required.filter((f) => {
+    const value = all[f];
+    if (f === "vehicles")
+      return !Object.values(p.vehicles ?? {}).some(
+        (count) => count != null && count > 0,
+      );
+    return (
+      value == null ||
+      (typeof value === "string" && !value.trim()) ||
+      (Array.isArray(value) && !value.length)
+    );
+  });
+  const missingContacts = choice.contactFields.filter((f) => !p.contacts[f]);
+  if (missingProfile.length || missingContacts.length) {
+    const errors = [];
+    if (missingProfile.length)
+      errors.push(
+        fieldError(c.get("language"), "incomplete_profile", missingProfile),
+      );
+    if (missingContacts.length)
+      errors.push(
+        fieldError(c.get("language"), "incomplete_contacts", missingContacts),
+      );
+    return c.json({ error: errors.join("\n") }, 400);
+  }
   const profileSnapshot: Record<string, unknown> = {},
     contactSnapshot: Record<string, string> = {};
   for (const f of choice.fields) {
     const v = all[f];
-    if (required.includes(f) && (v === "" || (Array.isArray(v) && !v.length)))
-      fail(400, "incomplete_profile");
     profileSnapshot[f] = v;
   }
   for (const f of choice.contactFields) {
-    if (!p.contacts[f]) fail(400, "incomplete_contacts");
     contactSnapshot[f] = p.contacts[f];
   }
   const id = crypto.randomUUID(),

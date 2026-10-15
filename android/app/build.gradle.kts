@@ -34,6 +34,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isReturnDefaultValues = true }
     sourceSets["test"].resources.srcDir("../../fixtures")
+    sourceSets["main"].assets.srcDir("../../shared")
+    sourceSets["test"].resources.srcDir("../../shared")
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))

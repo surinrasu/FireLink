@@ -1,7 +1,9 @@
 import fixture from "../fixtures/demo.json" with { type: "json" };
 import type { ApplicationStatus } from "./types.ts";
 import { NOW, TOKEN, SCENES } from "./scenes.ts";
-const profile = {
+import { profileSchema, type Profile } from "../server/src/domain.ts";
+import messages from "../server/src/messages.json" with { type: "json" };
+const profile: Profile = {
   id: "volunteer-demo",
   username: "林小满",
   pronouns: "她",
@@ -11,7 +13,10 @@ const profile = {
   verified: true,
   region: "浙江省 杭州市 西湖区",
   body: "可参与半天志愿服务",
-  equipment: ["firstAid", "protective"],
+  equipment: [],
+  equipmentDetails: {},
+  equipmentDescription: "急救包 1 套、绷带 10 卷；手套 2 双、雨衣 1 件",
+  vehicles: { sedan: 1 },
   contacts: {
     phone: "13800000000",
     wechat: "xiaoman_demo",
@@ -138,20 +143,22 @@ export function api(
   if (method === "GET" && path === "/v1/notifications")
     return ok(state.notifications);
   if (method === "PATCH" && path === "/v1/me") {
-    for (const key of ["username", "pronouns", "region", "body"] as const)
-      if (typeof body[key] === "string") state.profile[key] = body[key];
-    if (Array.isArray(body.equipment))
-      state.profile.equipment = body.equipment.filter(
-        (x): x is string =>
-          typeof x === "string" &&
-          ["vehicle", "firstAid", "tools", "protective"].includes(x),
+    const result = profileSchema.safeParse({ ...state.profile, ...body });
+    if (!result.success)
+      return fail(
+        400,
+        [
+          ...new Set(
+            result.error.issues.map(
+              ({ message }) =>
+                (Object.hasOwn(messages, message)
+                  ? messages[message as keyof typeof messages]
+                  : messages.invalid_input)["zh-Hans"],
+            ),
+          ),
+        ].join("\n"),
       );
-    if (body.contacts && typeof body.contacts === "object")
-      for (const key of ["phone", "wechat", "email"] as const)
-        if (key in body.contacts) {
-          const value = (body.contacts as Record<string, unknown>)[key];
-          if (typeof value === "string") state.profile.contacts[key] = value;
-        }
+    state.profile = { ...state.profile, ...result.data };
     return ok(state.profile);
   }
   if (method === "POST" && path === "/v1/applications") {

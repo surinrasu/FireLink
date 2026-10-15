@@ -238,5 +238,173 @@
     "zh-Hans": "组织者已更新你的申请结果",
     "zh-Hant": "組織者已更新你的申請結果",
     "zh-Hant-HK": "組織者已更新你的申請結果"
+  },
+  "invalid_username": {
+    "en": "Username must contain 1–30 characters.",
+    "zh-Hans": "用户名需为 1–30 个字符",
+    "zh-Hant": "使用者名稱需為 1–30 個字元",
+    "zh-Hant-HK": "用戶名稱需為 1–30 個字元"
+  },
+  "invalid_pronouns": {
+    "en": "Pronouns must contain no more than 20 characters.",
+    "zh-Hans": "称呼代词不能超过 20 个字符",
+    "zh-Hant": "稱呼代名詞不能超過 20 個字元",
+    "zh-Hant-HK": "稱呼代詞不能超過 20 個字元"
+  },
+  "invalid_region": {
+    "en": "Activity region must contain no more than 100 characters.",
+    "zh-Hans": "活动区域不能超过 100 个字符",
+    "zh-Hant": "活動區域不能超過 100 個字元",
+    "zh-Hant-HK": "活動區域不能超過 100 個字元"
+  },
+  "invalid_body": {
+    "en": "Physical information must contain no more than 300 characters.",
+    "zh-Hans": "身体信息不能超过 300 个字符",
+    "zh-Hant": "身體資訊不能超過 300 個字元",
+    "zh-Hant-HK": "身體資料不能超過 300 個字元"
+  },
+  "invalid_contact_phone": {
+    "en": "Contact phone must be a valid mainland China mobile number.",
+    "zh-Hans": "联系电话须为有效的中国大陆手机号",
+    "zh-Hant": "聯絡電話須為有效的中國大陸手機號碼",
+    "zh-Hant-HK": "聯絡電話須為有效的中國內地手機號碼"
+  },
+  "invalid_wechat": {
+    "en": "WeChat ID must contain no more than 60 characters.",
+    "zh-Hans": "微信号不能超过 60 个字符",
+    "zh-Hant": "微信帳號不能超過 60 個字元",
+    "zh-Hant-HK": "微信帳號不能超過 60 個字元"
+  },
+  "invalid_email": {
+    "en": "Email address is invalid. Enter a valid email address or leave it blank.",
+    "zh-Hans": "电子邮箱格式不正确，请填写有效邮箱或留空",
+    "zh-Hant": "電子郵件格式不正確，請填寫有效電子郵件或留空",
+    "zh-Hant-HK": "電郵格式不正確，請填寫有效電郵或留空"
+  },
+  "invalid_contacts": {
+    "en": "Complete your contact phone and check the optional WeChat ID and email address.",
+    "zh-Hans": "请填写联系电话，并检查可选的微信号和电子邮箱",
+    "zh-Hant": "請填寫聯絡電話，並檢查可選的微信帳號和電子郵件",
+    "zh-Hant-HK": "請填寫聯絡電話，並檢查可選的微信帳號和電郵"
+  },
+  "field_username": {
+    "en": "Username",
+    "zh-Hans": "用户名",
+    "zh-Hant": "使用者名稱",
+    "zh-Hant-HK": "用戶名稱"
+  },
+  "field_pronouns": {
+    "en": "Pronouns",
+    "zh-Hans": "称呼代词",
+    "zh-Hant": "稱呼代名詞",
+    "zh-Hant-HK": "稱呼代詞"
+  },
+  "field_realName": {
+    "en": "Full name",
+    "zh-Hans": "姓名",
+    "zh-Hant": "姓名",
+    "zh-Hant-HK": "姓名"
+  },
+  "field_age": {
+    "en": "Age",
+    "zh-Hans": "年龄",
+    "zh-Hant": "年齡",
+    "zh-Hant-HK": "年齡"
+  },
+  "field_gender": {
+    "en": "Gender",
+    "zh-Hans": "性别",
+    "zh-Hant": "性別",
+    "zh-Hant-HK": "性別"
+  },
+  "field_region": {
+    "en": "Activity area",
+    "zh-Hans": "活动区域",
+    "zh-Hant": "活動區域",
+    "zh-Hant-HK": "活動區域"
+  },
+  "field_body": {
+    "en": "Physical information",
+    "zh-Hans": "身体信息",
+    "zh-Hant": "身體資訊",
+    "zh-Hant-HK": "身體資料"
+  },
+  "field_equipment": {
+    "en": "Tools and equipment",
+    "zh-Hans": "工具装备",
+    "zh-Hant": "工具裝備",
+    "zh-Hant-HK": "工具裝備"
+  },
+  "field_skills": {
+    "en": "Skills and certifications",
+    "zh-Hans": "技能证明",
+    "zh-Hant": "技能證明",
+    "zh-Hant-HK": "技能證明"
+  },
+  "field_phone": {
+    "en": "Contact number",
+    "zh-Hans": "联系电话",
+    "zh-Hant": "聯絡電話",
+    "zh-Hant-HK": "聯絡電話"
+  },
+  "field_wechat": {
+    "en": "WeChat",
+    "zh-Hans": "微信",
+    "zh-Hant": "微信",
+    "zh-Hant-HK": "微信"
+  },
+  "field_email": {
+    "en": "Email",
+    "zh-Hans": "电子邮箱",
+    "zh-Hant": "電子郵件",
+    "zh-Hant-HK": "電郵"
+  },
+  "field_vehicles": {
+    "en": "Vehicles",
+    "zh-Hans": "载具",
+    "zh-Hant": "載具",
+    "zh-Hant-HK": "載具"
+  },
+  "invalid_equipment_text": {
+    "en": "Equipment must be text.",
+    "zh-Hans": "工具装备请填写文本内容",
+    "zh-Hant": "工具裝備請填寫文字內容",
+    "zh-Hant-HK": "工具裝備請填寫文字內容"
+  },
+  "invalid_vehicles": {
+    "en": "Check the vehicle types and counts.",
+    "zh-Hans": "请检查载具类型和数量",
+    "zh-Hant": "請檢查載具類型和數量",
+    "zh-Hant-HK": "請檢查載具類型和數量"
+  },
+  "invalid_motorcycle_count": {
+    "en": "Motorcycle count must be a whole number from 0 to 999.",
+    "zh-Hans": "摩托车数量须为 0–999 的整数",
+    "zh-Hant": "機車數量須為 0–999 的整數",
+    "zh-Hant-HK": "電單車數量須為 0–999 的整數"
+  },
+  "invalid_cargo_tricycle_count": {
+    "en": "Cargo tricycle count must be a whole number from 0 to 999.",
+    "zh-Hans": "三轮货车数量须为 0–999 的整数",
+    "zh-Hant": "三輪貨車數量須為 0–999 的整數",
+    "zh-Hant-HK": "三輪貨車數量須為 0–999 的整數"
+  },
+  "invalid_sedan_count": {
+    "en": "Sedan count must be a whole number from 0 to 999.",
+    "zh-Hans": "轿车数量须为 0–999 的整数",
+    "zh-Hant": "轎車數量須為 0–999 的整數",
+    "zh-Hant-HK": "私家車數量須為 0–999 的整數"
+  },
+  "invalid_off_road_count": {
+    "en": "Off-road vehicle count must be a whole number from 0 to 999.",
+    "zh-Hans": "越野车数量须为 0–999 的整数",
+    "zh-Hant": "越野車數量須為 0–999 的整數",
+    "zh-Hant-HK": "越野車數量須為 0–999 的整數"
+  },
+  "invalid_cargo_van_count": {
+    "en": "Cargo van count must be a whole number from 0 to 999.",
+    "zh-Hans": "厢式货车数量须为 0–999 的整数",
+    "zh-Hant": "廂式貨車數量須為 0–999 的整數",
+    "zh-Hant-HK": "客貨車數量須為 0–999 的整數"
   }
 }
