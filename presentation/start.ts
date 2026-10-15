@@ -17,6 +17,7 @@ import {
 } from "./platform.ts";
 import { createDemoServer } from "./server.ts";
 import { createBridge } from "./adb.ts";
+import { acquireLauncherLock } from "./launcher-lock.ts";
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const android = path.resolve(directory, "../android");
 const artifacts = path.join(directory, ".artifacts");
@@ -28,7 +29,7 @@ let server: Server | undefined;
 let serial = "";
 let adb = "";
 let restoreProperties: (() => Promise<void>) | null = null;
-let lockOwned = false;
+let releaseLock: (() => void) | undefined;
 let stopping = false;
 const children = new Set<ChildProcess>();
 function run(
@@ -87,12 +88,13 @@ async function cleanup(code = 0) {
   for (const child of children) child.kill();
   emulator?.kill();
   if (restoreProperties) await restoreProperties();
-  if (lockOwned)
-    await rm(path.join(artifacts, "launcher.lock"), { force: true });
+  releaseLock?.();
   process.exit(code);
 }
 process.on("SIGINT", () => cleanup());
 process.on("SIGTERM", () => cleanup());
+process.on("SIGHUP", () => cleanup());
+process.on("exit", () => releaseLock?.());
 try {
   if (!Number.isInteger(port) || port < 1024 || port > 65535)
     throw new Error("DEMO_PORT 必须是 1024–65535 之间的端口");
@@ -148,14 +150,7 @@ try {
   )
     throw new Error("请先在 presentation 目录执行 npm ci。");
   await mkdir(artifacts, { recursive: true });
-  await writeFile(path.join(artifacts, "launcher.lock"), String(process.pid), {
-    flag: "wx",
-  }).catch(() => {
-    throw new Error(
-      "演示已在运行，或上次启动意外退出。确认旧演示已停止后，删除 presentation/.artifacts/launcher.lock 再启动。",
-    );
-  });
-  lockOwned = true;
+  releaseLock = acquireLauncherLock(path.join(artifacts, "launcher.lock"));
   if (packages.length) {
     const manager = await sdkManager(sdk);
     if (!manager)
