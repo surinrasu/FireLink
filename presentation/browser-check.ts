@@ -23,6 +23,22 @@ page.on("request", (r) => {
     external.push(r.url());
 });
 const base = `http://127.0.0.1:${process.env.DEMO_PORT || 4173}`;
+const framePixels = () =>
+  page.evaluate(async () => {
+    const image = document.querySelector<HTMLImageElement>("#screen")!;
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    // The dedicated AVD's 24 dp (63 px) system gesture bar animates its color
+    // independently after a theme change. Compare all application pixels.
+    canvas.height = image.naturalHeight - 63;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const digest = await crypto.subtle.digest("SHA-256", pixels);
+    return Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+  });
 const ready = async () => {
   await page
     .locator("#screen-cover")
@@ -34,6 +50,22 @@ const ready = async () => {
   );
   assert.equal(await page.locator("#screen").isVisible(), true);
   assert.equal(await page.locator("#screen-preview").isVisible(), false);
+  const first = await framePixels();
+  for (let i = 0; i < 2; i++) {
+    const src = await page.locator("#screen").getAttribute("src");
+    await page.waitForFunction(
+      (previous) =>
+        document
+          .querySelector<HTMLImageElement>("#screen")
+          ?.getAttribute("src") !== previous,
+      src,
+    );
+  }
+  assert.equal(
+    await framePixels(),
+    first,
+    "first live frame must contain the fully rendered page",
+  );
 };
 const holdActivation = async () => {
   let release!: () => void;
@@ -197,6 +229,19 @@ try {
   await loading("welcome", "light");
   await page.getByRole("button", { name: "重新连接", exact: true }).click();
   await ready();
+  // A scene changed by another controller must restart the frame loop after
+  // invalidating its generation, then keep delivering live frames.
+  const switched = await page.request.post(base + "/api/demo/scene", {
+    data: { id: "discover", theme: "light" },
+  });
+  assert.equal(switched.status(), 200);
+  await page.waitForURL("**/#discover");
+  await ready();
+  const firstURL = await page.locator("#screen").getAttribute("src");
+  await page.waitForFunction((previous) => {
+    const screen = document.querySelector<HTMLImageElement>("#screen");
+    return screen && !screen.hidden && screen.getAttribute("src") !== previous;
+  }, firstURL);
   assert.equal(errors.length, 0, errors.join("\n"));
   assert.equal(external.length, 0, external.join("\n"));
   console.log(

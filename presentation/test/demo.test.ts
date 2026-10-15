@@ -8,7 +8,7 @@ import { SCENES, TOKEN, NOW } from "../scenes.ts";
 import { imageArchitecture, sdkCandidates, provisionAvd } from "../platform.ts";
 import { createDemoServer } from "../server.ts";
 import { spawnSync } from "node:child_process";
-import type { Bridge } from "../adb.ts";
+import type { Bridge, SceneReadiness } from "../adb.ts";
 const auth = `Bearer ${TOKEN}`;
 test("all scenes restore a fresh, deterministic state including read flags and approval", () => {
   for (const scene of SCENES) {
@@ -296,6 +296,130 @@ test("HTTP controller serializes transitions, rejects stale input, blocks foreig
       400,
     );
   } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("readiness is scoped to one launch; the first frame is reused and input invalidates it", async () => {
+  let readiness!: SceneReadiness;
+  let announce!: () => void;
+  let begin = new Promise<void>((resolve) => {
+    announce = resolve;
+  });
+  let release!: () => void;
+  let gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let captures = 0;
+  let readyResult = false;
+  const bridge: Bridge = {
+    serial: "emulator-test",
+    async activate(scene, theme, port, reset, signal) {
+      assert.ok(signal);
+      readiness = signal;
+      reset();
+      announce();
+      await gate;
+      readyResult = await signal.wait();
+    },
+    async frame() {
+      return Buffer.from(`frame-${++captures}`);
+    },
+    async input() {},
+  };
+  const server = createDemoServer({ bridge });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+  const post = (url: string, body: unknown, authorization = auth) =>
+    fetch(base + url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authorization,
+      },
+      body: JSON.stringify(body),
+    });
+  const readyBody = () => ({
+    token: readiness.token,
+    route: "incidents",
+    theme: "dark",
+  });
+  try {
+    const activation = post("/api/demo/scene", {
+      id: "discover",
+      theme: "dark",
+    });
+    await begin;
+    const firstToken = readiness.token;
+    assert.equal((await post("/api/demo/ready", readyBody(), "")).status, 401);
+    for (const wrong of [
+      { token: "old-launch" },
+      { route: "home" },
+      { theme: "light" },
+    ]) {
+      assert.equal(
+        (await post("/api/demo/ready", { ...readyBody(), ...wrong })).status,
+        409,
+      );
+    }
+    assert.equal(captures, 0);
+    // Notification can arrive before `am start -W` returns and wait() begins.
+    assert.equal((await post("/api/demo/ready", readyBody())).status, 200);
+    release();
+    const current = await (await activation).json();
+    assert.equal(readyResult, true);
+    assert.equal(captures, 1);
+    const frame = await fetch(
+      `${base}/api/demo/frame?revision=${current.revision}`,
+    );
+    assert.equal(await frame.text(), "frame-1");
+    assert.equal(frame.headers.get("X-Captured-At"), current.capturedAt);
+    assert.equal(captures, 1);
+    assert.equal(
+      await (
+        await fetch(`${base}/api/demo/frame?revision=${current.revision}`)
+      ).text(),
+      "frame-2",
+    );
+    assert.equal(captures, 2);
+    assert.equal((await post("/api/demo/ready", readyBody())).status, 409);
+
+    begin = new Promise<void>((resolve) => {
+      announce = resolve;
+    });
+    gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reset = post("/api/demo/scene", { id: "discover", theme: "dark" });
+    await begin;
+    assert.notEqual(readiness.token, firstToken);
+    assert.equal(
+      (await post("/api/demo/ready", { ...readyBody(), token: firstToken }))
+        .status,
+      409,
+    );
+    assert.equal(
+      (await fetch(`${base}/api/demo/frame?revision=${current.revision}`))
+        .status,
+      409,
+    );
+    // Missing notifications must time out so the bridge can run its UI fallback.
+    release();
+    const next = await (await reset).json();
+    assert.equal(readyResult, false);
+    assert.equal(captures, 3);
+    await post("/api/demo/input", { type: "back", revision: next.revision });
+    assert.equal(
+      await (
+        await fetch(`${base}/api/demo/frame?revision=${next.revision}`)
+      ).text(),
+      "frame-4",
+    );
+  } finally {
+    release();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
