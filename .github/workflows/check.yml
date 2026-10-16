@@ -1,4 +1,4 @@
-name: CI
+name: Check
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
         run: mise run check:presentation
 
   android:
-    name: Android tests and lint
+    name: Android client
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -62,7 +62,7 @@ jobs:
         run: mise run check:android
 
   ios:
-    name: iOS build and tests
+    name: iOS client
     runs-on: macos-15
     timeout-minutes: 25
     env:
