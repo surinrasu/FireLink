@@ -41,13 +41,14 @@ let currentOrg = "";
 let generation = 0;
 let editor: EditorHandle | null = null;
 const reviewDrafts = new Map<string, { response: string; note: string }>();
+const organizationDrafts = new Map<string, Record<string, string>>();
 const reviewDraftKey = (id: string) => `${currentOrg}:${id}`;
 
 async function confirmDiscardDrafts() {
-  if (!reviewDrafts.size) return true;
+  if (!reviewDrafts.size && !organizationDrafts.size) return true;
   const dialog = openDialog(
-    "有尚未提交的审核内容",
-    '<p class="dialog-copy">退出登录将丢失暂存的回应和内部备注。</p><div class="dialog-actions"><button class="border" data-close-dialog>继续处理</button><button id="discard-drafts">放弃并退出</button></div>',
+    "有尚未提交的内容",
+    `<p class="dialog-copy">退出登录将丢失暂存的${[reviewDrafts.size ? "审核回应和内部备注" : "", organizationDrafts.size ? "组织资料更改" : ""].filter(Boolean).join("、")}。</p><div class="dialog-actions"><button class="border" data-close-dialog>继续处理</button><button id="discard-drafts">放弃并退出</button></div>`,
   );
   return new Promise<boolean>((resolve) => {
     const cancel = () => resolve(false);
@@ -489,6 +490,37 @@ function settingsPage() {
 }
 function attachSettings() {
   const form = root.querySelector<HTMLFormElement>("#organization-form")!;
+  const key = currentOrg;
+  const read = () =>
+    Object.fromEntries(
+      Array.from(new FormData(form), ([name, value]) => [name, String(value)]),
+    );
+  const original = read();
+  if (!isAdmin()) organizationDrafts.delete(key);
+  const draft = organizationDrafts.get(key);
+  if (draft)
+    for (const [name, value] of Object.entries(draft)) {
+      const field = form.elements.namedItem(name) as HTMLInputElement | null;
+      if (field) field.value = value;
+    }
+  const status = document.createElement("p");
+  status.className = "help";
+  status.id = "organization-draft-status";
+  status.setAttribute("role", "status");
+  form.prepend(status);
+  const update = () => {
+    const values = read();
+    const changed = Object.keys(original).some(
+      (name) => original[name] !== values[name],
+    );
+    if (changed) organizationDrafts.set(key, values);
+    else organizationDrafts.delete(key);
+    status.textContent = changed
+      ? "更改未保存 · 切换页面会保留，刷新或退出后丢失"
+      : "";
+  };
+  form.addEventListener("input", update);
+  update();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
@@ -512,6 +544,7 @@ function attachSettings() {
         description: data.get("org-description"),
         contacts,
       });
+      organizationDrafts.delete(key);
       toast("组织资料已保存。");
       await refreshSession();
       await renderRoute();
@@ -750,6 +783,7 @@ root.addEventListener("click", (event) => {
           if (!(await confirmDiscardDrafts())) return;
           await api("/auth/logout", "POST", {});
           reviewDrafts.clear();
+          organizationDrafts.clear();
           closeDialog();
           editor?.dispose();
           editor = null;
@@ -771,6 +805,7 @@ async function refreshSession() {
 }
 async function showLogin() {
   reviewDrafts.clear();
+  organizationDrafts.clear();
   const joinToken = routeInfo().pathname.match(/^\/join\/([^/]+)$/)?.[1];
   let demo = false;
   try {
@@ -982,6 +1017,7 @@ window.addEventListener("hashchange", async (event) => {
   void renderRoute();
 });
 window.addEventListener("beforeunload", (event) => {
-  if (editor?.dirty() || reviewDrafts.size) event.preventDefault();
+  if (editor?.dirty() || reviewDrafts.size || organizationDrafts.size)
+    event.preventDefault();
 });
 void renderRoute();
