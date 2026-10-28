@@ -39,6 +39,74 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "publish-readiness": async (page) => {
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#publish-status")
+      .filter({ hasText: "发布还需完成" })
+      .waitFor();
+    await page.getByRole("button", { name: "发布招募", exact: true }).click();
+    assert.equal(
+      await page
+        .locator("#title")
+        .evaluate((e) => e === document.activeElement),
+      true,
+    );
+    assert.equal(
+      await page.locator("#summary").getAttribute("aria-invalid"),
+      "true",
+    );
+    await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption({ index: 1 });
+    await page
+      .getByLabel("一句话介绍任务", { exact: true })
+      .fill("整理社区物资");
+    const day = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    await page.getByLabel("服务开始时间", { exact: true }).fill(`${day}T10:00`);
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T12:00`);
+    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    assert.match(
+      await page.locator("#publish-issues").innerText(),
+      /不能晚于服务开始时间/,
+    );
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
+    await page
+      .locator("#publish-status")
+      .filter({ hasText: "发布准备已完成" })
+      .waitFor();
+    assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
+    await page.getByRole("button", { name: "发布招募", exact: true }).click();
+    await page.getByRole("button", { name: "确认发布", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "准备检查回归", exact: true })
+      .waitFor();
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      data.organization.verified = false;
+      data.organization.contacts = [];
+      await route.fulfill({ response, json: data });
+    });
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .first()
+      .click();
+    await page.locator("#publish-status").click();
+    await page
+      .getByRole("link", { name: "请先完成组织认证", exact: true })
+      .waitFor();
+    await page
+      .getByRole("link", {
+        name: "请在组织设置中填写至少一种公开联系方式",
+        exact: true,
+      })
+      .waitFor();
+  },
   "organization-drafts": async (page) => {
     const settings = () =>
       page.locator('.sidebar a[href="#/settings"]').click();
