@@ -1,0 +1,8 @@
+/*
+  X-Content-Type-Options: nosniff
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' https: data:; media-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'
+  Cache-Control: no-cache

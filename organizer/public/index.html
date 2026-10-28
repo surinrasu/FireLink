@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="theme-color" content="#fbf8f4" />
+    <meta
+      name="description"
+      content="FireLink 组织者工作台：任务发布与报名审核。"
+    />
+    <title>FireLink · 组织者工作台</title>
+    <link rel="icon" href="/assets/firelink.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/beer.min.css" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/assets/beer.min.js"></script>
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <div id="app">
+      <main id="main" class="boot">
+        <img src="/assets/firelink.svg" width="48" height="48" alt="" />
+        <h1>FireLink</h1>
+        <p role="status">正在加载…</p>
+      </main>
+    </div>
+    <div id="connection" class="connection-banner" hidden role="status">
+      已断网，未提交的内容暂留当前页。
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="dialog" class="round" aria-labelledby="dialog-title"></dialog>
+    <noscript><p>请启用 JavaScript 以使用组织者工作台。</p></noscript>
+  </body>
+</html>
