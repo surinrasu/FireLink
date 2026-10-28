@@ -42,6 +42,12 @@ let generation = 0;
 let editor: EditorHandle | null = null;
 const reviewDrafts = new Map<string, { response: string; note: string }>();
 const organizationDrafts = new Map<string, Record<string, string>>();
+let reviewOutcome: {
+  id: string;
+  name: string;
+  status: string;
+  organization: string;
+} | null = null;
 const reviewDraftKey = (id: string) => `${currentOrg}:${id}`;
 
 async function confirmDiscardDrafts() {
@@ -289,7 +295,7 @@ function profileValue(key: string, value: unknown): string {
 }
 function applicationDetail(item: OrganizerApplication, back: string) {
   const task = workspace.tasks.find((t) => t.id === item.taskId)!;
-  return `<a class="mobile-only button border" href="${back}">${icon("arrow_back")}返回报名列表</a><div class="review-heading"><div><h2>${h(applicationName(item))}</h2><p>${h(item.taskTitle)}</p></div>${badge(item.status)}</div><p class="muted" style="font-size:.8rem;margin-top:16px">提交时的授权资料 · ${formatDate(item.createdAt, true)}</p><dl class="profile-grid">${Object.entries(
+  return `<a class="mobile-only button border" href="${back}">${icon("arrow_back")}返回报名列表</a><div class="review-heading"><div><h2>${h(applicationName(item))}</h2><p>${h(item.taskTitle)}</p></div>${badge(item.status)}</div><details class="review-task-context"><summary>任务要求与安排</summary><p><a href="${taskLink(task)}">查看任务：${h(task.title)}</a></p><p>${h(task.summary)}</p><p>服务时间：${formatDate(task.startsAt, true)}${task.endsAt ? ` — ${formatDate(task.endsAt, true)}` : ""}</p><p>服务地点：${h(task.location || "未设置")}</p>${task.meetingPoint ? `<p>集合地点：${h(task.meetingPoint)}</p>` : ""}<div class="description">${renderBlocks(task.blocks)}</div></details><p class="muted" style="font-size:.8rem;margin-top:16px">提交时的授权资料 · ${formatDate(item.createdAt, true)}</p><dl class="profile-grid">${Object.entries(
     item.profile,
   )
     .filter(([key]) => fieldLabels[key])
@@ -309,7 +315,7 @@ function applicationDetail(item: OrganizerApplication, back: string) {
           )}</div><p class="muted" style="font-size:.78rem;margin-top:12px">仅用于本任务沟通。</p>`
       : `<div class="info-note" style="margin-top:12px">${icon("lock")}<div>${item.status === "accepted" ? "无查看权限，请联系管理员。" : item.status === "pending" ? `通过后向获授权成员开放：${item.contactFields.map((f) => fieldLabels[f] || f).join("、")}。` : "本次报名未开放联系方式。"}</div></div>`
   }
-  ${item.status === "pending" ? `<hr class="section-divider"><form id="review-form">${textarea("response", "给志愿者的回应", "", 'maxlength="1000"')}${textarea("note", "内部备注（不发送给志愿者）", item.note, 'maxlength="2000"')}<p class="help">已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""} 人${task.capacity ? "" : " · 不限人数"}</p><div class="review-actions"><button class="border" type="button" data-decision="rejected">不通过</button><button type="button" data-decision="accepted">${icon("check")}通过并通知</button></div></form>` : `<hr class="section-divider"><h3>审核结果</h3><p class="preserve-lines" style="margin-top:12px">${h(item.response || (item.status === "withdrawn" ? "志愿者已撤回本次报名。" : "暂无附加回应。"))}</p><p class="muted" style="font-size:.78rem;margin-top:12px">${item.reviewerName ? `${h(item.reviewerName)} · ` : ""}${formatDate(item.updatedAt, true)}</p>${item.note ? `<h3 style="margin-top:20px">内部备注</h3><p class="preserve-lines">${h(item.note)}</p>` : ""}`}`;
+  ${item.status === "pending" ? `<hr class="section-divider"><form id="review-form"><details id="review-fields"><summary>添加回应或内部备注（可选）</summary>${textarea("response", "给志愿者的回应", "", 'maxlength="1000"')}${textarea("note", "内部备注（不发送给志愿者）", item.note, 'maxlength="2000"')}</details><p class="help">已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""} 人${task.capacity ? "" : " · 不限人数"}</p><div class="review-actions"><button class="border" type="button" data-decision="rejected">不通过</button><button type="button" data-decision="accepted">${icon("check")}通过并通知</button></div></form>` : `<hr class="section-divider"><h3>审核结果</h3><p class="preserve-lines" style="margin-top:12px">${h(item.response || (item.status === "withdrawn" ? "志愿者已撤回本次报名。" : "暂无附加回应。"))}</p><p class="muted" style="font-size:.78rem;margin-top:12px">${item.reviewerName ? `${h(item.reviewerName)} · ` : ""}${formatDate(item.updatedAt, true)}</p>${item.note ? `<h3 style="margin-top:20px">内部备注</h3><p class="preserve-lines">${h(item.note)}</p>` : ""}`}`;
 }
 async function applicationsPage(params: URLSearchParams, turn: number) {
   const taskId = params.get("task") || "",
@@ -324,9 +330,11 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
   const explicitId = params.get("id");
   const selected =
     filtered.find((a) => a.id === explicitId) ??
-    (!explicitId && matchMedia("(min-width: 700px)").matches
-      ? filtered[0]
-      : undefined);
+    (explicitId
+      ? { id: explicitId }
+      : matchMedia("(min-width: 700px)").matches
+        ? filtered[0]
+        : undefined);
   const link = (
     nextStatus: string,
     id?: string,
@@ -334,10 +342,20 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
   ) =>
     `#/applications?${new URLSearchParams({ ...(taskId ? { task: taskId } : {}), status: nextStatus, page: String(nextPage), ...(searchTerm ? { q: searchTerm } : {}), ...(id ? { id } : {}) })}`;
   const task = workspace.tasks.find((t) => t.id === taskId);
-  const body = `${heading(status === "accepted" ? "已通过报名" : "报名审核", task ? task.title : "", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}
+  const result =
+    reviewOutcome?.organization === currentOrg ? reviewOutcome : null;
+  const outcome = result
+    ? `<section class="review-outcome" role="status"><p>${h(result.name)}的报名${result.status === "accepted" ? "已通过" : "未通过"}，已发送站内通知。</p><div class="row wrap">${status === "pending" && filtered.length ? `<a class="button border" href="${link(status, filtered[0].id)}">审核下一份</a>` : ""}<a class="button border" href="${link(result.status, result.id, 1)}">查看审核结果</a></div></section>`
+    : "";
+  const selectedIndex = filtered.findIndex((item) => item.id === selected?.id);
+  const navigation =
+    selectedIndex < 0
+      ? ""
+      : `<nav class="review-navigation" aria-label="逐份审核">${selectedIndex > 0 ? `<a class="button border" data-review-step="previous" aria-keyshortcuts="Alt+ArrowUp" title="上一份（Alt + ↑）" href="${link(status, filtered[selectedIndex - 1].id)}">上一份</a>` : ""}${selectedIndex + 1 < filtered.length ? `<a class="button border" data-review-step="next" aria-keyshortcuts="Alt+ArrowDown" title="下一份（Alt + ↓）" href="${link(status, filtered[selectedIndex + 1].id)}">下一份</a>` : ""}</nav>`;
+  const body = `${heading(status === "accepted" ? "已通过报名" : "报名审核", task ? task.title : "", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}${outcome}
   <form class="toolbar" id="application-filter">${select("application-task", "所属任务", [["", "全部任务"], ...workspace.tasks.map((t) => [t.id, t.title] as [string, string])], taskId)}<div class="field border round prefix search">${icon("search")}<input id="application-search" name="q" value="${h(searchTerm)}" type="search" placeholder="搜索姓名、昵称或地区" aria-label="搜索报名资料"></div><button class="border" type="submit">搜索</button></form>
   <div class="filter-chips" aria-label="报名状态">${["pending", "accepted", "rejected", "withdrawn", "all"].map((s) => `<a href="${link(s)}" class="${s === status ? "active" : ""}">${s === "all" ? "全部" : stateLabels[s as keyof typeof stateLabels]} <span>${s === "all" ? Object.values(page.counts).reduce((a, b) => a + b, 0) : page.counts[s as keyof typeof page.counts]}</span></a>`).join("")}</div>
-  ${filtered.length ? `<div class="review-layout ${explicitId && selected ? "has-selection" : ""}"><div class="application-list" aria-label="报名列表">${filtered.map((a) => `<a class="application-row ${a.id === selected?.id ? "active" : ""}" href="${link(status, a.id)}" data-search="${h(`${applicationName(a)} ${a.profile.region ?? ""}`.toLowerCase())}" ${a.id === selected?.id ? 'aria-current="true"' : ""}><div class="row"><strong>${h(applicationName(a))}</strong>${badge(a.status)}</div><p>${h(a.taskTitle)}</p><small>${formatDate(a.createdAt)} 提交</small></a>`).join("")}<p id="application-search-empty" hidden class="muted">没有匹配的报名资料。</p></div><section class="review-detail" aria-label="报名详情" id="review-detail">${selected ? '<p role="status">正在加载授权资料…</p>' : empty("选择报名查看资料", "", "", "person_search")}</section></div>` : empty("无匹配报名", "", "", "fact_check")}`;
+  ${filtered.length || selected ? `<div class="review-layout ${explicitId && selected ? "has-selection" : ""}"><div class="application-list" aria-label="报名列表">${filtered.map((a) => `<a class="application-row ${a.id === selected?.id ? "active" : ""}" href="${link(status, a.id)}" data-search="${h(`${applicationName(a)} ${a.profile.region ?? ""}`.toLowerCase())}" ${a.id === selected?.id ? 'aria-current="true"' : ""}><div class="row"><strong>${h(applicationName(a))}</strong>${badge(a.status)}</div><p>${h(a.taskTitle)}</p><small>${formatDate(a.createdAt)} 提交</small></a>`).join("")}<p id="application-search-empty" hidden class="muted">没有匹配的报名资料。</p></div><section class="review-detail" aria-label="报名详情" id="review-detail">${selected ? '<p role="status">正在加载授权资料…</p>' : empty("选择报名查看资料", "", "", "person_search")}</section></div>` : empty("无匹配报名", "", "", "fact_check")}`;
   const pagination =
     page.total > page.pageSize || pageNumber > 1
       ? `<nav class="pagination" aria-label="报名分页">${pageNumber > 1 ? `<a class="button border" href="${link(status, undefined, pageNumber - 1)}">上一页</a>` : ""}<span>第 ${pageNumber} 页 · 共 ${page.total} 份</span>${pageNumber * page.pageSize < page.total ? `<a class="button border" href="${link(status, undefined, pageNumber + 1)}">下一页</a>` : ""}</nav>`
@@ -366,10 +384,8 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
         `/applications/${selected.id}`,
       );
       if (turn !== generation) return;
-      root.querySelector("#review-detail")!.innerHTML = applicationDetail(
-        item,
-        link(status),
-      );
+      root.querySelector("#review-detail")!.innerHTML =
+        navigation + applicationDetail(item, link(status));
       const reviewForm = root.querySelector<HTMLFormElement>("#review-form");
       if (reviewForm) {
         const key = reviewDraftKey(item.id);
@@ -377,6 +393,9 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
           reviewForm.querySelector<HTMLTextAreaElement>("#response")!;
         const note = reviewForm.querySelector<HTMLTextAreaElement>("#note")!;
         const draft = reviewDrafts.get(key);
+        if (draft)
+          reviewForm.querySelector<HTMLDetailsElement>("#review-fields")!.open =
+            true;
         response.value = draft?.response ?? "";
         note.value = draft?.note ?? item.note;
         const status = document.createElement("p");
@@ -448,6 +467,27 @@ function decisionDialog(
         note,
       });
       reviewDrafts.delete(reviewDraftKey(item.id));
+      reviewOutcome = {
+        id: item.id,
+        name: applicationName(item),
+        status,
+        organization: currentOrg,
+      };
+      const route = routeInfo();
+      if (route.searchParams.get("status") !== "all") {
+        route.searchParams.delete("id");
+        const currentPage = Number(route.searchParams.get("page") || 1);
+        if (
+          root.querySelectorAll(".application-row").length === 1 &&
+          currentPage > 1
+        )
+          route.searchParams.set("page", String(currentPage - 1));
+        history.replaceState(
+          null,
+          "",
+          `#${route.pathname}?${route.searchParams}`,
+        );
+      }
       closeDialog();
       toast("已保存并发送站内通知。");
       await renderRoute();
@@ -713,6 +753,26 @@ async function copyText(value: string) {
     dialog.querySelector("textarea")!.select();
   }
 }
+root.addEventListener("keydown", (event) => {
+  if (
+    !event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    !["ArrowUp", "ArrowDown"].includes(event.key) ||
+    document.querySelector("dialog[open]") ||
+    (event.target as Element).closest(
+      "input, textarea, select, [contenteditable]",
+    )
+  )
+    return;
+  const link = root.querySelector<HTMLAnchorElement>(
+    `[data-review-step="${event.key === "ArrowUp" ? "previous" : "next"}"]`,
+  );
+  if (link) {
+    event.preventDefault();
+    link.click();
+  }
+});
 root.addEventListener("click", (event) => {
   const target = (event.target as Element).closest<HTMLElement>(
     "[data-action]",
@@ -869,6 +929,7 @@ async function renderRoute() {
   editor?.dispose();
   editor = null;
   const route = routeInfo();
+  if (route.pathname !== "/applications") reviewOutcome = null;
   if (route.pathname.startsWith("/join/")) return showLogin();
   if (!session) {
     try {

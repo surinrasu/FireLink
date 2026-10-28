@@ -889,6 +889,37 @@ video {
   gap: 10px;
   margin-top: 20px;
 }
+.review-navigation {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.review-task-context,
+#review-fields {
+  margin: 16px 0;
+}
+.review-task-context summary,
+#review-fields summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+  color: var(--primary);
+}
+.review-task-context p {
+  margin-top: 8px;
+}
+.review-outcome {
+  padding: 16px;
+  margin-bottom: 24px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: 12px;
+}
+.review-outcome .row {
+  margin-top: 12px;
+}
 .empty-state {
   display: flex;
   flex-direction: column;

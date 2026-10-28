@@ -39,6 +39,48 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "continuous-review": async (page) => {
+    await review(page);
+    const reviewedName = await page
+      .locator(".application-row strong")
+      .nth(1)
+      .innerText();
+    await page.locator(".application-row").nth(1).click();
+    await page
+      .getByRole("heading", { name: reviewedName, exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .locator("#review-fields")
+        .evaluate((e) => (e as HTMLDetailsElement).open),
+      false,
+    );
+    await page.locator(".review-task-context summary").click();
+    await page.locator('.review-task-context a[href^="#/tasks/"]').waitFor();
+    assert.match(
+      await page.locator(".review-task-context").innerText(),
+      /服务时间：/,
+    );
+    await page.getByRole("button", { name: "通过并通知", exact: true }).click();
+    await page
+      .getByRole("button", { name: "确认通过并通知", exact: true })
+      .click();
+    await page
+      .locator(".review-outcome")
+      .filter({ hasText: reviewedName })
+      .waitFor();
+    await page.getByRole("link", { name: "审核下一份", exact: true }).click();
+    await page.locator("#review-form").waitFor();
+    assert.notEqual(
+      await page.locator(".review-heading h2").innerText(),
+      reviewedName,
+    );
+    await page.getByRole("link", { name: "查看审核结果", exact: true }).click();
+    await page
+      .getByRole("heading", { name: reviewedName, exact: true })
+      .waitFor();
+    await page.locator(".contact-row").first().waitFor();
+  },
   "publish-readiness": async (page) => {
     await page
       .getByRole("link", { name: "新建任务", exact: true })
