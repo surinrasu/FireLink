@@ -40,6 +40,25 @@ let workspace: Workspace;
 let currentOrg = "";
 let generation = 0;
 let editor: EditorHandle | null = null;
+const reviewDrafts = new Map<string, { response: string; note: string }>();
+const reviewDraftKey = (id: string) => `${currentOrg}:${id}`;
+
+async function confirmDiscardDrafts() {
+  if (!reviewDrafts.size) return true;
+  const dialog = openDialog(
+    "有尚未提交的审核内容",
+    '<p class="dialog-copy">退出登录将丢失暂存的回应和内部备注。</p><div class="dialog-actions"><button class="border" data-close-dialog>继续处理</button><button id="discard-drafts">放弃并退出</button></div>',
+  );
+  return new Promise<boolean>((resolve) => {
+    const cancel = () => resolve(false);
+    dialog.addEventListener("close", cancel, { once: true });
+    dialog.querySelector("#discard-drafts")!.addEventListener("click", () => {
+      dialog.removeEventListener("close", cancel);
+      closeDialog();
+      resolve(true);
+    });
+  });
+}
 const roles = {
   admin: "组织管理员",
   manager: "任务负责人",
@@ -350,6 +369,35 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
         item,
         link(status),
       );
+      const reviewForm = root.querySelector<HTMLFormElement>("#review-form");
+      if (reviewForm) {
+        const key = reviewDraftKey(item.id);
+        const response =
+          reviewForm.querySelector<HTMLTextAreaElement>("#response")!;
+        const note = reviewForm.querySelector<HTMLTextAreaElement>("#note")!;
+        const draft = reviewDrafts.get(key);
+        response.value = draft?.response ?? "";
+        note.value = draft?.note ?? item.note;
+        const status = document.createElement("p");
+        status.className = "help";
+        status.setAttribute("role", "status");
+        status.id = "review-draft-status";
+        reviewForm.prepend(status);
+        const update = () => {
+          const changed = response.value !== "" || note.value !== item.note;
+          if (changed)
+            reviewDrafts.set(key, {
+              response: response.value,
+              note: note.value,
+            });
+          else reviewDrafts.delete(key);
+          status.textContent = changed
+            ? "未提交 · 切换报名会保留，刷新或退出后丢失"
+            : "";
+        };
+        reviewForm.addEventListener("input", update);
+        update();
+      } else reviewDrafts.delete(reviewDraftKey(item.id));
       root
         .querySelectorAll<HTMLButtonElement>("[data-decision]")
         .forEach((button) =>
@@ -398,6 +446,7 @@ function decisionDialog(
         response: new FormData(form).get("decision-response"),
         note,
       });
+      reviewDrafts.delete(reviewDraftKey(item.id));
       closeDialog();
       toast("已保存并发送站内通知。");
       await renderRoute();
@@ -698,7 +747,9 @@ root.addEventListener("click", (event) => {
             closeDialog();
             return;
           }
+          if (!(await confirmDiscardDrafts())) return;
           await api("/auth/logout", "POST", {});
+          reviewDrafts.clear();
           closeDialog();
           editor?.dispose();
           editor = null;
@@ -719,6 +770,7 @@ async function refreshSession() {
   setOrganization(currentOrg);
 }
 async function showLogin() {
+  reviewDrafts.clear();
   const joinToken = routeInfo().pathname.match(/^\/join\/([^/]+)$/)?.[1];
   let demo = false;
   try {
@@ -930,6 +982,6 @@ window.addEventListener("hashchange", async (event) => {
   void renderRoute();
 });
 window.addEventListener("beforeunload", (event) => {
-  if (editor?.dirty()) event.preventDefault();
+  if (editor?.dirty() || reviewDrafts.size) event.preventDefault();
 });
 void renderRoute();

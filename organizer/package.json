@@ -8,6 +8,7 @@
     "check": "tsc --noEmit",
     "dev": "bun run build && cd ../server && bun run wrangler dev",
     "test:browser": "bun test/browser.ts",
+    "test:ux": "bun test/ux-browser.ts",
     "test:media": "bun test/media-browser.ts"
   },
   "dependencies": {
