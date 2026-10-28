@@ -1000,6 +1000,35 @@ video {
 .editor-section {
   scroll-margin-top: 24px;
 }
+.publish-readiness {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+  border-radius: 12px;
+}
+.publish-readiness summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+  font-weight: 600;
+}
+.publish-readiness ul {
+  padding-left: 20px;
+}
+.publish-readiness button {
+  margin: 0;
+  padding: 8px 0;
+  height: auto;
+  white-space: normal;
+  text-align: left;
+  color: inherit;
+}
+.field-error {
+  color: var(--error);
+  font-size: 0.875rem;
+  margin: -8px 0 16px;
+}
 .editor-section > h2 {
   display: flex;
   align-items: center;
@@ -1578,7 +1607,8 @@ dialog::backdrop {
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  details::details-content {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
