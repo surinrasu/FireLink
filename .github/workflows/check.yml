@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   javascript:
-    name: Backend and presentation
+    name: Organizer, backend and presentation
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -34,7 +34,10 @@ jobs:
         run: |
           mise -C server install
           mise -C server run install
+          mise -C server exec -- bun install --cwd ../organizer --frozen-lockfile
           mise -C server exec -- npm --prefix ../presentation ci
+      - name: Check organizer web
+        run: mise run check:organizer
       - name: Check backend
         run: mise run check:server
       - name: Check presentation

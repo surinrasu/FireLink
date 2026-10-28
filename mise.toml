@@ -9,6 +9,13 @@ run = "mise -C server run dev"
 [tasks."server:test"]
 run = "mise -C server run test"
 
+[tasks."organizer:dev"]
+description = "构建组织者工作台并启动本地 Worker"
+run = "mise -C server run dev"
+
+[tasks."organizer:build"]
+run = "mise -C server exec -- bun run --cwd ../organizer build"
+
 [tasks."android:build"]
 run = "mise -C android run build"
 
@@ -22,8 +29,12 @@ run = "node start.ts"
 raw = true
 
 [tasks.check]
-description = "检查后端、演示程序和移动端（完整检查需要 macOS、Xcode 和 Android SDK）"
-depends = ["check:whitespace", "check:server", "check:presentation", "check:android", "check:ios"]
+description = "检查组织者工作台、后端、演示程序和移动端（完整检查需要 macOS、Xcode 和 Android SDK）"
+depends = ["check:whitespace", "check:organizer", "check:server", "check:presentation", "check:android", "check:ios"]
+
+[tasks."check:organizer"]
+description = "组织者网页 TypeScript 检查和生产构建"
+run = ["mise -C server exec -- bun run --cwd ../organizer check", "mise -C server exec -- bun run --cwd ../organizer build"]
 
 [tasks."check:whitespace"]
 description = "检查工作区及暂存区的空白错误"

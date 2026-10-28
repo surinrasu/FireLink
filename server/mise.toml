@@ -11,13 +11,16 @@ run = ["bun run wrangler types --strict-vars=false", "bun scripts/normalize-type
 [tasks.migrate]
 run = "bun run wrangler d1 migrations apply firelink-dev --local"
 [tasks.dev]
-depends = ["migrate"]
+depends = ["migrate", "web"]
 run = "bun run dev --ip 0.0.0.0"
+[tasks.web]
+run = "bun run --cwd ../organizer build"
 [tasks.check]
 run = ["bun run wrangler types --strict-vars=false --check", "bun run check", "bun run format:check"]
 [tasks.test]
 run = "bun run test"
 [tasks.deploy]
+depends = ["web"]
 run = "bun run wrangler deploy --env staging"
 
 [tasks.format]

@@ -18,6 +18,10 @@ import {
   type Profile,
 } from "./domain";
 import { passkeyRoutes } from "./passkeys";
+import { organizerAPI } from "./organizer-api";
+import { organizerMedia } from "./organizer-media";
+import { cleanupOrganizerData } from "./organizer-maintenance";
+import { volunteerTaskBlocks } from "./task-presentation";
 import {
   resolveLanguage,
   translate,
@@ -75,6 +79,7 @@ app.use("*", async (c, next) => {
   await next();
   c.header("Cache-Control", "no-store");
   c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Robots-Tag", "noindex, nofollow, noarchive");
 });
 app.onError((e, c) => {
   if (e instanceof ZodError)
@@ -239,7 +244,7 @@ app.get("/v1/incidents", async (c) => {
   ).results;
   const tasks = (
     await c.env.DB.prepare(
-      "SELECT id,incident_id AS incidentId,title,summary,status,updated_at AS updatedAt FROM tasks ORDER BY updated_at DESC,id",
+      "SELECT t.id,t.incident_id AS incidentId,t.title,t.summary,CASE WHEN t.paused=1 OR (t.deadline!='' AND t.deadline<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 'closed' ELSE t.status END AS status,t.updated_at AS updatedAt FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.publication_status='published' AND o.demo_expires_at IS NULL ORDER BY t.updated_at DESC,t.id",
     ).all()
   ).results;
   return c.json(
@@ -251,7 +256,7 @@ app.get("/v1/incidents", async (c) => {
 });
 app.get("/v1/tasks/:id", async (c) => {
   const row = await c.env.DB.prepare(
-    "SELECT t.*,o.name AS organizer_name,o.verified,o.contact,o.contact_methods FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=?",
+    "SELECT t.*,o.name AS organizer_name,o.verified,o.contact,o.contact_methods FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status!='draft' AND o.demo_expires_at IS NULL",
   )
     .bind(c.req.param("id"))
     .first();
@@ -261,7 +266,12 @@ app.get("/v1/tasks/:id", async (c) => {
     incidentId: row.incident_id,
     title: row.title,
     summary: row.summary,
-    status: row.status,
+    status:
+      row.paused ||
+      row.publication_status === "archived" ||
+      (row.deadline && String(row.deadline) <= timestamp())
+        ? "closed"
+        : row.status,
     updatedAt: row.updated_at,
     organizer: {
       id: row.organizer_id,
@@ -269,7 +279,7 @@ app.get("/v1/tasks/:id", async (c) => {
       verified: !!row.verified,
       contacts: asJSON(row.contact_methods),
     },
-    blocks: asJSON(row.blocks),
+    blocks: volunteerTaskBlocks(row, c.get("language")),
     requiredFields: asJSON(row.required_fields),
     contactFields: asJSON(row.contact_fields),
   });
@@ -435,12 +445,18 @@ app.post("/v1/applications", async (c) => {
     .extend({ taskId: z.string() })
     .parse(await boundedJSON(c.req.raw));
   const row = await c.env.DB.prepare(
-    "SELECT t.*,o.verified FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=?",
+    "SELECT t.*,o.verified FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status='published' AND o.demo_expires_at IS NULL",
   )
     .bind(taskId)
     .first();
   if (!row) fail(404, "task_not_found");
-  if (row.status !== "open" || !row.verified) fail(409, "applications_closed");
+  if (
+    row.status !== "open" ||
+    !row.verified ||
+    row.paused ||
+    (row.deadline && String(row.deadline) <= timestamp())
+  )
+    fail(409, "applications_closed");
   const required = asJSON<string[]>(row.required_fields),
     contacts = asJSON<string[]>(row.contact_fields);
   const missingConsent = [
@@ -513,7 +529,7 @@ app.post("/v1/applications", async (c) => {
   const id = crypto.randomUUID(),
     now = timestamp();
   const result = await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO applications SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks WHERE id=? AND status='open')",
+    "INSERT OR IGNORE INTO applications(id,user_id,task_id,status,profile_snapshot,contact_snapshot,consent_version,created_at,updated_at,response) SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.status='open' AND t.paused=0 AND t.publication_status='published' AND o.verified=1 AND o.demo_expires_at IS NULL AND (t.deadline='' OR t.deadline>strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
   )
     .bind(
       id,
@@ -601,4 +617,11 @@ app.post("/v1/notifications/:id/read", async (c) => {
   return c.json({ ok: true });
 });
 app.route("/", passkeyRoutes);
-export default app;
+app.route("/api/organizer", organizerAPI);
+app.route("/api/organizer-media", organizerMedia);
+export default {
+  fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: Env) {
+    await cleanupOrganizerData(env.DB, Date.now(), env.FILES);
+  },
+} satisfies ExportedHandler<Env>;

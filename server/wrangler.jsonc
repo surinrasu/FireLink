@@ -5,8 +5,15 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "assets": {
+    "directory": "../organizer/build",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/v1/*", "/health", "/.well-known/*"],
+  },
   "vars": {
     "APP_ENV": "local",
+    "ORGANIZER_DEMO": "true",
     "MOCK_AUTH": "true",
     "RP_ID": "localhost",
     "PASSKEY_ORIGINS": "http://localhost:8787",
@@ -24,10 +31,12 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "firelink-dev-files" }],
   "env": {
     "staging": {
-      "name": "firelink-staging",
+      "name": "firelink-organizer-staging",
+      "triggers": { "crons": ["27 * * * *"] },
       "vars": {
         "APP_ENV": "staging",
-        "MOCK_AUTH": "true",
+        "ORGANIZER_DEMO": "true",
+        "MOCK_AUTH": "false",
         "RP_ID": "",
         "PASSKEY_ORIGINS": "",
         "APPLE_APP_ID": "",
@@ -36,18 +45,23 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "firelink-staging",
+          "database_name": "firelink-organizer-staging",
+          "database_id": "0e8f3e9f-cfd5-408a-bd6d-69ba8269b2e5",
           "migrations_dir": "migrations",
         },
       ],
       "r2_buckets": [
-        { "binding": "FILES", "bucket_name": "firelink-staging-files" },
+        {
+          "binding": "FILES",
+          "bucket_name": "firelink-organizer-staging-files",
+        },
       ],
     },
     "production": {
       "name": "firelink-production",
       "vars": {
         "APP_ENV": "production",
+        "ORGANIZER_DEMO": "false",
         "MOCK_AUTH": "false",
         "RP_ID": "",
         "PASSKEY_ORIGINS": "",
