@@ -39,6 +39,38 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "organization-drafts": async (page) => {
+    const settings = () =>
+      page.locator('.sidebar a[href="#/settings"]').click();
+    await settings();
+    await page.getByLabel("组织介绍", { exact: true }).fill("暂存组织介绍");
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+    await settings();
+    await page
+      .locator("#organization-draft-status")
+      .filter({ hasText: "未保存" })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel("组织介绍", { exact: true }).inputValue(),
+      "暂存组织介绍",
+    );
+    await page
+      .getByRole("button", { name: "保存组织资料", exact: true })
+      .click();
+    await page
+      .locator("#organization-draft-status")
+      .filter({ hasText: /^$/ })
+      .waitFor({ state: "attached" });
+    await page.reload();
+    await page
+      .getByRole("heading", { name: "组织设置", exact: true })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel("组织介绍", { exact: true }).inputValue(),
+      "暂存组织介绍",
+    );
+  },
   "block-undo": async (page) => {
     await editDraft(page);
     const contents = () =>
