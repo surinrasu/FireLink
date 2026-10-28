@@ -58,6 +58,11 @@ export function mountEditor(
   let saving: Promise<void> | null = null;
   let revision = 0;
   let autoSaveStopped = false;
+  const deletedBlocks: {
+    block: ContentBlock;
+    index: number;
+    uploadCancelled: boolean;
+  }[] = [];
   const uploads = new Map<
     ContentBlock,
     {
@@ -106,6 +111,37 @@ export function mountEditor(
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
   const status = host.querySelector<HTMLElement>("#save-status")!;
   const blockHost = host.querySelector<HTMLElement>("#blocks")!;
+  const undoRegion = document.createElement("div");
+  undoRegion.className = "block-undo row wrap";
+  undoRegion.hidden = true;
+  undoRegion.innerHTML =
+    '<span id="block-undo-status" role="status"></span><button type="button" class="border" id="undo-block">撤销删除</button>';
+  blockHost.before(undoRegion);
+  const undoButton = undoRegion.querySelector<HTMLButtonElement>("button")!;
+  const undoStatus = undoRegion.querySelector<HTMLElement>("span")!;
+  undoButton.addEventListener("click", () => {
+    if (blocks.length >= 50)
+      return toast("内容已达 50 段，请先删除空段再恢复。");
+    const deleted = deletedBlocks.pop();
+    if (!deleted) return;
+    readBlocks();
+    const index = Math.min(deleted.index, blocks.length);
+    blocks.splice(index, 0, deleted.block);
+    drawBlocks();
+    changed();
+    undoRegion.hidden = !deletedBlocks.length;
+    undoStatus.textContent = deletedBlocks.length
+      ? `还有 ${deletedBlocks.length} 段可撤销删除`
+      : "";
+    blockHost.children[index]
+      ?.querySelector<HTMLElement>('input:not([type="file"]), textarea')
+      ?.focus();
+    toast(
+      deleted.uploadCancelled
+        ? "内容已恢复；已取消的上传请重新选择文件。"
+        : "已恢复删除的内容。",
+    );
+  });
   const value = (name: string) => String(new FormData(form).get(name) || "");
   function readBlocks() {
     blocks = blocks.map((block, index) => {
@@ -246,14 +282,20 @@ export function mountEditor(
       .forEach((button) =>
         button.addEventListener("click", () => {
           readBlocks();
-          const removed = blocks.splice(
-            Number(button.dataset.removeBlock),
-            1,
-          )[0];
+          const index = Number(button.dataset.removeBlock);
+          const removed = blocks.splice(index, 1)[0];
+          deletedBlocks.push({
+            block: structuredClone(removed),
+            index,
+            uploadCancelled: !!uploads.get(removed)?.pending,
+          });
           uploads.get(removed)?.controller.abort();
           uploads.delete(removed);
           drawBlocks();
           changed();
+          undoRegion.hidden = false;
+          undoStatus.textContent = `已删除第 ${index + 1} 段 · 本次编辑可撤销`;
+          undoButton.focus();
         }),
       );
     blockHost

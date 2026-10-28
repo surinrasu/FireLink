@@ -39,6 +39,37 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "block-undo": async (page) => {
+    await editDraft(page);
+    const contents = () =>
+      page
+        .locator('#blocks [name^="block-text-"]')
+        .evaluateAll((nodes) =>
+          nodes.map((node) => (node as HTMLInputElement).value),
+        );
+    const before = await contents();
+    await page
+      .getByRole("button", { name: "删除第 2 段", exact: true })
+      .click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    assert.equal((await contents()).length, before.length - 1);
+    await page
+      .getByRole("button", { name: "删除第 1 段", exact: true })
+      .click();
+    await page.getByRole("button", { name: "撤销删除", exact: true }).click();
+    await page.getByRole("button", { name: "撤销删除", exact: true }).click();
+    assert.deepEqual(await contents(), before);
+    assert.equal(
+      await page
+        .locator('[name="block-text-1"]')
+        .evaluate((e) => e === document.activeElement),
+      true,
+    );
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await page.reload();
+    await page.locator("#task-form").waitFor();
+    assert.deepEqual(await contents(), before);
+  },
   "review-drafts": async (page) => {
     await review(page);
     const first = await page
