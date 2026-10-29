@@ -630,6 +630,78 @@ video {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
+.task-view-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.task-view-controls button {
+  margin: 0;
+}
+.task-view-controls [aria-pressed="true"] {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+  border-color: var(--secondary-container);
+}
+#task-grid.compact {
+  grid-template-columns: 1fr;
+}
+.compact .task-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.7fr);
+  gap: 8px 20px;
+  align-items: center;
+  padding: 16px 20px;
+  margin: 0;
+  box-shadow: none;
+}
+.compact .task-card > * {
+  margin: 0;
+}
+.compact .task-card-top {
+  grid-column: 1;
+  grid-row: 1;
+}
+.compact .task-card-top > .muted,
+.compact .task-card .summary {
+  display: none;
+}
+.compact .task-card h2 {
+  grid-column: 1;
+  grid-row: 2;
+}
+.compact .task-event {
+  grid-column: 1;
+  grid-row: 3;
+}
+.compact .task-deadline {
+  grid-column: 2;
+  grid-row: 1;
+}
+.compact .task-progress {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+}
+.compact .task-card footer {
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  flex-direction: column;
+  align-items: flex-end;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+@media (max-width: 699px) {
+  .compact .task-card {
+    display: flex;
+    align-items: stretch;
+  }
+  .compact .task-card footer {
+    flex-direction: row;
+    align-items: center;
+  }
+}
 .task-card {
   margin: 0;
   padding: 24px;
