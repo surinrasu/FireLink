@@ -39,6 +39,37 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "route-loading": async (page) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/organizer/workspace", async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "正在加载页面" })
+      .waitFor();
+    assert.equal(await page.locator("#app").getAttribute("aria-busy"), "true");
+    release();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    await page.locator(".route-status").waitFor({ state: "hidden" });
+    assert.equal(await page.locator("#app").getAttribute("aria-busy"), null);
+    await page.unroute("**/api/organizer/workspace");
+    await page.route("**/api/organizer/workspace", (route) =>
+      route.fulfill({ status: 503, json: { error: "暂时无法连接" } }),
+    );
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await page.getByRole("heading", { name: "暂时无法打开此页面" }).waitFor();
+    assert.equal(await page.locator("#app").getAttribute("aria-busy"), null);
+    assert.equal(await page.locator(".route-status").isVisible(), false);
+    await page.unroute("**/api/organizer/workspace");
+    await page.getByRole("button", { name: "重试", exact: true }).click();
+    await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  },
   "clear-filters": async (page) => {
     await page.locator('.sidebar a[href="#/tasks"]').click();
     await page.locator(".task-card").first().waitFor();
