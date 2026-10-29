@@ -35,6 +35,11 @@ import {
 import { mountEditor, type EditorHandle } from "./editor";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
+const routeStatus = document.createElement("div");
+routeStatus.className = "route-status";
+routeStatus.setAttribute("role", "status");
+routeStatus.hidden = true;
+document.body.append(routeStatus);
 let session: Session | null = null;
 let workspace: Workspace;
 let currentOrg = "";
@@ -954,6 +959,24 @@ async function showLogin() {
 }
 async function renderRoute() {
   const turn = ++generation;
+  root.setAttribute("aria-busy", "true");
+  const loading = setTimeout(() => {
+    if (turn !== generation) return;
+    routeStatus.hidden = false;
+    routeStatus.textContent = "正在加载页面…";
+  }, 180);
+  try {
+    await renderPage(turn);
+  } finally {
+    clearTimeout(loading);
+    if (turn === generation) {
+      root.removeAttribute("aria-busy");
+      routeStatus.hidden = true;
+      routeStatus.textContent = "";
+    }
+  }
+}
+async function renderPage(turn: number) {
   editor?.dispose();
   editor = null;
   const route = routeInfo();
@@ -962,7 +985,9 @@ async function renderRoute() {
   if (!session) {
     try {
       await refreshSession();
+      if (turn !== generation) return;
     } catch (error) {
+      if (turn !== generation) return;
       if (error instanceof APIError && error.status === 401) return showLogin();
       root.innerHTML = `<main class="boot" id="main">${empty("暂时无法连接工作台", errorText(error), '<button data-action="refresh">重新连接</button>', "wifi_off")}</main>`;
       return;
