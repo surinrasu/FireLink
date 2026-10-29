@@ -150,7 +150,9 @@ try {
   await page.locator('.sidebar a[href="#/incidents"]').click();
   await page.getByRole("heading", { name: "事件协作", exact: true }).waitFor();
   await page.locator('.sidebar a[href="#/notices"]').click();
-  await page.getByRole("heading", { name: "通知记录", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "已发送通知", exact: true })
+    .waitFor();
   assert.ok((await page.locator(".notice").count()) > 0);
   await page.getByRole("button", { name: "外观与阅读设置" }).click();
   await page.getByLabel("主题", { exact: true }).selectOption("dark");
