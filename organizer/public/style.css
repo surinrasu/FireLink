@@ -99,6 +99,17 @@ a.button {
 button:disabled {
   cursor: not-allowed;
 }
+button.circle,
+a.button.circle {
+  min-width: 44px;
+}
+.task-info a,
+.task-row-end small a,
+.panel-header > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
 .field input::placeholder,
 .field textarea::placeholder {
   color: var(--on-surface-variant);
@@ -604,7 +615,7 @@ video {
   border: 1px solid var(--outline-variant);
   border-radius: 22px;
   font-size: 0.82rem;
-  min-height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -657,7 +668,7 @@ video {
 .task-card footer a {
   font-size: 0.8rem;
   color: var(--primary);
-  min-height: 32px;
+  min-height: 44px;
   display: flex;
   align-items: center;
 }
