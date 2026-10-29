@@ -99,6 +99,11 @@ a.button {
 button:disabled {
   cursor: not-allowed;
 }
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 1;
+}
 a {
   text-decoration: none;
 }
@@ -797,6 +802,9 @@ video {
 .application-row.active {
   background: var(--primary-container);
   border-color: var(--primary-container);
+}
+.application-row.active > small {
+  color: var(--on-primary-container);
 }
 .application-row .row {
   gap: 10px;
