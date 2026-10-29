@@ -39,6 +39,23 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "clear-filters": async (page) => {
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page.locator(".task-card").first().waitFor();
+    const count = await page.locator(".task-card").count();
+    await page
+      .getByRole("searchbox", { name: "搜索任务", exact: true })
+      .fill("没有这项任务XYZ");
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    assert.equal(await page.locator(".task-card:visible").count(), count);
+    assert.equal(await page.locator("#task-search").inputValue(), "");
+    await page
+      .locator('.filter-chips a[href="#/tasks?state=archived"]')
+      .click();
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    await page.locator(".task-card").first().waitFor();
+    assert.equal(await page.locator(".task-card:visible").count(), count);
+  },
   "mobile-actions": async (page) => {
     await page
       .getByRole("link", { name: "新建任务", exact: true })

@@ -177,7 +177,7 @@ function tasksPage(params: URLSearchParams) {
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active">72 小时内截止</a>' : ""}</div>
   <div class="toolbar"><div class="field border round prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])])}</div>
-  <div class="task-grid" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty("无匹配任务", "", canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
+  <div class="task-grid" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
   const search = root.querySelector<HTMLInputElement>("#task-search")!;
@@ -201,6 +201,15 @@ function attachTaskSearch() {
   };
   search.addEventListener("input", apply);
   filter.addEventListener("change", apply);
+  root.querySelector("#clear-task-filters")?.addEventListener("click", () => {
+    search.value = "";
+    filter.value = "";
+    if (routeInfo().search) location.hash = "/tasks";
+    else {
+      apply();
+      search.focus();
+    }
+  });
 }
 function taskDetail(task: OrganizerTask, tab: string) {
   const actions = canEdit()
