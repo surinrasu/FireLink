@@ -39,6 +39,52 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "mobile-actions": async (page) => {
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .last()
+      .click();
+    await page.locator("#task-form").waitFor();
+    for (const size of ["normal", "large"]) {
+      await page.getByRole("button", { name: "外观与阅读设置" }).click();
+      await page.getByLabel("文字大小", { exact: true }).selectOption(size);
+      await page.getByRole("button", { name: "完成", exact: true }).click();
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+          true,
+        );
+        const actions = await page
+          .locator(".editor-footer button")
+          .evaluateAll((buttons) =>
+            buttons.map((button) => {
+              const box = button.getBoundingClientRect();
+              const text = Array.from(button.childNodes).filter(
+                (node) =>
+                  node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+              );
+              return {
+                inside: box.left >= 0 && box.right <= innerWidth,
+                wraps: text.some((node) => {
+                  const range = document.createRange();
+                  range.selectNodeContents(node);
+                  return range.getClientRects().length > 1;
+                }),
+                fits: button.scrollWidth <= button.clientWidth,
+              };
+            }),
+          );
+        assert.equal(
+          actions.every((a) => a.inside && !a.wraps && a.fits),
+          true,
+          `${width}px ${size}: action labels must fit`,
+        );
+      }
+    }
+  },
   "continuous-review": async (page) => {
     await review(page);
     const reviewedName = await page
