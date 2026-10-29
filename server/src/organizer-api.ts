@@ -809,7 +809,10 @@ organizerAPI.post("/invitations", async (c) => {
     audit(c, "创建成员邀请", input.email),
   ]);
   return c.json(
-    { url: `${new URL(c.req.url).origin}/#/join/${token}`, expiresInHours: 48 },
+    {
+      url: `${new URL(c.req.url).origin}/mng-dash#/join/${token}`,
+      expiresInHours: 48,
+    },
     201,
   );
 });

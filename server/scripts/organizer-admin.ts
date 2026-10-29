@@ -47,7 +47,7 @@ if (command === "bootstrap") {
     token = randomToken();
   sql = `INSERT INTO organizations(id,name,verified,contact_methods) VALUES (${quote(id)},${quote(name)},0,'[]');
 INSERT INTO organizer_invitations VALUES (${quote(await hash(token))},${quote(id)},${quote(email)},'admin',1,'[]',${Date.now() + 48 * 3600000},NULL);`;
-  invitation = `组织 ID：${id}\n首位管理员邀请（48 小时内一次有效）：${origin.origin}/#/join/${token}\n组织初始为未认证，请完成核实后运行 verify。`;
+  invitation = `组织 ID：${id}\n首位管理员邀请（48 小时内一次有效）：${origin.origin}/mng-dash#/join/${token}\n组织初始为未认证，请完成核实后运行 verify。`;
 } else if (command === "verify") {
   const id = quote(required("organization"));
   sql = `UPDATE organizations SET verified=1,verification_status='verified' WHERE id=${id} AND demo_expires_at IS NULL;

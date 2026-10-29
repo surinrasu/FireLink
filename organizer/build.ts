@@ -1,21 +1,29 @@
-import { cp, mkdir, readdir } from "node:fs/promises";
+import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL(".", import.meta.url));
-await mkdir(`${root}build/assets`, { recursive: true });
-await cp(`${root}public`, `${root}build`, { recursive: true });
-await cp(`${root}../assets/firelink.svg`, `${root}build/assets/firelink.svg`);
+const output = `${root}build/mng-dash`;
+await rm(`${root}build`, { recursive: true, force: true });
+await mkdir(`${output}/assets`, { recursive: true });
+for (const name of await readdir(`${root}public`)) {
+  const directory =
+    name.startsWith("_") || name === "robots.txt" ? `${root}build` : output;
+  await cp(`${root}public/${name}`, `${directory}/${name}`, {
+    recursive: true,
+  });
+}
+await cp(`${root}../assets/firelink.svg`, `${output}/assets/firelink.svg`);
 const vendor = `${root}node_modules/beercss/dist/cdn`;
 for (const name of await readdir(vendor)) {
   if (/^(beer\.min\.(css|js)|.*\.woff2)$/.test(name))
-    await cp(`${vendor}/${name}`, `${root}build/assets/${name}`);
+    await cp(`${vendor}/${name}`, `${output}/assets/${name}`);
 }
 await cp(
   `${root}node_modules/leaflet/dist/leaflet.css`,
-  `${root}build/assets/leaflet.css`,
+  `${output}/assets/leaflet.css`,
 );
 const result = await Bun.build({
   entrypoints: [`${root}src/app.ts`],
-  outdir: `${root}build/assets`,
+  outdir: `${output}/assets`,
   target: "browser",
   minify: true,
   naming: "app.js",
