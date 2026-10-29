@@ -1084,6 +1084,19 @@ video {
   white-space: normal;
   font-size: 0.9rem;
 }
+.requirement-group {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
+}
+.requirement-group legend {
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+}
+.requirement-group .check-grid {
+  margin: 8px 0 0;
+}
 .editor-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 310px;
