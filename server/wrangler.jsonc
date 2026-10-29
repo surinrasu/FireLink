@@ -8,7 +8,7 @@
   "assets": {
     "directory": "../organizer/build",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    "html_handling": "drop-trailing-slash",
     "run_worker_first": ["/api/*", "/v1/*", "/health", "/.well-known/*"],
   },
   "vars": {
@@ -31,7 +31,7 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "firelink-dev-files" }],
   "env": {
     "staging": {
-      "name": "firelink-organizer-staging",
+      "name": "firelink-demo",
       "triggers": { "crons": ["27 * * * *"] },
       "vars": {
         "APP_ENV": "staging",

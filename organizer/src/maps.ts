@@ -53,7 +53,7 @@ class LocationMap extends HTMLElement {
   }
   connectedCallback() {
     if (this.map || this.observer) return;
-    this.root.innerHTML = `<link rel="stylesheet" href="/assets/leaflet.css"><style>
+    this.root.innerHTML = `<link rel="stylesheet" href="/mng-dash/assets/leaflet.css"><style>
       :host{display:block;min-width:0;margin:16px 0;color:var(--on-surface,#242722);font:inherit}
       *{box-sizing:border-box}[hidden]{display:none!important}.frame{border:1px solid var(--outline-variant,#d5d9ce);border-radius:16px;overflow:hidden;background:var(--surface,#fbf8f4)}
       .heading{display:flex;align-items:center;gap:12px;padding:12px 14px;font-size:.82rem;line-height:1.5}.label{flex:1;overflow-wrap:anywhere;font-weight:600}

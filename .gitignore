@@ -15,4 +15,5 @@ xcuserdata/
 !*.xcodeproj/project.pbxproj
 mise.local.toml
 .artifacts/
+.impeccable/
 *.log

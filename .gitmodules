@@ -1,0 +1,3 @@
+[submodule ".agents/skills/impeccable"]
+	path = .agents/skills/impeccable
+	url = git@github.com:pbakaus/impeccable.git
