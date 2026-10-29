@@ -43,17 +43,24 @@ export const vehicleLabels: Record<string, string> = {
 export function badge(state: TaskState | ApplicationState) {
   return `<span class="status status-${state}"><span aria-hidden="true"></span>${stateLabels[state]}</span>`;
 }
+const beijingYear = new Intl.DateTimeFormat("en", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+});
 export function formatDate(value: string, full = false) {
   if (!value || Number.isNaN(Date.parse(value))) return "未设置";
+  const date = new Date(value);
+  const showYear =
+    full || beijingYear.format(date) !== beijingYear.format(new Date());
   return new Intl.DateTimeFormat("zh-CN", {
     timeZone: "Asia/Shanghai",
-    ...(full ? { year: "numeric" } : {}),
+    ...(showYear ? { year: "numeric" } : {}),
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date(value));
+  }).format(date);
 }
 export function input(
   name: string,
