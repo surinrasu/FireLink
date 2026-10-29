@@ -82,7 +82,7 @@ const destinations = [
   ["tasks", "assignment", "任务管理"],
   ["applications", "fact_check", "报名审核"],
   ["incidents", "explore", "事件协作"],
-  ["notices", "notifications", "通知记录"],
+  ["notices", "notifications", "已发送通知"],
   ["settings", "settings", "组织设置"],
 ];
 function routeInfo() {
@@ -111,7 +111,7 @@ function taskProgress(task: OrganizerTask) {
 function shell(body: string, section: string) {
   const pending = workspace.tasks.reduce((n, task) => n + task.pending, 0);
   root.innerHTML = `<aside class="sidebar" aria-label="工作台导航"><a class="brand" href="#/dashboard"><strong>FireLink</strong></a>${canEdit() ? `<a class="button primary-container create-button" href="#/tasks/new" aria-label="新建任务">${icon("add")}<span>新建任务</span></a>` : ""}<nav class="side-links">${destinations.map(([id, symbol, label]) => `<a class="side-link ${section === id ? "active" : ""}" href="#/${id}" ${section === id ? 'aria-current="page"' : ""} title="${label}">${icon(symbol)}<span>${label}</span>${id === "applications" && pending ? `<span class="count">${pending}</span>` : ""}</a>`).join("")}</nav><div class="sidebar-footer"><span class="workspace-label">${workspace.organization.demo ? "演示环境" : workspace.organization.verified ? "已认证组织" : "组织待认证"}</span></div></aside>
-  <div class="app-shell"><header class="topbar"><div class="org-switch">${icon("domain")}<select aria-label="切换组织" id="org-switch">${session!.memberships.map((m) => `<option value="${h(m.organizationId)}" ${m.organizationId === currentOrg ? "selected" : ""}>${h(m.organizationName)}</option>`).join("")}</select></div><span class="topbar-spacer"></span><button class="transparent circle" data-action="appearance" aria-label="外观与阅读设置" title="外观与阅读设置">${icon("contrast")}</button><a class="button transparent circle" href="#/notices" aria-label="通知记录" title="通知记录">${icon("notifications_none")}</a><button class="transparent circle" data-action="account" aria-label="账号菜单"><span class="avatar">${h(session!.account.name.slice(0, 1))}</span></button></header><main class="content" id="main">${body}</main></div>
+  <div class="app-shell"><header class="topbar"><div class="org-switch">${icon("domain")}<select aria-label="切换组织" id="org-switch">${session!.memberships.map((m) => `<option value="${h(m.organizationId)}" ${m.organizationId === currentOrg ? "selected" : ""}>${h(m.organizationName)}</option>`).join("")}</select></div><span class="topbar-spacer"></span><button class="transparent circle" data-action="appearance" aria-label="外观与阅读设置" title="外观与阅读设置">${icon("contrast")}</button><a class="button transparent circle" href="#/notices" aria-label="已发送通知" title="已发送通知">${icon("notifications_none")}</a><button class="transparent circle" data-action="account" aria-label="账号菜单"><span class="avatar">${h(session!.account.name.slice(0, 1))}</span></button></header><main class="content" id="main">${body}</main></div>
   <nav class="mobile-nav" aria-label="主要导航">${destinations
     .slice(0, 3)
     .map(
@@ -549,7 +549,7 @@ async function noticesPage(turn: number) {
   const notices = await api<ResultNotice[]>("/notices");
   if (turn !== generation) return;
   shell(
-    `${heading("通知记录", "最近 200 条 · 已读状态来自志愿者端", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}<section class="panel">${notices.length ? notices.map((n) => `<article class="notice"><div class="task-symbol">${icon("notifications_none")}</div><div class="notice-body"><h2>${h(n.title)}</h2><p>${h(n.taskTitle)} · ${h(n.body)}</p><small>${formatDate(n.createdAt, true)}</small></div><span class="status">${n.readAt ? "已读" : "未读"}</span></article>`).join("") : empty("暂无通知", "", "", "notifications_none")}</section>`,
+    `${heading("已发送通知", "最近 200 条 · 已读状态来自志愿者端", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}<section class="panel">${notices.length ? notices.map((n) => `<article class="notice"><div class="task-symbol">${icon("notifications_none")}</div><div class="notice-body"><h2>${h(n.title)}</h2><p>${h(n.taskTitle)} · ${h(n.body)}</p><small>${formatDate(n.createdAt, true)}</small></div><span class="status">${n.readAt ? "已读" : "未读"}</span></article>`).join("") : empty("还没有发送通知", "审核结果通知会显示在这里。", "", "notifications_none")}</section>`,
     "notices",
   );
 }
