@@ -39,6 +39,33 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "date-years": async (page) => {
+    // Beijing has entered 2027 while UTC is still in 2026.
+    await page.clock.setFixedTime(new Date("2026-12-31T16:00:00Z"));
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      const deadlines = [
+        "2026-12-31T15:59:00Z",
+        "2026-12-31T16:01:00Z",
+        "2027-12-31T16:00:00Z",
+      ];
+      deadlines.forEach((deadline, i) => (data.tasks[i].deadline = deadline));
+      await route.fulfill({ response, json: data });
+    });
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page.locator(".task-card").first().waitFor();
+    const deadlines = await page.locator(".task-deadline").allTextContents();
+    assert.match(deadlines[0], /2026年/);
+    assert.doesNotMatch(deadlines[1], /年/);
+    assert.match(deadlines[2], /2028年/);
+    await page.setViewportSize({ width: 320, height: 844 });
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+  },
   "route-loading": async (page) => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
