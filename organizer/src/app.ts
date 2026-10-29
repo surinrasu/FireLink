@@ -39,6 +39,7 @@ let session: Session | null = null;
 let workspace: Workspace;
 let currentOrg = "";
 let generation = 0;
+let taskView: "cards" | "compact" = "cards";
 let editor: EditorHandle | null = null;
 const reviewDrafts = new Map<string, { response: string; note: string }>();
 const organizationDrafts = new Map<string, Record<string, string>>();
@@ -100,7 +101,7 @@ function taskProgress(task: OrganizerTask) {
   const percentage = task.capacity
     ? Math.min(100, (task.accepted / task.capacity) * 100)
     : 0;
-  return `<div><div class="progress-label"><span>已通过 <strong>${task.accepted}</strong>${task.capacity ? ` / ${task.capacity} 人` : " 人"}</span><span class="muted">${task.pending} 份待审核</span></div>${task.capacity ? `<div class="progress-track" role="meter" aria-label="已通过报名人数" aria-valuemin="0" aria-valuemax="${task.capacity}" aria-valuenow="${task.accepted}"><span style="width:${percentage}%"></span></div>` : ""}</div>`;
+  return `<div class="task-progress"><div class="progress-label"><span>已通过 <strong>${task.accepted}</strong>${task.capacity ? ` / ${task.capacity} 人` : " 人"}</span><span class="muted">${task.pending} 份待审核</span></div>${task.capacity ? `<div class="progress-track" role="meter" aria-label="已通过报名人数" aria-valuemin="0" aria-valuemax="${task.capacity}" aria-valuenow="${task.accepted}"><span style="width:${percentage}%"></span></div>` : ""}</div>`;
 }
 function shell(body: string, section: string) {
   const pending = workspace.tasks.reduce((n, task) => n + task.pending, 0);
@@ -161,7 +162,7 @@ function dashboard() {
   <div class="dashboard-grid"><div><section class="panel"><div class="panel-header"><h2>需要关注的任务</h2><a href="#/tasks">全部任务 ${icon("arrow_forward")}</a></div>${rows.length ? rows.map((t) => `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a><p>${h(t.incidentTitle)}</p></div><div class="task-row-end">${badge(t.state)}<small>${t.pending ? `<a href="${applicationsLink(t.id)}">${t.pending} 份待审核 →</a>` : `已通过 ${t.accepted}${t.capacity ? ` / ${t.capacity}` : ""}`}</small></div></div>`).join("") : empty("暂无任务", "", canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "", "add_task")}</section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
 }
 function taskCard(task: OrganizerTask) {
-  return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}<span class="muted">${icon(task.state === "draft" ? "edit_note" : "assignment")}</span></div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="meta-line">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)} · 负责人</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
+  return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}<span class="muted">${icon(task.state === "draft" ? "edit_note" : "assignment")}</span></div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)} · 负责人</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
 }
 function tasksPage(params: URLSearchParams) {
   const state = params.get("state") || "all",
@@ -177,9 +178,27 @@ function tasksPage(params: URLSearchParams) {
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active">72 小时内截止</a>' : ""}</div>
   <div class="toolbar"><div class="field border round prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])])}</div>
-  <div class="task-grid" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
+  <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">紧凑列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
+  root
+    .querySelectorAll<HTMLButtonElement>("[data-task-view]")
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        taskView = button.dataset.taskView === "compact" ? "compact" : "cards";
+        root
+          .querySelector("#task-grid")!
+          .classList.toggle("compact", taskView === "compact");
+        root
+          .querySelectorAll<HTMLElement>("[data-task-view]")
+          .forEach((control) =>
+            control.setAttribute(
+              "aria-pressed",
+              String(control.dataset.taskView === taskView),
+            ),
+          );
+      }),
+    );
   const search = root.querySelector<HTMLInputElement>("#task-search")!;
   const filter = root.querySelector<HTMLSelectElement>("#incident-filter")!;
   const apply = () => {
