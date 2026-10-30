@@ -200,6 +200,7 @@ const cases: Record<
     );
   },
   "route-loading": async (page) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
     await page.route("**/api/organizer/workspace", async (route) => {
@@ -212,6 +213,88 @@ const cases: Record<
       .filter({ hasText: "正在加载页面" })
       .waitFor();
     assert.equal(await page.locator("#app").getAttribute("aria-busy"), "true");
+    const progress = page.locator(".route-status");
+    const aligned = async () => {
+      const placement = await progress.evaluate((element) => {
+        const bar = element.getBoundingClientRect();
+        const header = document
+          .querySelector(".topbar")!
+          .getBoundingClientRect();
+        return {
+          top: bar.top,
+          left: bar.left,
+          right: bar.right,
+          height: bar.height,
+          headerBottom: Math.max(0, header.bottom),
+          headerLeft: header.left,
+          viewport: innerWidth,
+        };
+      });
+      assert.equal(placement.height, 3);
+      assert.equal(placement.top, placement.headerBottom);
+      assert.equal(placement.left, placement.headerLeft);
+      assert.equal(placement.right, placement.viewport);
+    };
+    await aligned();
+    assert.equal(
+      await progress.locator(".sr-only").textContent(),
+      "正在加载页面…",
+    );
+    const initialTransform = await progress.evaluate(
+      (element) => getComputedStyle(element, "::before").transform,
+    );
+    await page.waitForFunction(
+      (initial) =>
+        getComputedStyle(document.querySelector(".route-status")!, "::before")
+          .transform !== initial,
+      initialTransform,
+    );
+    await page.waitForFunction(() => {
+      const bar = document.querySelector(".route-status")!;
+      const x = new DOMMatrixReadOnly(
+        getComputedStyle(bar, "::before").transform,
+      ).m41;
+      return x > 0 && x < bar.clientWidth / 2;
+    });
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/route-loading-desktop.png",
+    });
+    await page.setViewportSize({ width: 834, height: 1000 });
+    await aligned();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await aligned();
+    await page.getByRole("button", { name: "外观与阅读设置" }).click();
+    await page.getByLabel("主题", { exact: true }).selectOption("dark");
+    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal(
+      await progress.evaluate(
+        (element) => getComputedStyle(element, "::before").animationName,
+      ),
+      "none",
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/route-loading-mobile.png",
+    });
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.waitForFunction(
+      () =>
+        document.querySelector(".route-status")!.getBoundingClientRect().top ===
+        0,
+    );
+    await aligned();
+    await page.emulateMedia({
+      reducedMotion: "no-preference",
+      forcedColors: "active",
+    });
+    assert.equal(
+      await progress.evaluate(
+        (element) => getComputedStyle(element, "::before").forcedColorAdjust,
+      ),
+      "none",
+    );
+    await page.emulateMedia({ forcedColors: "none" });
+    await page.setViewportSize({ width: 1440, height: 1000 });
     release();
     await page
       .getByRole("heading", { name: "任务管理", exact: true })

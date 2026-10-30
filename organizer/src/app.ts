@@ -39,7 +39,24 @@ const routeStatus = document.createElement("div");
 routeStatus.className = "route-status";
 routeStatus.setAttribute("role", "status");
 routeStatus.hidden = true;
+const routeStatusText = document.createElement("span");
+routeStatusText.className = "sr-only";
+routeStatus.append(routeStatusText);
 document.body.append(routeStatus);
+let hideRouteStatus: ReturnType<typeof setTimeout> | undefined;
+function positionRouteStatus() {
+  if (routeStatus.hidden) return;
+  const header = root.querySelector(".topbar")?.getBoundingClientRect();
+  routeStatus.style.top = `${Math.max(0, header?.bottom ?? 0)}px`;
+  routeStatus.style.left = `${Math.max(0, header?.left ?? 0)}px`;
+}
+window.addEventListener("resize", positionRouteStatus);
+window.addEventListener("scroll", positionRouteStatus, { passive: true });
+const pauseRouteStatus = () => {
+  routeStatus.style.animationPlayState = document.hidden ? "paused" : "running";
+};
+document.addEventListener("visibilitychange", pauseRouteStatus);
+pauseRouteStatus();
 let session: Session | null = null;
 let workspace: Workspace;
 let currentOrg = "";
@@ -1076,11 +1093,15 @@ async function showLogin() {
 }
 async function renderRoute() {
   const turn = ++generation;
+  clearTimeout(hideRouteStatus);
+  routeStatus.classList.remove("complete");
+  if (!routeStatus.hidden) routeStatusText.textContent = "正在加载页面…";
   root.setAttribute("aria-busy", "true");
   const loading = setTimeout(() => {
     if (turn !== generation) return;
     routeStatus.hidden = false;
-    routeStatus.textContent = "正在加载页面…";
+    routeStatusText.textContent = "正在加载页面…";
+    positionRouteStatus();
   }, 180);
   try {
     await renderPage(turn);
@@ -1088,8 +1109,18 @@ async function renderRoute() {
     clearTimeout(loading);
     if (turn === generation) {
       root.removeAttribute("aria-busy");
-      routeStatus.hidden = true;
-      routeStatus.textContent = "";
+      routeStatusText.textContent = "";
+      if (!routeStatus.hidden) {
+        positionRouteStatus();
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches)
+          routeStatus.hidden = true;
+        else {
+          routeStatus.classList.add("complete");
+          hideRouteStatus = setTimeout(() => {
+            if (turn === generation) routeStatus.hidden = true;
+          }, 180);
+        }
+      }
     }
   }
 }
