@@ -1,5 +1,6 @@
 import type {
   ContentBlock,
+  MapAnnotation,
   OrganizerTask,
   TaskInput,
   Workspace,
@@ -7,6 +8,7 @@ import type {
 import { api, uploadMedia } from "./api";
 import { mediaTypes } from "../../shared/media";
 import { mapPreview, updatePreview } from "./maps";
+import { completeMap, mapAnnotations } from "../../shared/maps";
 import {
   closeDialog,
   errorText,
@@ -39,7 +41,7 @@ const blockNames = {
   image: "图片",
   video: "视频",
   table: "表格",
-  map: "地图位置",
+  map: "地图",
 };
 
 export function mountEditor(
@@ -50,6 +52,15 @@ export function mountEditor(
   incidentId = "",
 ): EditorHandle {
   const source = task || copy;
+  const now = Date.now();
+  const halfHour = 30 * 60 * 1000;
+  const times = task || {
+    startsAt: new Date(
+      (Math.floor(now / halfHour) + 1) * halfHour,
+    ).toISOString(),
+    deadline: new Date(now + 24 * 3600000).toISOString(),
+    endsAt: new Date(now + 48 * 3600000).toISOString(),
+  };
   let id = task?.id;
   let version = task?.version ?? 1;
   let disposed = false;
@@ -104,7 +115,7 @@ export function mountEditor(
         .map((m) => [m.id, m.name]),
       source?.ownerId || workspace.membership.id,
     )}</div></section>
-    <section class="panel editor-section"><h2><span class="step-number">2</span>时间与地点</h2><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "服务开始时间", task ? beijingInput(task.startsAt) : "", "", "datetime-local")}${input("endsAt", "服务结束时间", task ? beijingInput(task.endsAt) : "", "", "datetime-local")}${input("deadline", "报名截止时间", task ? beijingInput(task.deadline) : "", "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "服务地点", source?.location || "", 'maxlength="300"')}</section>
+    <section class="panel editor-section"><h2><span class="step-number">2</span>时间与地点</h2><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "任务开始时间", beijingInput(times.startsAt), "", "datetime-local")}${input("endsAt", "任务结束时间", beijingInput(times.endsAt), "", "datetime-local")}${input("deadline", "报名截止时间", beijingInput(times.deadline), "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "服务地点", source?.location || "", 'maxlength="300"')}</section>
     <section class="panel editor-section"><div class="block-section-heading"><h2><span class="step-number">3</span>工作内容与参与要求</h2><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
       blockNames,
     )
@@ -213,7 +224,7 @@ export function mountEditor(
       title: "任务标题",
       incidentId: "所属事件",
       summary: "一句话介绍任务",
-      startsAt: "服务开始时间",
+      startsAt: "任务开始时间",
       deadline: "报名截止时间",
       location: "服务地点",
     };
@@ -228,16 +239,16 @@ export function mountEditor(
       invalidate("deadline", "报名截止时间须晚于当前时间");
     if (
       value("deadline") &&
-      value("startsAt") &&
-      value("deadline") > value("startsAt")
+      value("endsAt") &&
+      value("deadline") > value("endsAt")
     )
-      invalidate("deadline", "报名截止时间不能晚于服务开始时间");
+      invalidate("deadline", "报名截止时间不能晚于任务结束时间");
     if (
       value("endsAt") &&
       value("startsAt") &&
       value("endsAt") <= value("startsAt")
     )
-      invalidate("endsAt", "服务结束时间须晚于开始时间");
+      invalidate("endsAt", "任务结束时间须晚于任务开始时间");
     check(
       "required-fields",
       !!form.querySelector('[name="requiredFields"]:checked'),
@@ -259,9 +270,9 @@ export function mountEditor(
         );
       if (block.type === "map")
         check(
-          `block-lat-${index}`,
-          block.latitude !== undefined && block.longitude !== undefined,
-          `请标记第 ${index + 1} 段地图的位置`,
+          `block-map-${index}`,
+          completeMap(block),
+          `请完成第 ${index + 1} 段地图标注：位置至少 1 个点，路径 2 个不同点，范围 3 个不共线的点`,
         );
     });
     check(
@@ -338,12 +349,6 @@ export function mountEditor(
     blocks = blocks.map((block, index) => {
       const result = block;
       result.text = value(`block-text-${index}`);
-      if (block.type === "map") {
-        const latitude = value(`block-lat-${index}`).trim(),
-          longitude = value(`block-lng-${index}`).trim();
-        result.latitude = latitude ? Number(latitude) : undefined;
-        result.longitude = longitude ? Number(longitude) : undefined;
-      }
       if (block.type === "table")
         result.rows = value(`block-rows-${index}`)
           .split("\n")
@@ -365,8 +370,9 @@ export function mountEditor(
     return mapPreview(
       block.latitude,
       block.longitude,
-      block.text || "标记位置",
-      `editable data-map-index="${index}" ${incident ? `center-lat="${incident.latitude}" center-lng="${incident.longitude}"` : ""}`,
+      block.text || "地图",
+      `editable id="block-map-${index}" tabindex="-1" data-map-index="${index}" ${incident ? `center-lat="${incident.latitude}" center-lng="${incident.longitude}"` : ""}`,
+      mapAnnotations(block),
     );
   }
   function refreshUpload(block: ContentBlock) {
@@ -449,25 +455,23 @@ export function mountEditor(
       picker.value = "";
     }
   });
-  blockHost.addEventListener("locationchange", (event) => {
+  blockHost.addEventListener("mapchange", (event) => {
     const map = event.target as HTMLElement;
     const index = Number(map.dataset.mapIndex);
-    const point = (
-      event as CustomEvent<{ latitude: number; longitude: number }>
+    const { annotations } = (
+      event as CustomEvent<{ annotations: MapAnnotation[] }>
     ).detail;
-    form.querySelector<HTMLInputElement>(`#block-lat-${index}`)!.value = String(
-      point.latitude,
-    );
-    form.querySelector<HTMLInputElement>(`#block-lng-${index}`)!.value = String(
-      point.longitude,
-    );
+    blocks[index].annotations = annotations;
+    const point = annotations[0]?.coordinates[0];
+    blocks[index].latitude = point?.latitude;
+    blocks[index].longitude = point?.longitude;
     changed();
   });
   function drawBlocks() {
     blockHost.innerHTML = blocks
       .map(
         (block, index) =>
-          `<div class="block-editor" style="border-top:1px solid var(--outline-variant);margin-top:20px;padding-top:16px"><div class="row"><strong class="max" style="font-size:.85rem">${index + 1}. ${blockNames[block.type]}</strong><button class="transparent circle" type="button" data-move-block="${index}" ${index === 0 ? "disabled" : ""} aria-label="上移第 ${index + 1} 段">${icon("arrow_upward")}</button><button class="transparent circle" type="button" data-remove-block="${index}" aria-label="删除第 ${index + 1} 段">${icon("delete_outline")}</button></div>${block.type === "paragraph" ? textarea(`block-text-${index}`, "段落内容", block.text || "", 'maxlength="10000"') : input(`block-text-${index}`, block.type === "heading" ? "小标题" : "说明文字", block.text || "", 'maxlength="10000"')}${uploadControl(block, index)}${block.type === "map" ? `${mapControl(block, index)}<div class="form-grid">${input(`block-lat-${index}`, "纬度", String(block.latitude ?? ""), 'min="-90" max="90" step="any"', "number")}${input(`block-lng-${index}`, "经度", String(block.longitude ?? ""), 'min="-180" max="180" step="any"', "number")}</div>` : ""}${block.type === "table" ? textarea(`block-rows-${index}`, "表格内容", block.rows?.map((row) => row.join(" | ")).join("\n") || "", 'maxlength="10000"') + '<p class="help">每行一条记录，列之间用 | 分隔，第一行为表头。</p>' : ""}</div>`,
+          `<div class="block-editor" style="border-top:1px solid var(--outline-variant);margin-top:20px;padding-top:16px"><div class="row"><strong class="max" style="font-size:.85rem">${index + 1}. ${blockNames[block.type]}</strong><button class="transparent circle" type="button" data-move-block="${index}" ${index === 0 ? "disabled" : ""} aria-label="上移第 ${index + 1} 段">${icon("arrow_upward")}</button><button class="transparent circle" type="button" data-remove-block="${index}" aria-label="删除第 ${index + 1} 段">${icon("delete_outline")}</button></div>${block.type === "paragraph" ? textarea(`block-text-${index}`, "段落内容", block.text || "", 'maxlength="10000"') : input(`block-text-${index}`, block.type === "heading" ? "小标题" : "说明文字", block.text || "", 'maxlength="10000"')}${uploadControl(block, index)}${block.type === "map" ? mapControl(block, index) : ""}${block.type === "table" ? textarea(`block-rows-${index}`, "表格内容", block.rows?.map((row) => row.join(" | ")).join("\n") || "", 'maxlength="10000"') + '<p class="help">每行一条记录，列之间用 | 分隔，第一行为表头。</p>' : ""}</div>`,
       )
       .join("");
     blockHost
@@ -526,8 +530,8 @@ export function mountEditor(
   function previewHTML() {
     readBlocks();
     const rows = [
-      ["服务开始（北京时间）", value("startsAt").replace("T", " ")],
-      ["服务结束（北京时间）", value("endsAt").replace("T", " ")],
+      ["任务开始（北京时间）", value("startsAt").replace("T", " ")],
+      ["任务结束（北京时间）", value("endsAt").replace("T", " ")],
       ["报名截止（北京时间）", value("deadline").replace("T", " ")],
       ["服务地点", value("location")],
       ["集合地点", source?.meetingPoint || ""],
@@ -551,7 +555,8 @@ export function mountEditor(
         if (block[coordinate] === undefined) map.removeAttribute(coordinate);
         else map.setAttribute(coordinate, String(block[coordinate]));
       }
-      map.setAttribute("label", block.text || "标记位置");
+      map.setAttribute("annotations", JSON.stringify(mapAnnotations(block)));
+      map.setAttribute("label", block.text || "地图");
       const incident = workspace.incidents.find(
         (i) => i.id === value("incidentId"),
       );

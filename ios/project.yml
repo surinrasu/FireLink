@@ -38,6 +38,8 @@ targets:
         buildPhase: resources
       - path: ../fixtures/incident-sorting.json
         buildPhase: resources
+      - path: ../fixtures/map-annotations.json
+        buildPhase: resources
     dependencies:
       - target: FireLink
   FireLinkUITests:

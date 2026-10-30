@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +33,8 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
+import kotlin.math.ln
+import kotlin.math.tan
 
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: android.content.Context) {
@@ -495,7 +499,7 @@ fun HomeScreen(model: AppModel, go: (String) -> Unit) {
 }
 
 @Composable
-fun MapPreview(latitude: Double, longitude: Double) {
+fun MapPreview(latitude: Double, longitude: Double, annotations: List<MapAnnotation>? = null) {
     val strings = localizedResources()
     val primary = MaterialTheme.colorScheme.primary
     val dark = isSystemInDarkTheme()
@@ -506,36 +510,81 @@ fun MapPreview(latitude: Double, longitude: Double) {
     val labelBackground = if (dark) Color(0xFF243029) else Color.White
     Box(Modifier.fillMaxWidth().height(155.dp).background(land)) {
         Canvas(Modifier.fillMaxSize()) {
-            drawLine(
-                park,
-                Offset(0f, size.height * .25f),
-                Offset(size.width, size.height * .8f),
-                42.dp.toPx(),
-            )
-            for (i in 0..5) {
-                val x = size.width * i / 5
+            if (annotations == null) {
                 drawLine(
-                    road,
-                    Offset(x, 0f),
-                    Offset(x + size.width * .15f, size.height),
-                    9.dp.toPx(),
+                    park,
+                    Offset(0f, size.height * .25f),
+                    Offset(size.width, size.height * .8f),
+                    42.dp.toPx(),
                 )
+                for (i in 0..5) {
+                    val x = size.width * i / 5
+                    drawLine(
+                        road,
+                        Offset(x, 0f),
+                        Offset(x + size.width * .15f, size.height),
+                        9.dp.toPx(),
+                    )
+                }
+                for (i in 1..3) {
+                    val y = size.height * i / 4
+                    drawLine(
+                        road,
+                        Offset(0f, y),
+                        Offset(size.width, y - size.height * .1f),
+                        7.dp.toPx(),
+                    )
+                }
+            } else {
+                for (i in 1..4) {
+                    val x = size.width * i / 5
+                    val y = size.height * i / 5
+                    drawLine(label.copy(alpha = .12f), Offset(x, 0f), Offset(x, size.height), 1.dp.toPx())
+                    drawLine(label.copy(alpha = .12f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                }
             }
-            for (i in 1..3) {
-                val y = size.height * i / 4
-                drawLine(
-                    road,
-                    Offset(0f, y),
-                    Offset(size.width, y - size.height * .1f),
-                    7.dp.toPx(),
-                )
+            val points = annotations.orEmpty().flatMap { it.coordinates }
+            if (points.isEmpty()) {
+                drawCircle(primary.copy(alpha = .15f), 42.dp.toPx(), center)
+                drawCircle(primary, 9.dp.toPx(), center)
+                drawCircle(Color.White, 4.dp.toPx(), center)
+            } else {
+                fun mercator(point: MapCoordinate): Pair<Double, Double> =
+                    Math.toRadians(point.longitude) to
+                        ln(tan(Math.PI / 4 + Math.toRadians(point.latitude.coerceIn(-85.0, 85.0)) / 2))
+                val projected = points.map(::mercator)
+                val minX = projected.minOf { it.first }
+                val maxX = projected.maxOf { it.first }
+                val minY = projected.minOf { it.second }
+                val maxY = projected.maxOf { it.second }
+                val scale = minOf((size.width - 48.dp.toPx()) / (maxX - minX).coerceAtLeast(0.00001),
+                    (size.height - 60.dp.toPx()) / (maxY - minY).coerceAtLeast(0.00001))
+                fun position(point: MapCoordinate): Offset {
+                    val (x, y) = mercator(point)
+                    return Offset(center.x + ((x - (minX + maxX) / 2) * scale).toFloat(),
+                        center.y - ((y - (minY + maxY) / 2) * scale).toFloat())
+                }
+                annotations.orEmpty().forEach { annotation ->
+                    val vertices = annotation.coordinates.map(::position)
+                    if (vertices.size > 1 && annotation.type != "point") {
+                        val path = Path().apply {
+                            moveTo(vertices.first().x, vertices.first().y)
+                            vertices.drop(1).forEach { lineTo(it.x, it.y) }
+                            if (annotation.type == "area" && vertices.size >= 3) close()
+                        }
+                        if (annotation.type == "area" && vertices.size >= 3)
+                            drawPath(path, primary.copy(alpha = .18f))
+                        drawPath(path, primary, style = Stroke(3.dp.toPx()))
+                    }
+                    vertices.forEach { point ->
+                        drawCircle(Color.White, 6.dp.toPx(), point)
+                        drawCircle(primary, 4.dp.toPx(), point)
+                    }
+                }
             }
-            drawCircle(primary.copy(alpha = .15f), 42.dp.toPx(), center)
-            drawCircle(primary, 9.dp.toPx(), center)
-            drawCircle(Color.White, 4.dp.toPx(), center)
         }
         Text(
-            strings.getString(R.string.location),
+            strings.getString(if (annotations == null) R.string.location else R.string.map_annotations),
             Modifier.align(Alignment.TopStart).padding(10.dp),
             style = MaterialTheme.typography.labelSmall,
             color = label,
@@ -728,8 +777,11 @@ fun ContentBlocks(blocks: List<ContentBlock>) {
                     modifier = Modifier.fillMaxWidth().height(220.dp),
                 )
             "map" -> {
-                MapPreview(block.latitude ?: 0.0, block.longitude ?: 0.0)
-                Text(block.text.orEmpty(), style = MaterialTheme.typography.labelMedium)
+                if (block.annotations?.isNotEmpty() == true ||
+                    (block.annotations == null && block.latitude != null && block.longitude != null)) {
+                    MapPreview(block.latitude ?: 0.0, block.longitude ?: 0.0, block.annotations)
+                    Text(block.text.orEmpty(), style = MaterialTheme.typography.labelMedium)
+                }
             }
             "table" ->
                 Column(

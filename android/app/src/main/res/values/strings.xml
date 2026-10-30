@@ -200,4 +200,5 @@
     <string name="vehicle_decrease">"Decrease %1$s count"</string>
     <string name="vehicle_increase">"Increase %1$s count"</string>
     <string name="equipment_text_hint">"Describe any tools, equipment, or supplies you can provide."</string>
+    <string name="map_annotations">"Map annotations (schematic)"</string>
 </resources>

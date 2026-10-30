@@ -5,6 +5,7 @@ import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import type {
   ApplicationPage,
+  ContentBlock,
   OrganizerApplication,
   OrganizerTask,
   Session,
@@ -975,6 +976,192 @@ test("large videos use multipart storage and support ranges; demo expiry removes
       .first(),
     null,
   );
+});
+
+test("tasks can accept applications after starting, but not after their end", async () => {
+  const identity = await demo();
+  const task = (await workspace(identity)).tasks.find(
+    (task) => task.state === "draft",
+  )!;
+  const now = Date.now();
+  const input = {
+    ...taskInput(task),
+    title: "持续报名的任务",
+    summary: "任务开始后仍可加入",
+    location: "社区服务中心",
+    startsAt: new Date(now - 3600000).toISOString(),
+    deadline: new Date(now + 24 * 3600000).toISOString(),
+    endsAt: new Date(now + 48 * 3600000).toISOString(),
+  };
+  const created = await request<{ id: string }>("/tasks", identity, input);
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.equal(
+    (
+      await request(`/tasks/${created.data.id}/state`, identity, {
+        state: "open",
+        version: 1,
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await request(
+        `/tasks/${created.data.id}`,
+        identity,
+        {
+          ...input,
+          version: 2,
+          deadline: new Date(now + 49 * 3600000).toISOString(),
+        },
+        "PUT",
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        `/tasks/${created.data.id}`,
+        identity,
+        { ...input, version: 2, endsAt: input.startsAt },
+        "PUT",
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        `/tasks/${created.data.id}`,
+        identity,
+        { ...input, version: 2, deadline: input.endsAt },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+});
+
+test("map annotations round-trip, publish all geometry types and reject incomplete or invalid shapes", async () => {
+  const identity = await demo();
+  const task = (await workspace(identity)).tasks.find(
+    (task) => task.state === "draft",
+  )!;
+  const fixture = JSON.parse(
+    await readFile("../fixtures/map-annotations.json", "utf8"),
+  ) as ContentBlock[];
+  const input = {
+    ...taskInput(task),
+    title: "地图标注验证",
+    summary: "位置、路径与范围",
+    location: "社区服务中心",
+    startsAt: new Date(Date.now() + 3600000).toISOString(),
+    deadline: new Date(Date.now() + 86400000).toISOString(),
+    endsAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+    blocks: [fixture[1]],
+  };
+  const created = await request<{ id: string }>("/tasks", identity, input);
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  assert.deepEqual(
+    (await workspace(identity)).tasks.find(
+      (task) => task.id === created.data.id,
+    )!.blocks,
+    input.blocks,
+  );
+  assert.equal(
+    (
+      await request(`/tasks/${created.data.id}/state`, identity, {
+        state: "open",
+        version: 1,
+      })
+    ).status,
+    200,
+  );
+  await db
+    .prepare("UPDATE organizations SET demo_expires_at=NULL WHERE id=?")
+    .bind(identity.org)
+    .run();
+  const published = (await (
+    await fetch(new URL(`/v1/tasks/${created.data.id}`, base))
+  ).json()) as { blocks: ContentBlock[] };
+  assert.deepEqual(
+    published.blocks.find((block) => block.type === "map")?.annotations,
+    fixture[1].annotations,
+  );
+  for (const annotation of [
+    { type: "path", coordinates: [{ latitude: 91, longitude: 120 }] },
+    {
+      type: "point",
+      coordinates: [
+        { latitude: 30, longitude: 120 },
+        { latitude: 31, longitude: 121 },
+      ],
+    },
+  ])
+    assert.equal(
+      (
+        await request("/tasks", identity, {
+          ...input,
+          blocks: [{ type: "map", annotations: [annotation] }],
+        })
+      ).status,
+      400,
+    );
+  for (const annotations of [
+    [{ type: "path", coordinates: [{ latitude: 30, longitude: 120 }] }],
+    [
+      {
+        type: "area",
+        coordinates: [
+          { latitude: 30, longitude: 120 },
+          { latitude: 31, longitude: 121 },
+          { latitude: 32, longitude: 122 },
+        ],
+      },
+    ],
+    [
+      {
+        type: "area",
+        coordinates: [
+          { latitude: 30, longitude: 120 },
+          { latitude: 31, longitude: 121 },
+        ],
+      },
+    ],
+    [
+      {
+        type: "path",
+        coordinates: [
+          { latitude: 30, longitude: 120 },
+          { latitude: 30, longitude: 120 },
+        ],
+      },
+    ],
+    [],
+  ]) {
+    const draft = await request<{ id: string }>("/tasks", identity, {
+      ...input,
+      blocks: [{ type: "map", latitude: 30, longitude: 120, annotations }],
+    });
+    assert.equal(draft.status, 201);
+    assert.equal(
+      (
+        await request(`/tasks/${draft.data.id}/state`, identity, {
+          state: "open",
+          version: 1,
+        })
+      ).status,
+      400,
+    );
+    if (!annotations.length)
+      assert.equal(
+        (await workspace(identity)).tasks.find(
+          (task) => task.id === draft.data.id,
+        )!.blocks[0].latitude,
+        undefined,
+      );
+  }
 });
 
 test("publishing requires complete media and map blocks, while draft coordinates may be blank", async () => {

@@ -39,6 +39,15 @@ export interface ContentBlock {
   rows?: string[][];
   latitude?: number;
   longitude?: number;
+  annotations?: MapAnnotation[];
+}
+export interface MapCoordinate {
+  latitude: number;
+  longitude: number;
+}
+export interface MapAnnotation {
+  type: "point" | "path" | "area";
+  coordinates: MapCoordinate[];
 }
 export interface OrganizerTask {
   id: string;

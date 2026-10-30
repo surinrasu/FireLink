@@ -1,0 +1,39 @@
+[
+  {
+    "type": "map",
+    "text": "Legacy location",
+    "latitude": 30.25,
+    "longitude": 120.15
+  },
+  {
+    "type": "map",
+    "text": "Locations, route and area",
+    "latitude": 30.25,
+    "longitude": 120.15,
+    "annotations": [
+      {
+        "type": "point",
+        "coordinates": [{ "latitude": 30.25, "longitude": 120.15 }]
+      },
+      {
+        "type": "point",
+        "coordinates": [{ "latitude": 30.26, "longitude": 120.16 }]
+      },
+      {
+        "type": "path",
+        "coordinates": [
+          { "latitude": 30.25, "longitude": 120.15 },
+          { "latitude": 30.26, "longitude": 120.16 }
+        ]
+      },
+      {
+        "type": "area",
+        "coordinates": [
+          { "latitude": 30.25, "longitude": 120.15 },
+          { "latitude": 30.26, "longitude": 120.16 },
+          { "latitude": 30.25, "longitude": 120.17 }
+        ]
+      }
+    ]
+  }
+]

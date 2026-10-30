@@ -109,6 +109,37 @@ struct MapPreview: View {
     .accessibilityLabel(L10n.text("coordinates", latitude, longitude))
   }
 }
+struct AnnotatedMapPreview: View {
+  let annotations: [MapAnnotation]
+  var body: some View {
+    Map(initialPosition: .automatic, interactionModes: []) {
+      ForEach(Array(annotations.enumerated()), id: \.offset) { _, annotation in
+        let coordinates = annotation.coordinates.map {
+          CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        if annotation.type == "area" && coordinates.count >= 3 {
+          MapPolygon(coordinates: coordinates)
+            .foregroundStyle(Color.accentColor.opacity(0.18))
+            .stroke(Color.accentColor, lineWidth: 3)
+        } else if annotation.type == "path" && coordinates.count >= 2 {
+          MapPolyline(coordinates: coordinates).stroke(Color.accentColor, lineWidth: 3)
+        }
+        ForEach(Array(coordinates.enumerated()), id: \.offset) { index, coordinate in
+          if annotation.type == "point" {
+            Marker(L10n.text("location"), coordinate: coordinate).tint(Color.accentColor)
+          } else {
+            Annotation("\(index + 1)", coordinate: coordinate) {
+              Circle().fill(Color.accentColor).frame(width: 8, height: 8)
+                .overlay(Circle().stroke(.white, lineWidth: 2))
+            }
+          }
+        }
+      }
+    }
+    .mapStyle(.standard(elevation: .flat)).frame(height: 220).allowsHitTesting(false)
+    .accessibilityLabel(L10n.text("location"))
+  }
+}
 struct IncidentCard: View {
   let incident: Incident
   var body: some View {
@@ -309,7 +340,13 @@ struct ContentBlocks: View {
             VideoPlayer(player: AVPlayer(url: url)).frame(height: 220)
           }
         case "map":
-          if let latitude = block.latitude, let longitude = block.longitude {
+          if let annotations = block.annotations {
+            if !annotations.isEmpty {
+              AnnotatedMapPreview(annotations: annotations).clipShape(
+                RoundedRectangle(cornerRadius: 12))
+              Text(block.text ?? L10n.text("location")).font(.caption)
+            }
+          } else if let latitude = block.latitude, let longitude = block.longitude {
             MapPreview(latitude: latitude, longitude: longitude, height: 200).clipShape(
               RoundedRectangle(cornerRadius: 12))
             Text(block.text ?? L10n.text("location")).font(.caption)
