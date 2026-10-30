@@ -41,6 +41,147 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "account-preferences": async (page) => {
+    const theme = page.getByRole("button", { name: "主题", exact: true });
+    const text = page.getByRole("button", { name: "文字大小", exact: true });
+    const account = page.getByRole("link", {
+      name: "当前账户设置",
+      exact: true,
+    });
+    assert.equal(await page.locator('.topbar a[href="#/notices"]').count(), 0);
+    await theme.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Tab");
+    assert.equal(
+      await page
+        .getByRole("radio", { name: "跟随系统", exact: true })
+        .evaluate((element) => element === document.activeElement),
+      true,
+    );
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    assert.equal(
+      await page
+        .locator("body")
+        .evaluate((element) => element.classList.contains("dark")),
+      true,
+    );
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await theme.evaluate((element) => element === document.activeElement),
+      true,
+    );
+    await text.click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await account.waitFor();
+    assert.equal(
+      await page.evaluate(
+        () =>
+          document.body.classList.contains("dark") &&
+          document.documentElement.classList.contains("large-text"),
+      ),
+      true,
+    );
+    await account.click();
+    const current = page.locator("#current-member");
+    await current.waitFor();
+    assert.equal(await page.getByRole("dialog").count(), 0);
+    assert.equal(
+      await current.locator('[data-action="member"]').isDisabled(),
+      true,
+    );
+    assert.equal(
+      await page.getByText("阅读与显示", { exact: true }).count(),
+      0,
+    );
+    const focusedAndVisible = async () => {
+      await page.waitForFunction(
+        () => {
+          const member = document.querySelector("#current-member");
+          const rect = member?.getBoundingClientRect();
+          const nav = document
+            .querySelector(".mobile-nav")
+            ?.getBoundingClientRect();
+          return (
+            member === document.activeElement &&
+            rect &&
+            rect.top >= 0 &&
+            rect.bottom <= (nav?.height ? nav.top : innerHeight)
+          );
+        },
+        undefined,
+        { timeout: 5000 },
+      );
+    };
+    await focusedAndVisible();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/account-settings-desktop.png",
+    });
+    for (const width of [834, 390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await account.click();
+      await focusedAndVisible();
+      assert.equal(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        true,
+      );
+    }
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/account-settings-mobile.png",
+    });
+    await theme.click();
+    await page.getByRole("radio", { name: "浅色", exact: true }).check();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/theme-menu-mobile.png",
+    });
+    await text.click();
+    assert.equal(await page.locator("#preference-theme").isVisible(), false);
+    assert.equal(
+      await page
+        .getByRole("radio", { name: "更大字号", exact: true })
+        .isChecked(),
+      true,
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/text-menu-mobile.png",
+    });
+    await page.keyboard.press("Escape");
+    await account.click();
+    // Repeated avatar navigation stays on the same form and preserves unsaved edits.
+    await page.getByLabel("组织介绍", { exact: true }).fill("暂存的组织介绍");
+    await account.click();
+    await focusedAndVisible();
+    assert.equal(
+      await page.getByLabel("组织介绍", { exact: true }).inputValue(),
+      "暂存的组织介绍",
+    );
+    await current
+      .getByRole("button", { name: "退出登录", exact: true })
+      .click();
+    await page.getByRole("button", { name: "继续处理", exact: true }).click();
+    assert.equal(
+      await current
+        .getByRole("button", { name: "退出登录", exact: true })
+        .isEnabled(),
+      true,
+    );
+    await current
+      .getByRole("button", { name: "退出登录", exact: true })
+      .click();
+    await page.getByRole("button", { name: "放弃并退出", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "组织者登录", exact: true })
+      .waitFor();
+    await theme.click();
+    assert.equal(
+      await page.getByRole("radio", { name: "浅色", exact: true }).isChecked(),
+      true,
+    );
+  },
   "dashboard-fill": async (page) => {
     let mode = "pending";
     const total = 40;
@@ -137,9 +278,9 @@ const cases: Record<
     await filled();
     assert.match(await titles.first().innerText(), /^关注任务 1 ·/);
     await page.setViewportSize({ width: 320, height: 844 });
-    await page.getByRole("button", { name: "外观与阅读设置" }).click();
-    await page.getByLabel("文字大小", { exact: true }).selectOption("large");
-    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
     await page.reload();
     await filled();
     assert.ok((await rows.count()) < total);
@@ -152,9 +293,9 @@ const cases: Record<
     await page.screenshot({
       path: "../.artifacts/organizer/ux/dashboard-fill-mobile.png",
     });
-    await page.getByRole("button", { name: "外观与阅读设置" }).click();
-    await page.getByLabel("文字大小", { exact: true }).selectOption("normal");
-    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "标准字号", exact: true }).check();
+    await page.keyboard.press("Escape");
     await filled();
     mode = "open";
     await page.reload();
@@ -215,27 +356,25 @@ const cases: Record<
       .waitFor();
     assert.equal(await page.locator("#app").getAttribute("aria-busy"), "true");
     const progress = page.locator(".route-status");
-    const aligned = async () => {
-      const placement = await progress.evaluate((element) => {
-        const bar = element.getBoundingClientRect();
-        const header = document
-          .querySelector(".topbar")!
-          .getBoundingClientRect();
-        return {
-          top: bar.top,
-          left: bar.left,
-          right: bar.right,
-          height: bar.height,
-          headerBottom: Math.max(0, header.bottom),
-          headerLeft: header.left,
-          viewport: innerWidth,
-        };
-      });
-      assert.equal(placement.height, 3);
-      assert.equal(placement.top, placement.headerBottom);
-      assert.equal(placement.left, placement.headerLeft);
-      assert.equal(placement.right, placement.viewport);
-    };
+    const aligned = () =>
+      page.waitForFunction(
+        () => {
+          const bar = document
+            .querySelector(".route-status")!
+            .getBoundingClientRect();
+          const header = document
+            .querySelector(".topbar")!
+            .getBoundingClientRect();
+          return (
+            bar.height === 3 &&
+            bar.top === Math.max(0, header.bottom) &&
+            bar.left === header.left &&
+            bar.right === innerWidth
+          );
+        },
+        undefined,
+        { timeout: 5000 },
+      );
     await aligned();
     assert.equal(
       await progress.locator(".sr-only").textContent(),
@@ -264,9 +403,9 @@ const cases: Record<
     await aligned();
     await page.setViewportSize({ width: 390, height: 844 });
     await aligned();
-    await page.getByRole("button", { name: "外观与阅读设置" }).click();
-    await page.getByLabel("主题", { exact: true }).selectOption("dark");
-    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
     await page.emulateMedia({ reducedMotion: "reduce" });
     assert.equal(
       await progress.evaluate(
@@ -338,9 +477,14 @@ const cases: Record<
       .click();
     await page.locator("#task-form").waitFor();
     for (const size of ["normal", "large"]) {
-      await page.getByRole("button", { name: "外观与阅读设置" }).click();
-      await page.getByLabel("文字大小", { exact: true }).selectOption(size);
-      await page.getByRole("button", { name: "完成", exact: true }).click();
+      await page.getByRole("button", { name: "文字大小", exact: true }).click();
+      await page
+        .getByRole("radio", {
+          name: size === "large" ? "更大字号" : "标准字号",
+          exact: true,
+        })
+        .check();
+      await page.keyboard.press("Escape");
       for (const width of [390, 320]) {
         await page.setViewportSize({ width, height: 844 });
         assert.equal(
@@ -581,9 +725,9 @@ const cases: Record<
     await map.screenshot({
       path: "../.artifacts/organizer/ux/map-annotations-mobile.png",
     });
-    await page.getByRole("button", { name: "外观与阅读设置" }).click();
-    await page.getByLabel("主题", { exact: true }).selectOption("dark");
-    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
     await map.screenshot({
       path: "../.artifacts/organizer/ux/map-annotations-dark.png",
     });
@@ -943,10 +1087,13 @@ const cases: Record<
       "请确认服务时间。",
     );
     assert.equal(await page.locator("#note").inputValue(), "等待同事核对。");
-    await page.getByRole("button", { name: "账号菜单" }).click();
+    await page.getByRole("link", { name: "当前账户设置" }).click();
     await page.getByRole("button", { name: "退出登录", exact: true }).click();
     await page.getByRole("dialog").filter({ hasText: "尚未提交" }).waitFor();
     await page.getByRole("button", { name: "继续处理", exact: true }).click();
+    await review(page);
+    await page.locator(`.application-row[href="${first}"]`).click();
+    await reviewFields(page);
     assert.equal(await page.locator("#note").inputValue(), "等待同事核对。");
     await page.getByRole("button", { name: "通过并通知", exact: true }).click();
     assert.equal(
@@ -959,7 +1106,7 @@ const cases: Record<
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     await page.locator(".filter-chips a").filter({ hasText: "已通过" }).click();
     await page.locator(".contact-row").first().waitFor();
-    await page.getByRole("button", { name: "账号菜单" }).click();
+    await page.getByRole("link", { name: "当前账户设置" }).click();
     await page.getByRole("button", { name: "退出登录", exact: true }).click();
     await page.getByRole("heading", { name: "组织者登录" }).waitFor();
   },
