@@ -133,7 +133,9 @@ const cases: Record<
           true,
         );
         const actions = await page
-          .locator(".editor-footer button")
+          .locator(
+            ".editor-footer button, .block-history button, .block-add-actions button",
+          )
           .evaluateAll((buttons) =>
             buttons.map((button) => {
               const box = button.getBoundingClientRect();
@@ -159,6 +161,9 @@ const cases: Record<
         );
       }
     }
+    await page
+      .getByRole("group", { name: "添加内容", exact: true })
+      .scrollIntoViewIfNeeded();
   },
   "continuous-review": async (page) => {
     await review(page);
@@ -207,22 +212,14 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
-    await page
-      .locator("#publish-status")
-      .filter({ hasText: "发布还需完成" })
-      .waitFor();
-    await page.getByRole("button", { name: "发布招募", exact: true }).click();
-    assert.equal(
-      await page
-        .locator("#title")
-        .evaluate((e) => e === document.activeElement),
-      true,
-    );
-    assert.equal(
-      await page.locator("#summary").getAttribute("aria-invalid"),
-      "true",
-    );
+    const publish = page.locator("#publish-task");
+    await publish.waitFor();
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (4/10)");
+    assert.equal(await page.locator(".publish-readiness").count(), 0);
+    assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
+    assert.equal(await publish.innerText(), "发布招募 (5/10)");
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
@@ -233,20 +230,45 @@ const cases: Record<
     await page.getByLabel("服务开始时间", { exact: true }).fill(`${day}T10:00`);
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T12:00`);
     await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
     assert.match(
-      await page.locator("#publish-issues").innerText(),
+      await page.locator("#deadline-publish-error").innerText(),
       /不能晚于服务开始时间/,
     );
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
-    await page
-      .locator("#publish-status")
-      .filter({ hasText: "发布准备已完成" })
-      .waitFor();
+    assert.equal(await publish.isEnabled(), true);
+    assert.equal(await publish.innerText(), "发布招募");
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
+    await page.getByLabel("任务标题", { exact: true }).fill("");
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
+    await page.getByLabel("计划招募人数", { exact: true }).fill("0");
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    await page.getByLabel("计划招募人数", { exact: true }).fill("");
+    assert.equal(await publish.isEnabled(), true);
+    await page.getByRole("button", { name: "添加图片", exact: true }).click();
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    await page.getByRole("button", { name: "撤销", exact: true }).click();
+    assert.equal(await publish.isEnabled(), true);
+    // A completed draft becomes unavailable when its deadline passes, even
+    // without another form edit.
+    await page.clock.install({ time: new Date(`${day}T08:59:59+08:00`) });
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:01`);
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
+    await page.clock.runFor(1100);
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:30`);
+    assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "发布招募", exact: true }).click();
     await page.getByRole("button", { name: "确认发布", exact: true }).click();
+    await page.locator("#task-form").waitFor({ state: "hidden" });
     await page
-      .getByRole("heading", { name: "准备检查回归", exact: true })
+      .getByRole("heading", { name: "准备检查回归", exact: true, level: 1 })
       .waitFor();
     await page.route("**/api/organizer/workspace", async (route) => {
       const response = await route.fetch();
@@ -259,16 +281,17 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .first()
       .click();
-    await page.locator("#publish-status").click();
-    await page
-      .getByRole("link", { name: "请先完成组织认证", exact: true })
-      .waitFor();
-    await page
-      .getByRole("link", {
-        name: "请在组织设置中填写至少一种公开联系方式",
-        exact: true,
-      })
-      .waitFor();
+    await publish.waitFor();
+    assert.equal(await publish.innerText(), "发布招募 (2/10)");
+    assert.equal(await publish.isDisabled(), true);
+    assert.match(
+      (await publish.getAttribute("title")) || "",
+      /请先完成组织认证/,
+    );
+    assert.match(
+      (await publish.getAttribute("title")) || "",
+      /至少一种公开联系方式/,
+    );
   },
   "organization-drafts": async (page) => {
     const settings = () =>
@@ -304,6 +327,10 @@ const cases: Record<
   },
   "block-undo": async (page) => {
     await editDraft(page);
+    const undo = page.getByRole("button", { name: "撤销", exact: true });
+    const redo = page.getByRole("button", { name: "重做", exact: true });
+    assert.equal(await undo.isDisabled(), true);
+    assert.equal(await redo.isDisabled(), true);
     const contents = () =>
       page
         .locator('#blocks [name^="block-text-"]')
@@ -319,12 +346,59 @@ const cases: Record<
     await page
       .getByRole("button", { name: "删除第 1 段", exact: true })
       .click();
-    await page.getByRole("button", { name: "撤销删除", exact: true }).click();
-    await page.getByRole("button", { name: "撤销删除", exact: true }).click();
+    await undo.click();
+    await undo.click();
+    assert.deepEqual(await contents(), before);
+    assert.equal(await undo.isDisabled(), true);
+    await redo.click();
+    await redo.click();
+    assert.equal((await contents()).length, before.length - 2);
+    assert.equal(await redo.isDisabled(), true);
+    await undo.click();
+    await undo.click();
     assert.deepEqual(await contents(), before);
     assert.equal(
+      await page.getByText("本次编辑可撤销", { exact: false }).count(),
+      0,
+    );
+
+    // A new change after undo starts a new branch and drops the redo history.
+    await page.getByRole("button", { name: "添加段落", exact: true }).click();
+    assert.equal(await redo.isDisabled(), true);
+    const added = page.locator('#blocks [name^="block-text-"]').last();
+    await added.pressSequentially("新增的段落");
+    await undo.click();
+    assert.equal(await added.inputValue(), "");
+    await redo.click();
+    assert.equal(await added.inputValue(), "新增的段落");
+    await page
+      .getByRole("button", {
+        name: `上移第 ${before.length + 1} 段`,
+        exact: true,
+      })
+      .click();
+    assert.equal((await contents())[before.length - 1], "新增的段落");
+    await undo.click();
+    assert.equal((await contents())[before.length], "新增的段落");
+    await undo.click();
+    await undo.click();
+    assert.deepEqual(await contents(), before);
+
+    for (const name of ["小标题", "段落", "图片", "视频", "表格", "地图位置"]) {
       await page
-        .locator('[name="block-text-1"]')
+        .getByRole("button", { name: `添加${name}`, exact: true })
+        .click();
+      const block = page.locator(".block-editor").last();
+      assert.match(await block.locator("strong").innerText(), new RegExp(name));
+      await undo.click();
+      assert.deepEqual(await contents(), before);
+      await redo.click();
+      assert.equal((await contents()).length, before.length + 1);
+      await undo.click();
+    }
+    assert.equal(
+      await page
+        .locator("#redo-block")
         .evaluate((e) => e === document.activeElement),
       true,
     );
@@ -332,6 +406,8 @@ const cases: Record<
     await page.reload();
     await page.locator("#task-form").waitFor();
     assert.deepEqual(await contents(), before);
+    assert.equal(await undo.isDisabled(), true);
+    assert.equal(await redo.isDisabled(), true);
   },
   "review-drafts": async (page) => {
     await review(page);
