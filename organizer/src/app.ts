@@ -45,6 +45,7 @@ let workspace: Workspace;
 let currentOrg = "";
 let generation = 0;
 let taskView: "cards" | "compact" = "cards";
+let dashboardSort: "updated" | "pending" | "deadline" = "updated";
 let editor: EditorHandle | null = null;
 const reviewDrafts = new Map<string, { response: string; note: string }>();
 const organizationDrafts = new Map<string, Record<string, string>>();
@@ -110,7 +111,7 @@ function taskProgress(task: OrganizerTask) {
 }
 function shell(body: string, section: string) {
   const pending = workspace.tasks.reduce((n, task) => n + task.pending, 0);
-  root.innerHTML = `<aside class="sidebar" aria-label="工作台导航"><a class="brand" href="#/dashboard"><strong>FireLink</strong></a>${canEdit() ? `<a class="button primary-container create-button" href="#/tasks/new" aria-label="新建任务">${icon("add")}<span>新建任务</span></a>` : ""}<nav class="side-links">${destinations.map(([id, symbol, label]) => `<a class="side-link ${section === id ? "active" : ""}" href="#/${id}" ${section === id ? 'aria-current="page"' : ""} title="${label}">${icon(symbol)}<span>${label}</span>${id === "applications" && pending ? `<span class="count">${pending}</span>` : ""}</a>`).join("")}</nav><div class="sidebar-footer"><span class="workspace-label">${workspace.organization.demo ? "演示环境" : workspace.organization.verified ? "已认证组织" : "组织待认证"}</span></div></aside>
+  root.innerHTML = `<aside class="sidebar" aria-label="工作台导航"><a class="brand" href="#/dashboard"><strong>FireLink</strong></a>${canEdit() ? `<a class="button primary-container create-button" href="#/tasks/new" aria-label="新建任务">${icon("add")}<span>新建任务</span></a>` : ""}<nav class="side-links">${destinations.map(([id, symbol, label]) => `<a class="side-link ${section === id ? "active" : ""}" href="#/${id}" ${section === id ? 'aria-current="page"' : ""} title="${label}">${icon(symbol)}<span>${label}</span>${id === "tasks" ? `<span class="count">${workspace.tasks.length}</span>` : id === "applications" && pending ? `<span class="count">${pending}</span>` : ""}</a>`).join("")}</nav><div class="sidebar-footer"><span class="workspace-label">${workspace.organization.demo ? "演示环境" : workspace.organization.verified ? "已认证组织" : "组织待认证"}</span></div></aside>
   <div class="app-shell"><header class="topbar"><div class="org-switch">${icon("domain")}<select aria-label="切换组织" id="org-switch">${session!.memberships.map((m) => `<option value="${h(m.organizationId)}" ${m.organizationId === currentOrg ? "selected" : ""}>${h(m.organizationName)}</option>`).join("")}</select></div><span class="topbar-spacer"></span><button class="transparent circle" data-action="appearance" aria-label="外观与阅读设置" title="外观与阅读设置">${icon("contrast")}</button><a class="button transparent circle" href="#/notices" aria-label="已发送通知" title="已发送通知">${icon("notifications_none")}</a><button class="transparent circle" data-action="account" aria-label="账号菜单"><span class="avatar">${h(session!.account.name.slice(0, 1))}</span></button></header><main class="content" id="main">${body}</main></div>
   <nav class="mobile-nav" aria-label="主要导航">${destinations
     .slice(0, 3)
@@ -135,36 +136,66 @@ function shell(body: string, section: string) {
       void renderRoute();
     });
 }
+function dashboardTasks() {
+  const attention = workspace.tasks.filter((task) => task.pending > 0);
+  const tasks = attention.length
+    ? attention
+    : workspace.tasks.filter((task) => task.state === "open");
+  const deadline = (task: OrganizerTask) => {
+    const value = Date.parse(task.deadline);
+    return Number.isNaN(value) ? Infinity : value;
+  };
+  const rows = tasks
+    .sort((a, b) => {
+      const updated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      if (dashboardSort === "pending") return b.pending - a.pending || updated;
+      if (dashboardSort === "deadline")
+        return deadline(a) - deadline(b) || updated;
+      return updated;
+    })
+    .slice(0, 5);
+  return rows.length
+    ? rows
+        .map(
+          (t) =>
+            `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a><p>${h(t.incidentTitle)}</p></div><div class="task-row-end">${badge(t.state)}<small>${t.pending ? `<a href="${applicationsLink(t.id)}">${t.pending} 份待审核 →</a>` : `已通过 ${t.accepted}${t.capacity ? ` / ${t.capacity}` : ""}`}</small></div></div>`,
+        )
+        .join("")
+    : empty(
+        "暂无任务",
+        "",
+        canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "",
+        "add_task",
+      );
+}
+function attachDashboardSort() {
+  root
+    .querySelector<HTMLSelectElement>("#dashboard-sort")!
+    .addEventListener("change", (event) => {
+      const value = (event.target as HTMLSelectElement).value;
+      dashboardSort =
+        value === "pending" || value === "deadline" ? value : "updated";
+      root.querySelector("#dashboard-tasks")!.innerHTML = dashboardTasks();
+    });
+}
 function dashboard() {
-  const tasks = workspace.tasks;
-  const pending = tasks.reduce((n, task) => n + task.pending, 0);
-  const active = tasks.filter((t) => t.state === "open");
-  const ending = active.filter(
-    (t) => t.deadline && Date.parse(t.deadline) - Date.now() < 3 * 86400000,
-  );
-  const drafts = tasks.filter((t) => t.state === "draft");
   const today = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
     weekday: "long",
     timeZone: "Asia/Shanghai",
   }).format(new Date());
-  const metric = (
-    label: string,
-    count: number,
-    note: string,
-    symbol: string,
-    href: string,
-  ) =>
-    `<a href="${href}" class="metric"><div class="metric-top"><span>${label}</span>${icon(symbol)}</div><strong>${count}<span class="sr-only">${label}</span></strong>${note ? `<small>${note}</small>` : ""}</a>`;
-  const attention = tasks
-    .filter((t) => t.pending > 0)
-    .sort((a, b) => b.pending - a.pending);
-  const rows = (attention.length ? attention : active).slice(0, 5);
-  return `${heading("工作台", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
-  <section class="hero" aria-label="当前待办"><div class="hero-icon">${icon(pending ? "mark_email_unread" : "task_alt")}</div><div class="hero-copy"><h2>${pending ? `${pending} 份报名待审核` : "暂无待审核报名"}</h2></div><a class="button surface" href="${applicationsLink()}">${pending ? "开始审核" : "查看报名"}${icon("arrow_forward")}</a></section>
-  <div class="metrics">${metric("待审核报名", pending, "", "fact_check", applicationsLink())}${metric("招募中任务", active.length, "", "campaign", "#/tasks?state=open")}${metric("即将截止", ending.length, "未来 72 小时内", "schedule", "#/tasks?ending=1")}${metric("任务草稿", drafts.length, "", "edit_note", "#/tasks?state=draft")}</div>
-  <div class="dashboard-grid"><div><section class="panel"><div class="panel-header"><h2>需要关注的任务</h2><a href="#/tasks">全部任务 ${icon("arrow_forward")}</a></div>${rows.length ? rows.map((t) => `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a><p>${h(t.incidentTitle)}</p></div><div class="task-row-end">${badge(t.state)}<small>${t.pending ? `<a href="${applicationsLink(t.id)}">${t.pending} 份待审核 →</a>` : `已通过 ${t.accepted}${t.capacity ? ` / ${t.capacity}` : ""}`}</small></div></div>`).join("") : empty("暂无任务", "", canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "", "add_task")}</section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
+  return `${heading("工作台", "", canEdit() ? `<a class="button border" href="#/tasks?state=draft">${icon("edit_note")}<span>草稿</span></a><a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
+  <div class="dashboard-grid"><div><section class="panel"><div class="panel-header dashboard-task-header"><h2>需要关注的任务</h2><div class="dashboard-task-controls">${select(
+    "dashboard-sort",
+    "排序方式",
+    [
+      ["updated", "按最近更新"],
+      ["pending", "按待审核人数"],
+      ["deadline", "按距截止时间"],
+    ],
+    dashboardSort,
+  )}<a href="#/tasks">全部任务 ${icon("arrow_forward")}</a></div></div><div id="dashboard-tasks">${dashboardTasks()}</div></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
 }
 function taskCard(task: OrganizerTask) {
   return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}<span class="muted">${icon(task.state === "draft" ? "edit_note" : "assignment")}</span></div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)} · 负责人</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
@@ -1063,7 +1094,10 @@ async function renderPage(turn: number) {
     else if (path === "/settings") {
       shell(settingsPage(), "settings");
       attachSettings();
-    } else shell(dashboard(), "dashboard");
+    } else {
+      shell(dashboard(), "dashboard");
+      attachDashboardSort();
+    }
     if (turn === generation) {
       root.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
       window.scrollTo({ top: 0, behavior: "instant" });
