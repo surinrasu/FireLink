@@ -162,7 +162,9 @@ export function renderBlocks(blocks: ContentBlock[]) {
         return mapPreview(
           block.latitude,
           block.longitude,
-          block.text || "位置",
+          block.text || "地图",
+          "",
+          block.annotations,
         );
       if (
         (block.type === "image" || block.type === "video") &&

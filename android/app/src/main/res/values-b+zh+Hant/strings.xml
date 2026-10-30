@@ -200,4 +200,5 @@
     <string name="vehicle_decrease">"減少%1$s數量"</string>
     <string name="vehicle_increase">"增加%1$s數量"</string>
     <string name="equipment_text_hint">"可自由填寫你能提供的工具、裝備或其他物資"</string>
+    <string name="map_annotations">"地圖標註（示意）"</string>
 </resources>

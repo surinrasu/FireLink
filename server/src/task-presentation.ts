@@ -12,8 +12,8 @@ export function volunteerTaskBlocks(
     language === "en"
       ? [
           "Recruitment details",
-          "Starts (China time)",
-          "Ends (China time)",
+          "Task starts (China time)",
+          "Task ends (China time)",
           "Application deadline (China time)",
           "Location",
           "Meeting point",
@@ -22,8 +22,8 @@ export function volunteerTaskBlocks(
       : language.startsWith("zh-Hant")
         ? [
             "招募資訊",
-            "服務開始（北京時間）",
-            "服務結束（北京時間）",
+            "任務開始（北京時間）",
+            "任務結束（北京時間）",
             "報名截止（北京時間）",
             "服務地點",
             "集合地點",
@@ -31,8 +31,8 @@ export function volunteerTaskBlocks(
           ]
         : [
             "招募信息",
-            "服务开始（北京时间）",
-            "服务结束（北京时间）",
+            "任务开始（北京时间）",
+            "任务结束（北京时间）",
             "报名截止（北京时间）",
             "服务地点",
             "集合地点",

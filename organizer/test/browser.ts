@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, access } from "node:fs/promises";
 import { chromium } from "playwright";
+import { isolateLocalDemo } from "./local-demo";
 const url = process.env.TEST_URL || "http://127.0.0.1:8787";
 let executablePath = process.env.BROWSER_EXECUTABLE;
 if (!executablePath && process.platform === "darwin") {
@@ -34,6 +35,7 @@ try {
     }),
   );
   const page = await context.newPage();
+  await isolateLocalDemo(context, url);
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(url);
   await page.getByRole("heading", { name: "组织者登录" }).waitFor();
@@ -145,8 +147,8 @@ try {
   const deadline = new Date(Date.now() + 3 * 86400000)
     .toISOString()
     .slice(0, 10);
-  await page.getByLabel("服务开始时间", { exact: true }).fill(`${start}T09:00`);
-  await page.getByLabel("服务结束时间", { exact: true }).fill(`${start}T13:00`);
+  await page.getByLabel("任务开始时间", { exact: true }).fill(`${start}T09:00`);
+  await page.getByLabel("任务结束时间", { exact: true }).fill(`${start}T13:00`);
   await page
     .getByLabel("报名截止时间", { exact: true })
     .fill(`${deadline}T18:00`);

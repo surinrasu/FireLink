@@ -6,6 +6,17 @@ import org.junit.Test
 
 class ContractTest {
     @Test
+    fun mapAnnotationsPreserveLegacyAndMultipleGeometries() {
+        val payload = javaClass.classLoader!!.getResourceAsStream("map-annotations.json")!!
+            .bufferedReader().use { it.readText() }
+        val blocks = Json.decodeFromString<List<ContentBlock>>(payload)
+        assertNull(blocks[0].annotations)
+        assertEquals(30.25, blocks[0].latitude!!, 0.0)
+        assertEquals(listOf("point", "point", "path", "area"), blocks[1].annotations!!.map { it.type })
+        assertEquals(listOf(1, 1, 2, 3), blocks[1].annotations!!.map { it.coordinates.size })
+        assertEquals(blocks, Json.decodeFromString<List<ContentBlock>>(Json.encodeToString(blocks)))
+    }
+    @Test
     fun vehiclesAndEquipmentPreserveLegacyTextAndRoundTrip() {
         val legacy =
             """{"id":"test","username":"Test","pronouns":"","realName":"Test","birthDate":"2000-01-01","gender":"","verified":true,"region":"","body":"","equipment":["vehicle"],"contacts":{"phone":"13800000000","wechat":"","email":""}}"""

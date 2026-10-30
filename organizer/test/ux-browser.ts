@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { access, mkdir } from "node:fs/promises";
 import { chromium, type Page, type BrowserContext } from "playwright";
-import type { Workspace } from "../../shared/organizer";
+import type { MapAnnotation, Workspace } from "../../shared/organizer";
+import { isolateLocalDemo } from "./local-demo";
 
 const base = process.env.TEST_URL || "http://127.0.0.1:8787/mng-dash";
 let executablePath = process.env.BROWSER_EXECUTABLE;
@@ -423,6 +424,285 @@ const cases: Record<
       .waitFor();
     await page.locator(".contact-row").first().waitFor();
   },
+  "map-annotations": async (page) => {
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .last()
+      .click();
+    await page.getByLabel("任务标题", { exact: true }).fill("地图标注验证");
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption({ index: 1 });
+    await page.getByLabel("一句话介绍任务").fill("多处位置、路线与活动范围");
+    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    await page.getByRole("button", { name: "添加地图", exact: true }).click();
+    const map = page.locator("#blocks firelink-map");
+    await map.locator(".leaflet-container").waitFor();
+    const annotations = async () =>
+      JSON.parse(
+        (await map.getAttribute("annotations")) || "[]",
+      ) as MapAnnotation[];
+    const clickPoint = async (x: number, y: number) => {
+      const bounds = (await map.locator(".canvas").boundingBox())!;
+      await map
+        .locator(".canvas")
+        .click({ position: { x: bounds.width * x, y: bounds.height * y } });
+    };
+    await clickPoint(0.3, 0.35);
+    await clickPoint(0.65, 0.35);
+    assert.equal((await annotations()).length, 2);
+    await map.getByRole("button", { name: "路径", exact: true }).click();
+    // Existing locations can also be selected as vertices of a new route.
+    await map.locator(".location-marker").first().click();
+    assert.equal(
+      await map
+        .getByRole("button", { name: "完成路径", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(await page.locator("#publish-task").isDisabled(), true);
+    await clickPoint(0.4, 0.8);
+    await clickPoint(0.7, 0.7);
+    await map.getByRole("button", { name: "完成路径", exact: true }).click();
+    assert.equal(await map.locator(".location-path").count(), 1);
+    await map.getByRole("button", { name: "范围", exact: true }).click();
+    await clickPoint(0.65, 0.12);
+    await clickPoint(0.85, 0.25);
+    assert.equal(
+      await map
+        .getByRole("button", { name: "完成范围", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await clickPoint(0.8, 0.5);
+    await map.getByRole("button", { name: "完成范围", exact: true }).click();
+    assert.equal(await map.locator(".location-area").count(), 1);
+    assert.equal(await page.locator("#publish-task").isEnabled(), true);
+    assert.deepEqual(
+      (await annotations()).map((mark) => mark.type),
+      ["point", "point", "path", "area"],
+    );
+    const beforeDelete = await annotations();
+    await map.getByRole("button", { name: "删除范围 4", exact: true }).click();
+    assert.equal((await annotations()).length, 3);
+    await page.getByRole("button", { name: "撤销", exact: true }).click();
+    assert.deepEqual(await annotations(), beforeDelete);
+    await map.locator(".canvas").scrollIntoViewIfNeeded();
+    const marker = (await map
+      .locator(".location-marker")
+      .nth(1)
+      .boundingBox())!;
+    const beforeDrag = (await annotations())[1].coordinates[0];
+    await page.mouse.move(
+      marker.x + marker.width / 2,
+      marker.y + marker.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      marker.x + marker.width / 2 + 24,
+      marker.y + marker.height / 2 + 20,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    assert.notDeepEqual((await annotations())[1].coordinates[0], beforeDrag);
+    await map
+      .getByRole("button", { name: "路径 3 · 3 个点", exact: true })
+      .focus();
+    await page.keyboard.press("Enter");
+    assert.equal(
+      await map.evaluate(
+        (element) =>
+          (element.shadowRoot?.activeElement as HTMLElement)?.dataset.select,
+      ),
+      "2",
+    );
+    await map
+      .getByRole("button", { name: "选择第 2 个点", exact: true })
+      .click();
+    const beforePointDelete = await annotations();
+    await map.getByRole("button", { name: "删除所选点", exact: true }).click();
+    assert.equal((await annotations())[2].coordinates.length, 2);
+    await page.getByRole("button", { name: "撤销", exact: true }).click();
+    assert.deepEqual(await annotations(), beforePointDelete);
+    await map
+      .getByRole("button", { name: "路径 3 · 3 个点", exact: true })
+      .click();
+    await map
+      .getByRole("button", { name: "选择第 2 个点", exact: true })
+      .click();
+    await map.locator(".precise summary").click();
+    await map.getByLabel("纬度", { exact: true }).fill("30.275");
+    await map.getByRole("button", { name: "更新所选点", exact: true }).click();
+    assert.equal((await annotations())[2].coordinates[1].latitude, 30.275);
+    await map.locator(".precise summary").click();
+    await map.getByRole("button", { name: "完成路径", exact: true }).click();
+    const expected = await annotations();
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await map.screenshot({
+      path: "../.artifacts/organizer/ux/map-annotations-desktop.png",
+    });
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page
+      .locator(".task-card")
+      .filter({
+        has: page.getByRole("heading", { name: "地图标注验证", exact: true }),
+      })
+      .getByRole("link", { name: "继续编辑", exact: true })
+      .click();
+    await map.waitFor();
+    assert.deepEqual(await annotations(), expected);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await map.scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => {
+      const root = document.querySelector("#blocks firelink-map")?.shadowRoot;
+      const bounds = root?.querySelector(".canvas")?.getBoundingClientRect();
+      const markers = root?.querySelectorAll(".location-marker");
+      return (
+        bounds &&
+        markers?.length &&
+        Array.from(markers).every((marker) => {
+          const point = marker.getBoundingClientRect();
+          return (
+            point.left >= bounds.left &&
+            point.right <= bounds.right &&
+            point.top >= bounds.top &&
+            point.bottom <= bounds.bottom
+          );
+        })
+      );
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await map.screenshot({
+      path: "../.artifacts/organizer/ux/map-annotations-mobile.png",
+    });
+    await page.getByRole("button", { name: "外观与阅读设置" }).click();
+    await page.getByLabel("主题", { exact: true }).selectOption("dark");
+    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await map.screenshot({
+      path: "../.artifacts/organizer/ux/map-annotations-dark.png",
+    });
+    await page.getByRole("button", { name: "发布招募", exact: true }).click();
+    await page.getByRole("button", { name: "确认发布", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "地图标注验证", level: 1, exact: true })
+      .waitFor();
+    const preview = page.locator(".description firelink-map");
+    await preview.scrollIntoViewIfNeeded();
+    await preview.locator(".location-path").waitFor();
+    assert.equal(await preview.locator(".location-area").count(), 1);
+    assert.equal(await preview.locator(".location-marker").count(), 8);
+  },
+  "task-time-defaults": async (page) => {
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .last()
+      .click();
+    const start = page.getByLabel("任务开始时间", { exact: true });
+    const end = page.getByLabel("任务结束时间", { exact: true });
+    const deadline = page.getByLabel("报名截止时间", { exact: true });
+    for (const [now, startsAt, closesAt, endsAt] of [
+      [
+        "2030-12-31T15:14:25Z",
+        "2030-12-31T23:30",
+        "2031-01-01T23:14",
+        "2031-01-02T23:14",
+      ],
+      [
+        "2030-12-31T15:30:00Z",
+        "2031-01-01T00:00",
+        "2031-01-01T23:30",
+        "2031-01-02T23:30",
+      ],
+      [
+        "2030-12-31T16:00:00Z",
+        "2031-01-01T00:30",
+        "2031-01-02T00:00",
+        "2031-01-03T00:00",
+      ],
+    ]) {
+      await page.clock.setFixedTime(new Date(now));
+      await page.reload();
+      await start.waitFor();
+      assert.equal(await start.inputValue(), startsAt);
+      assert.equal(await deadline.inputValue(), closesAt);
+      assert.equal(await end.inputValue(), endsAt);
+      assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
+    }
+    assert.match(
+      await page.locator("#live-preview").innerText(),
+      /任务开始（北京时间）/,
+    );
+    assert.match(
+      await page.locator("#live-preview").innerText(),
+      /任务结束（北京时间）/,
+    );
+    await page
+      .getByLabel("任务标题", { exact: true })
+      .fill("任务时间默认值验证");
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption({ index: 1 });
+    await page.getByLabel("一句话介绍任务").fill("整理社区物资");
+    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    assert.equal(
+      await page
+        .getByRole("button", { name: "发布招募", exact: true })
+        .isEnabled(),
+      true,
+    );
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    const card = page.locator(".task-card").filter({
+      has: page.getByRole("heading", {
+        name: "任务时间默认值验证",
+        exact: true,
+      }),
+    });
+    await page.clock.setFixedTime(new Date("2031-01-01T17:42:00Z"));
+    await card.getByRole("link", { name: "继续编辑", exact: true }).click();
+    await start.waitFor();
+    assert.equal(
+      await start.inputValue(),
+      "2031-01-01T00:30",
+      "editing must preserve saved times",
+    );
+    assert.equal(await deadline.inputValue(), "2031-01-02T00:00");
+    assert.equal(await end.inputValue(), "2031-01-03T00:00");
+    await page.getByRole("link", { name: "返回任务", exact: false }).click();
+    await card.locator("h2 a").click();
+    await page.getByRole("button", { name: "复制", exact: true }).click();
+    await start.waitFor();
+    assert.equal(
+      await start.inputValue(),
+      "2031-01-02T02:00",
+      "copies use fresh defaults",
+    );
+    assert.equal(await deadline.inputValue(), "2031-01-03T01:42");
+    assert.equal(await end.inputValue(), "2031-01-04T01:42");
+    const timePanel = page
+      .locator(".editor-section")
+      .filter({ hasText: "时间与地点" });
+    await timePanel.screenshot({
+      path: "../.artifacts/organizer/ux/task-times-desktop.png",
+    });
+    await page.setViewportSize({ width: 320, height: 844 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await timePanel.screenshot({
+      path: "../.artifacts/organizer/ux/task-times-mobile.png",
+    });
+  },
   "publish-readiness": async (page) => {
     await page
       .getByRole("link", { name: "新建任务", exact: true })
@@ -431,11 +711,11 @@ const cases: Record<
     const publish = page.locator("#publish-task");
     await publish.waitFor();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (4/10)");
+    assert.equal(await publish.innerText(), "发布招募 (7/11)");
     assert.equal(await page.locator(".publish-readiness").count(), 0);
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
-    assert.equal(await publish.innerText(), "发布招募 (5/10)");
+    assert.equal(await publish.innerText(), "发布招募 (8/11)");
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
@@ -443,31 +723,32 @@ const cases: Record<
       .getByLabel("一句话介绍任务", { exact: true })
       .fill("整理社区物资");
     const day = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-    await page.getByLabel("服务开始时间", { exact: true }).fill(`${day}T10:00`);
+    await page.getByLabel("任务开始时间", { exact: true }).fill(`${day}T10:00`);
+    await page.getByLabel("任务结束时间", { exact: true }).fill(`${day}T11:00`);
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T12:00`);
     await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
     assert.match(
       await page.locator("#deadline-publish-error").innerText(),
-      /不能晚于服务开始时间/,
+      /不能晚于任务结束时间/,
     );
-    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
+    await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T10:30`);
     assert.equal(await publish.isEnabled(), true);
     assert.equal(await publish.innerText(), "发布招募");
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
     await page.getByLabel("计划招募人数", { exact: true }).fill("0");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (11/12)");
     await page.getByLabel("计划招募人数", { exact: true }).fill("");
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "添加图片", exact: true }).click();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (11/12)");
     await page.getByRole("button", { name: "撤销", exact: true }).click();
     assert.equal(await publish.isEnabled(), true);
     // A completed draft becomes unavailable when its deadline passes, even
@@ -477,7 +758,7 @@ const cases: Record<
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
     await page.clock.runFor(1100);
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:30`);
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "发布招募", exact: true }).click();
@@ -498,7 +779,7 @@ const cases: Record<
       .first()
       .click();
     await publish.waitFor();
-    assert.equal(await publish.innerText(), "发布招募 (2/10)");
+    assert.equal(await publish.innerText(), "发布招募 (5/11)");
     assert.equal(await publish.isDisabled(), true);
     assert.match(
       (await publish.getAttribute("title")) || "",
@@ -600,7 +881,7 @@ const cases: Record<
     await undo.click();
     assert.deepEqual(await contents(), before);
 
-    for (const name of ["小标题", "段落", "图片", "视频", "表格", "地图位置"]) {
+    for (const name of ["小标题", "段落", "图片", "视频", "表格", "地图"]) {
       await page
         .getByRole("button", { name: `添加${name}`, exact: true })
         .click();
@@ -702,6 +983,7 @@ try {
       }),
     );
     const page = await context.newPage();
+    await isolateLocalDemo(context, base);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     try {

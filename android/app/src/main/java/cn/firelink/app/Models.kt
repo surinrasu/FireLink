@@ -13,7 +13,14 @@ data class ContentBlock(
     val rows: List<List<String>>? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val annotations: List<MapAnnotation>? = null,
 )
+
+@Serializable
+data class MapCoordinate(val latitude: Double, val longitude: Double)
+
+@Serializable
+data class MapAnnotation(val type: String, val coordinates: List<MapCoordinate>)
 
 @Serializable
 data class Organizer(

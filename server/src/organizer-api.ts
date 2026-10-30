@@ -16,6 +16,11 @@ import {
 } from "./organizer-auth";
 import { createDemo } from "./organizer-demo";
 import { uploadMedia, validateMedia } from "./organizer-media";
+import {
+  completeMap,
+  MAX_MAP_ANNOTATIONS,
+  MAX_MAP_POINTS,
+} from "../../shared/maps";
 import type {
   ContentBlock,
   OrganizerApplication,
@@ -256,17 +261,45 @@ organizerAPI.get("/workspace", async (c) => {
 const date = z
   .union([z.literal(""), z.iso.datetime()])
   .transform((s) => (s ? new Date(s).toISOString() : ""));
-const block = z.object({
-  type: z.enum(["heading", "paragraph", "image", "video", "map", "table"]),
-  text: z.string().max(10000).optional(),
-  url: z.url().max(2048).optional(),
-  rows: z
-    .array(z.array(z.string().max(500)).max(12))
-    .max(30)
-    .optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-});
+const block = z
+  .object({
+    type: z.enum(["heading", "paragraph", "image", "video", "map", "table"]),
+    text: z.string().max(10000).optional(),
+    url: z.url().max(2048).optional(),
+    rows: z
+      .array(z.array(z.string().max(500)).max(12))
+      .max(30)
+      .optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    annotations: z
+      .array(
+        z
+          .object({
+            type: z.enum(["point", "path", "area"]),
+            coordinates: z
+              .array(
+                z.object({
+                  latitude: z.number().min(-90).max(90),
+                  longitude: z.number().min(-180).max(180),
+                }),
+              )
+              .min(1)
+              .max(MAX_MAP_POINTS),
+          })
+          .refine(
+            (mark) => mark.type !== "point" || mark.coordinates.length === 1,
+            "每个位置须包含一个点。",
+          ),
+      )
+      .max(MAX_MAP_ANNOTATIONS)
+      .optional(),
+  })
+  .transform((block) => {
+    if (block.type !== "map" || block.annotations === undefined) return block;
+    const point = block.annotations[0]?.coordinates[0];
+    return { ...block, latitude: point?.latitude, longitude: point?.longitude };
+  });
 const taskInput = z
   .object({
     title: z.string().trim().min(1, "请填写任务标题。").max(100),
@@ -289,11 +322,11 @@ const taskInput = z
   })
   .refine(
     (i) => !i.startsAt || !i.endsAt || i.endsAt > i.startsAt,
-    "结束时间必须晚于开始时间。",
+    "任务结束时间必须晚于任务开始时间。",
   )
   .refine(
-    (i) => !i.deadline || !i.startsAt || i.deadline <= i.startsAt,
-    "报名截止时间应不晚于服务开始时间。",
+    (i) => !i.deadline || !i.endsAt || i.deadline <= i.endsAt,
+    "报名截止时间应不晚于任务结束时间。",
   );
 function validatePublishedBlocks(blocks: ContentBlock[]) {
   if (
@@ -303,14 +336,11 @@ function validatePublishedBlocks(blocks: ContentBlock[]) {
     )
   )
     deny(400, "请上传图片或视频，或删除空的内容块。");
-  if (
-    blocks.some(
-      (block) =>
-        block.type === "map" &&
-        (block.latitude === undefined || block.longitude === undefined),
-    )
-  )
-    deny(400, "请标记地图位置，或删除空的地图内容块。");
+  if (blocks.some((block) => block.type === "map" && !completeMap(block)))
+    deny(
+      400,
+      "请完成地图标注：位置至少 1 个点，路径 2 个不同点，范围 3 个不共线的点；或删除未完成的地图。",
+    );
 }
 async function validateTaskRelations(
   c: OrgContext,

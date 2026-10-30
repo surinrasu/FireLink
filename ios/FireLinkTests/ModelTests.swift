@@ -3,6 +3,17 @@ import XCTest
 @testable import FireLink
 
 final class ModelTests: XCTestCase {
+  func testMapAnnotationsPreserveLegacyAndMultipleGeometries() throws {
+    let url = try XCTUnwrap(
+      Bundle(for: Self.self).url(forResource: "map-annotations", withExtension: "json"))
+    let blocks = try JSONDecoder().decode([ContentBlock].self, from: Data(contentsOf: url))
+    XCTAssertNil(blocks[0].annotations)
+    XCTAssertEqual(blocks[0].latitude, 30.25)
+    XCTAssertEqual(blocks[1].annotations?.map(\.type), ["point", "point", "path", "area"])
+    XCTAssertEqual(blocks[1].annotations?.map { $0.coordinates.count }, [1, 1, 2, 3])
+    let restored = try JSONDecoder().decode([ContentBlock].self, from: JSONEncoder().encode(blocks))
+    XCTAssertEqual(restored, blocks)
+  }
   func testVehiclesAndEquipmentPreserveLegacyTextAndRoundTrip() throws {
     let legacy =
       #"{"id":"test","username":"Test","pronouns":"","realName":"Test","birthDate":"2000-01-01","gender":"","verified":true,"region":"","body":"","equipment":["vehicle"],"contacts":{"phone":"13800000000","wechat":"","email":""}}"#

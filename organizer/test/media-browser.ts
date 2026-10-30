@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
+import { isolateLocalDemo } from "./local-demo";
 const url = process.env.TEST_URL || "http://127.0.0.1:8787";
 const browser = await chromium.launch({
   headless: true,
@@ -28,6 +29,7 @@ try {
     }),
   );
   const page = await context.newPage();
+  await isolateLocalDemo(context, url);
   page.on("pageerror", (error) => errors.push(error.message));
   const response = await page.goto(url);
   assert.match(response!.headers()["x-robots-tag"], /noindex/);
@@ -47,7 +49,7 @@ try {
   await page.getByLabel("任务标题", { exact: true }).fill("地图与附件验证");
   await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
   await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
-  await page.getByRole("button", { name: "添加地图位置", exact: true }).click();
+  await page.getByRole("button", { name: "添加地图", exact: true }).click();
   const map = page.locator("#blocks firelink-map");
   await map.locator(".leaflet-container").waitFor();
   assert.equal(await page.getByLabel("纬度", { exact: true }).inputValue(), "");
@@ -59,7 +61,9 @@ try {
   const markerBefore = await map
     .locator(".location-marker")
     .getAttribute("style");
+  await map.locator(".precise summary").click();
   await page.getByLabel("纬度", { exact: true }).fill("30.275");
+  await map.getByRole("button", { name: "更新所选点", exact: true }).click();
   assert.equal(await map.getAttribute("latitude"), "30.275");
   assert.ok(markerBefore);
   await page
@@ -164,6 +168,8 @@ try {
   });
   await page.getByRole("link", { name: "编辑任务", exact: true }).click();
   await page.locator("#task-form").waitFor();
+  await map.getByRole("button", { name: "位置 1", exact: true }).click();
+  await map.locator(".precise summary").click();
   assert.equal(
     await page.getByLabel("纬度", { exact: true }).inputValue(),
     "30.275",

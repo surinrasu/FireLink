@@ -7,6 +7,15 @@ struct ContentBlock: Codable, Hashable {
   var rows: [[String]]?
   var latitude: Double?
   var longitude: Double?
+  var annotations: [MapAnnotation]?
+}
+struct MapCoordinate: Codable, Hashable {
+  let latitude: Double
+  let longitude: Double
+}
+struct MapAnnotation: Codable, Hashable {
+  let type: String
+  let coordinates: [MapCoordinate]
 }
 struct Organizer: Codable {
   let id: String
