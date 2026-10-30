@@ -141,7 +141,7 @@ try {
     .fill("浏览器验证 · 社区物资整理");
   await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
   await page
-    .getByLabel("一句话介绍任务")
+    .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
     .fill("协助社区清点和分类物资，招募 3 位志愿者。");
   const start = new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10);
   const deadline = new Date(Date.now() + 3 * 86400000)

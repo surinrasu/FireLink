@@ -41,6 +41,91 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "select-menus": async (page) => {
+    const menu = page.locator(".select-popover:popover-open");
+    const organization = page.getByRole("combobox", {
+      name: "切换组织",
+      exact: true,
+    });
+    await organization.click();
+    await menu.waitFor();
+    assert.equal(await organization.getAttribute("aria-expanded"), "true");
+    await page.keyboard.press("Escape");
+    await menu.waitFor({ state: "hidden" });
+    assert.equal(
+      await organization.evaluate(
+        (element) => element === document.activeElement,
+      ),
+      true,
+    );
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    const incident = page.getByLabel("所属事件", { exact: true });
+    await incident.click();
+    await menu
+      .getByRole("option", { name: "南京鼓楼区火情", exact: true })
+      .click();
+    assert.equal(await incident.inputValue(), "incident-nanjing");
+    assert.equal(await page.locator(".task-card:visible").count(), 2);
+    await page.keyboard.press("Space");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    assert.equal(await incident.inputValue(), "incident-hangzhou");
+    assert.equal(await page.locator(".task-card:visible").count(), 4);
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Escape");
+    assert.equal(await incident.inputValue(), "incident-hangzhou");
+    await incident.click();
+    await page.getByRole("heading", { name: "任务管理", exact: true }).click();
+    await menu.waitFor({ state: "hidden" });
+    await page.locator('.sidebar a[href="#/settings"]').click();
+    await page.getByRole("button", { name: "邀请成员", exact: true }).click();
+    const role = page.getByLabel("成员角色", { exact: true });
+    await role.click();
+    await menu.waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await page.getByRole("dialog").isVisible(), true);
+    await role.click();
+    await menu.getByRole("option", { name: "任务负责人", exact: true }).click();
+    assert.equal(await role.inputValue(), "manager");
+    await page.getByRole("button", { name: "取消", exact: true }).click();
+    await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await page.locator("#task-form").waitFor();
+    const editorIncident = page.getByLabel("所属事件", { exact: true });
+    await editorIncident.click();
+    await menu
+      .getByRole("option", { name: "南京鼓楼区火情", exact: true })
+      .click();
+    assert.equal(
+      await page
+        .locator("#task-form")
+        .evaluate((form) =>
+          new FormData(form as HTMLFormElement).get("incidentId"),
+        ),
+      "incident-nanjing",
+    );
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 320, height: 740 });
+    await editorIncident.click();
+    await menu.waitFor();
+    const bounds = await menu.boundingBox();
+    assert.ok(
+      bounds &&
+        bounds.x >= 0 &&
+        bounds.x + bounds.width <= 320 &&
+        bounds.y >= 0 &&
+        bounds.y + bounds.height <= 740,
+    );
+    await page.keyboard.press("Escape");
+    await page.getByLabel("任务负责人", { exact: true }).click();
+    await menu.waitFor();
+  },
   "incident-tasks": async (page) => {
     const incidents = () => page.goto(`${base}/#/incidents`);
     const cards = page.locator(".incident-grid > .panel");
@@ -704,7 +789,9 @@ const cases: Record<
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
-    await page.getByLabel("一句话介绍任务").fill("多处位置、路线与活动范围");
+    await page
+      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
+      .fill("多处位置、路线与活动范围");
     await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
     await page.getByRole("button", { name: "添加地图", exact: true }).click();
     const map = page.locator("#blocks firelink-map");
@@ -919,7 +1006,9 @@ const cases: Record<
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
-    await page.getByLabel("一句话介绍任务").fill("整理社区物资");
+    await page
+      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
+      .fill("整理社区物资");
     await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
     assert.equal(
       await page
@@ -991,7 +1080,9 @@ const cases: Record<
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
     await page
-      .getByLabel("一句话介绍任务", { exact: true })
+      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求", {
+        exact: true,
+      })
       .fill("整理社区物资");
     const day = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
     await page.getByLabel("任务开始时间", { exact: true }).fill(`${day}T10:00`);

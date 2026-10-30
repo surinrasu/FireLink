@@ -115,6 +115,75 @@ a.button.circle {
   color: var(--on-surface-variant);
   opacity: 1;
 }
+.field:has(> select[data-custom-select]),
+.org-switch {
+  position: relative;
+}
+.field > select[data-custom-select],
+.org-switch > select[data-custom-select] {
+  appearance: none;
+  padding-inline-end: 42px;
+  cursor: pointer;
+}
+.field > .select-arrow,
+.org-switch > .select-arrow {
+  position: absolute;
+  inset: 50% 12px auto auto;
+  transform: translateY(-50%);
+  color: var(--on-surface-variant);
+  pointer-events: none;
+}
+.select-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--on-surface);
+  box-shadow: 0 8px 24px #0002;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.select-option {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  gap: 12px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.select-option > span {
+  min-width: 0;
+  flex: 1;
+}
+.select-option > i {
+  flex-shrink: 0;
+  color: var(--secondary);
+}
+.select-option:hover,
+.select-option.active {
+  background: var(--surface-container);
+}
+.select-option[aria-selected="true"] {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+  font-weight: 650;
+}
+.select-popover.keyboard .select-option.active {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.select-option[aria-disabled="true"] {
+  color: var(--on-surface-variant);
+  cursor: not-allowed;
+}
 a {
   text-decoration: none;
 }
@@ -181,9 +250,6 @@ video {
   justify-items: center;
   gap: 16px;
 }
-.boot img {
-  border-radius: 14px;
-}
 .skip-link {
   position: fixed;
   left: 12px;
@@ -204,6 +270,7 @@ video {
   padding: 26px 18px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   border-right: 1px solid var(--outline-variant);
   background: var(--surface-container-low);
   z-index: 20;
@@ -215,7 +282,8 @@ video {
   color: var(--on-surface);
   padding: 0 14px 28px;
 }
-.brand strong {
+.brand strong,
+.boot > h1 {
   font-size: 1.75rem;
   font-weight: 750;
   line-height: 1.2;
@@ -258,7 +326,9 @@ video {
 }
 .sidebar-footer {
   margin-top: auto;
-  padding: 22px 15px 0;
+  padding-top: 22px;
+  flex-shrink: 0;
+  width: 100%;
 }
 .workspace-label {
   display: inline-flex;
@@ -289,23 +359,52 @@ video {
   background: var(--surface-container-low);
 }
 .org-switch {
-  max-width: 360px;
   min-width: 0;
-  flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
 }
-.org-switch select {
+.org-switch:hover,
+.org-switch:has(select[aria-expanded="true"]) {
+  background: var(--surface-container-high);
+}
+.org-switch:has(select:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.org-switch > select {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
   border: 0;
-  background: transparent;
-  color: var(--on-surface);
-  min-height: 44px;
+  opacity: 0;
   width: 100%;
-  min-width: 0;
-  text-overflow: ellipsis;
-  font-size: 0.87rem;
+  height: 100%;
   cursor: pointer;
+}
+.org-switch > .select-arrow,
+.org-monogram {
+  display: none;
+}
+.org-details {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.org-details > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.87rem;
+  font-weight: 650;
+}
+.org-switch > i {
+  flex-shrink: 0;
+  color: var(--on-surface-variant);
 }
 .topbar-spacer {
   flex: 1;
@@ -517,16 +616,6 @@ video {
 .task-row:first-child {
   border-top: 0;
 }
-.task-symbol {
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  background: var(--surface-container);
-  color: var(--secondary);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
 .task-info {
   flex: 1;
   min-width: 0;
@@ -647,6 +736,13 @@ video {
 .toolbar .search {
   flex: 2 1 260px;
 }
+#main .task-toolbar > .field {
+  margin: 0;
+}
+.task-toolbar .field > input,
+.task-toolbar .field > select {
+  border-radius: 12px;
+}
 .filter-chips {
   display: flex;
   gap: 8px;
@@ -706,7 +802,6 @@ video {
   grid-column: 1;
   grid-row: 1;
 }
-.compact .task-card-top > .muted,
 .compact .task-card .summary {
   display: none;
 }
@@ -714,17 +809,16 @@ video {
   grid-column: 1;
   grid-row: 2;
 }
-.compact .task-event {
-  grid-column: 1;
+.compact .task-meta {
+  grid-column: 1 / span 2;
   grid-row: 3;
-}
-.compact .task-deadline {
-  grid-column: 2;
-  grid-row: 1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 20px;
 }
 .compact .task-progress {
   grid-column: 2;
-  grid-row: 2 / span 2;
+  grid-row: 1 / span 2;
 }
 .compact .task-card footer {
   grid-column: 3;
@@ -755,10 +849,19 @@ video {
   flex-direction: column;
   gap: 15px;
 }
+#task-grid > .task-card {
+  margin: 0;
+}
 .task-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.task-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 0;
 }
 .task-card h2 a {
   color: var(--on-surface);
@@ -1146,6 +1249,19 @@ video {
   gap: 24px;
   align-items: start;
 }
+.task-summary {
+  margin-top: 20px;
+}
+.task-summary > label {
+  display: block;
+  white-space: normal;
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+#task-form .task-summary > .field {
+  margin: 8px 0 0;
+}
 .editor-preview {
   position: sticky;
   top: 24px;
@@ -1347,10 +1463,6 @@ th {
   border-radius: 18px;
   margin-bottom: 20px;
 }
-.incident-header i {
-  margin-bottom: 14px;
-  color: var(--secondary);
-}
 .incident-grid .panel-header {
   flex-wrap: wrap;
   gap: 4px 16px;
@@ -1482,6 +1594,12 @@ dialog::backdrop {
 .login-tools button {
   margin: 0;
 }
+.login-preferences {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
 .large-text {
   font-size: 18px;
 }
@@ -1507,9 +1625,24 @@ dialog::backdrop {
   .sidebar .brand strong {
     font-size: 1.05rem;
   }
-  .side-link > span,
-  .sidebar-footer {
+  .side-link > span {
     display: none;
+  }
+  .sidebar-footer .org-switch {
+    width: 52px;
+    height: 52px;
+    margin-inline: auto;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .sidebar-footer .org-details,
+  .sidebar-footer .org-switch > i {
+    display: none;
+  }
+  .sidebar-footer .org-monogram {
+    display: inline;
+    font-weight: 650;
   }
   .sidebar .create-button {
     padding: 0;
@@ -1590,7 +1723,13 @@ dialog::backdrop {
     gap: 8px;
   }
   .topbar .org-switch {
+    flex: 1;
     max-width: calc(100vw - 150px);
+    min-height: 44px;
+    padding: 8px;
+  }
+  .topbar .org-switch .workspace-label {
+    display: none;
   }
   .org-switch > i {
     display: none;
@@ -1635,9 +1774,6 @@ dialog::backdrop {
   }
   .task-row-end {
     min-width: 75px;
-  }
-  .task-symbol {
-    display: none;
   }
   .task-info a {
     font-size: 0.9rem;
