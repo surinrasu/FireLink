@@ -41,6 +41,133 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "incident-tasks": async (page) => {
+    const incidents = () => page.goto(`${base}/#/incidents`);
+    const cards = page.locator(".incident-grid > .panel");
+    const visibleTasks = page.locator(".task-card:visible");
+    await incidents();
+    await page
+      .getByRole("heading", { name: "活跃事件", exact: true })
+      .waitFor();
+    assert.deepEqual(
+      await cards.locator(".incident-header h2").allTextContents(),
+      ["杭州西湖区火情", "南京鼓楼区火情"],
+    );
+    assert.equal(await cards.locator(".incident-header p").count(), 0);
+    for (const [index, count] of [4, 2].entries()) {
+      const card = cards.nth(index);
+      assert.equal(await card.locator(".task-row").count(), 2);
+      assert.equal(
+        await card.locator(".panel-header h3").textContent(),
+        `${count} 个当前组织关联任务`,
+      );
+      assert.equal(
+        await card.locator("firelink-map .label").textContent(),
+        index ? "江苏省 南京市 鼓楼区" : "浙江省 杭州市 西湖区",
+      );
+    }
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incident-tasks-desktop.png",
+      fullPage: true,
+    });
+    await cards.first().getByRole("link", { name: "显示全部" }).click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel("所属事件", { exact: true }).inputValue(),
+      "incident-hangzhou",
+    );
+    assert.equal(await visibleTasks.count(), 4);
+    assert.ok(
+      (await visibleTasks.locator(".task-event").allTextContents()).every(
+        (title) => title.includes("杭州西湖区火情"),
+      ),
+    );
+    await page.reload();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 4);
+    await page.getByRole("link", { name: "草稿 1", exact: true }).click();
+    await page
+      .locator(".filter-chips a.active")
+      .filter({ hasText: "草稿" })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 1);
+    assert.equal(
+      await page.getByLabel("所属事件", { exact: true }).inputValue(),
+      "incident-hangzhou",
+    );
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption("incident-nanjing");
+    await page
+      .getByRole("heading", { name: "无匹配任务", exact: true })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 0);
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    await page.getByRole("link", { name: "全部任务 6", exact: true }).waitFor();
+    assert.equal(await visibleTasks.count(), 6);
+    assert.equal(
+      await page.getByLabel("所属事件", { exact: true }).inputValue(),
+      "",
+    );
+    await incidents();
+    await cards.nth(1).getByRole("link", { name: "显示全部" }).click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 2);
+    assert.ok(
+      (await visibleTasks.locator(".task-event").allTextContents()).every(
+        (title) => title.includes("南京鼓楼区火情"),
+      ),
+    );
+    await page
+      .getByRole("searchbox", { name: "搜索任务", exact: true })
+      .fill("信息登记");
+    assert.equal(await visibleTasks.count(), 1);
+    await page
+      .getByRole("searchbox", { name: "搜索任务", exact: true })
+      .fill("");
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption("incident-hangzhou");
+    await page.reload();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 4);
+    await incidents();
+    await cards.first().waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incident-tasks-mobile.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 320, height: 740 });
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    await cards.first().getByRole("link", { name: "显示全部" }).click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    assert.equal(await visibleTasks.count(), 4);
+    await page.goBack();
+    await page
+      .getByRole("heading", { name: "活跃事件", exact: true })
+      .waitFor();
+  },
   "account-preferences": async (page) => {
     const theme = page.getByRole("button", { name: "主题", exact: true });
     const text = page.getByRole("button", { name: "文字大小", exact: true });

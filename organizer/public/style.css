@@ -867,7 +867,7 @@ video {
   object-fit: contain;
   background: #191c19;
 }
-.incident-grid > .panel {
+#main .incident-grid > .panel {
   margin: 0;
 }
 .description figcaption {
@@ -1347,14 +1347,17 @@ th {
   border-radius: 18px;
   margin-bottom: 20px;
 }
-.incident-header p {
-  font-size: 0.83rem;
-  margin-top: 8px;
-  color: var(--on-secondary-container);
-}
 .incident-header i {
   margin-bottom: 14px;
   color: var(--secondary);
+}
+.incident-grid .panel-header {
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.incident-grid .panel-header > a {
+  white-space: nowrap;
+  margin: 0;
 }
 dialog {
   padding: 28px;
