@@ -1135,39 +1135,36 @@ video {
 .editor-section {
   scroll-margin-top: 24px;
 }
-.publish-readiness {
-  margin-bottom: 24px;
-  padding: 16px 20px;
-  background: var(--secondary-container);
-  color: var(--on-secondary-container);
-  border-radius: 12px;
-}
-.publish-readiness summary {
-  cursor: pointer;
-  min-height: 44px;
-  align-content: center;
-  font-weight: 600;
-}
-.publish-readiness ul {
-  padding-left: 20px;
-}
-.publish-readiness button {
-  margin: 0;
-  padding: 8px 0;
-  height: auto;
-  white-space: normal;
-  text-align: left;
-  color: inherit;
-}
 .field-error {
   color: var(--error);
   font-size: 0.875rem;
   margin: -8px 0 16px;
 }
-.editor-section > h2 {
+.editor-section > h2,
+.block-section-heading h2 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.block-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.block-history,
+.block-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.block-add-actions {
+  margin-top: 20px;
+}
+.block-history button,
+.block-add-actions button {
+  margin: 0;
 }
 .step-number {
   height: 27px;

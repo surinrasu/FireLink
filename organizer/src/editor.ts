@@ -58,11 +58,6 @@ export function mountEditor(
   let saving: Promise<void> | null = null;
   let revision = 0;
   let autoSaveStopped = false;
-  const deletedBlocks: {
-    block: ContentBlock;
-    index: number;
-    uploadCancelled: boolean;
-  }[] = [];
   const uploads = new Map<
     ContentBlock,
     {
@@ -109,51 +104,85 @@ export function mountEditor(
         .map((m) => [m.id, m.name]),
       source?.ownerId || workspace.membership.id,
     )}</div></section>
-    <section class="panel editor-section"><h2><span class="step-number">2</span>时间与地点</h2><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "服务开始时间", task ? beijingInput(task.startsAt) : "", "", "datetime-local")}${input("endsAt", "服务结束时间", task ? beijingInput(task.endsAt) : "", "", "datetime-local")}${input("deadline", "报名截止时间", task ? beijingInput(task.deadline) : "", "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div><p class="help">留空不限人数，按通过报名计数。</p>${input("location", "服务地点", source?.location || "", 'maxlength="300"')}${input("meetingPoint", "集合地点（可选）", source?.meetingPoint || "", 'maxlength="300"')}<button class="border" type="button" id="mark-location">${icon("add_location_alt")}地图标记</button></section>
-    <section class="panel editor-section"><h2><span class="step-number">3</span>工作内容与参与要求</h2><div id="blocks"></div><div class="row wrap">${select("add-block-type", "添加内容", Object.entries(blockNames))}<button class="border" type="button" id="add-block">${icon("add")}添加</button></div></section>
-    <section class="panel editor-section"><h2><span class="step-number">4</span>报名资料与授权</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}</fieldset><fieldset id="contact-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>通过后开放的联系方式</legend><div class="check-grid">${["phone", "wechat", "email"].map((key) => `<label class="checkbox"><input type="checkbox" name="contactFields" value="${key}" ${contacts.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`).join("")}</div></fieldset></section>
+    <section class="panel editor-section"><h2><span class="step-number">2</span>时间与地点</h2><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "服务开始时间", task ? beijingInput(task.startsAt) : "", "", "datetime-local")}${input("endsAt", "服务结束时间", task ? beijingInput(task.endsAt) : "", "", "datetime-local")}${input("deadline", "报名截止时间", task ? beijingInput(task.deadline) : "", "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "服务地点", source?.location || "", 'maxlength="300"')}</section>
+    <section class="panel editor-section"><div class="block-section-heading"><h2><span class="step-number">3</span>工作内容与参与要求</h2><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
+      blockNames,
+    )
+      .map(
+        ([type, label]) =>
+          `<button class="border" type="button" data-add-block="${type}" aria-label="添加${label}">${icon("add")}${label}</button>`,
+      )
+      .join("")}</div></section>
+    <section class="panel editor-section"><h2><span class="step-number">4</span>报名资料与授权</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}</fieldset><fieldset id="contact-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>联系方式</legend><div class="check-grid">${["phone", "wechat", "email"].map((key) => `<label class="checkbox"><input type="checkbox" name="contactFields" value="${key}" ${contacts.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`).join("")}</div></fieldset></section>
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
     <footer class="editor-footer"><small id="save-status" role="status">${draft ? "草稿填写后自动保存" : "已发布任务的更改需要手动保存"}</small><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
   const status = host.querySelector<HTMLElement>("#save-status")!;
   const blockHost = host.querySelector<HTMLElement>("#blocks")!;
-  const undoRegion = document.createElement("div");
-  undoRegion.className = "block-undo row wrap";
-  undoRegion.hidden = true;
-  undoRegion.innerHTML =
-    '<span id="block-undo-status" role="status"></span><button type="button" class="border" id="undo-block">撤销删除</button>';
-  blockHost.before(undoRegion);
-  const undoButton = undoRegion.querySelector<HTMLButtonElement>("button")!;
-  const undoStatus = undoRegion.querySelector<HTMLElement>("span")!;
-  undoButton.addEventListener("click", () => {
-    if (blocks.length >= 50)
-      return toast("内容已达 50 段，请先删除空段再恢复。");
-    const deleted = deletedBlocks.pop();
-    if (!deleted) return;
-    readBlocks();
-    const index = Math.min(deleted.index, blocks.length);
-    blocks.splice(index, 0, deleted.block);
+  const undoButton = host.querySelector<HTMLButtonElement>("#undo-block")!;
+  const redoButton = host.querySelector<HTMLButtonElement>("#redo-block")!;
+  // Keep block identities so unrelated uploads survive a history change.
+  const snapshot = () =>
+    blocks.map((block) => ({ block, content: structuredClone(block) }));
+  type BlockSnapshot = ReturnType<typeof snapshot>;
+  const past: BlockSnapshot[] = [];
+  const future: BlockSnapshot[] = [];
+  let current: BlockSnapshot;
+  let editGroup: EventTarget | null = null;
+  function updateHistoryButtons() {
+    undoButton.disabled = !past.length;
+    redoButton.disabled = !future.length;
+  }
+  function recordBlocks(event?: Event) {
+    const next = snapshot();
+    const group = event?.type === "input" ? event.target : null;
+    if (
+      JSON.stringify(next.map((entry) => entry.content)) !==
+      JSON.stringify(current.map((entry) => entry.content))
+    ) {
+      if (!group || group !== editGroup) {
+        past.push(current);
+        if (past.length > 100) past.shift();
+      }
+      current = next;
+      future.length = 0;
+    }
+    editGroup = group;
+    updateHistoryButtons();
+  }
+  function restoreBlocks(from: BlockSnapshot[], to: BlockSnapshot[]) {
+    const restored = from.pop();
+    if (!restored) return;
+    to.push(current);
+    for (const block of blocks) {
+      if (restored.some((entry) => entry.block === block)) continue;
+      uploads.get(block)?.controller.abort();
+      uploads.delete(block);
+    }
+    blocks = restored.map(({ block, content }) => {
+      for (const key of Object.keys(block) as (keyof ContentBlock)[])
+        delete block[key];
+      Object.assign(block, structuredClone(content));
+      return block;
+    });
+    current = restored;
+    editGroup = null;
     drawBlocks();
     changed();
-    undoRegion.hidden = !deletedBlocks.length;
-    undoStatus.textContent = deletedBlocks.length
-      ? `还有 ${deletedBlocks.length} 段可撤销删除`
-      : "";
-    blockHost.children[index]
-      ?.querySelector<HTMLElement>('input:not([type="file"]), textarea')
-      ?.focus();
-    toast(
-      deleted.uploadCancelled
-        ? "内容已恢复；已取消的上传请重新选择文件。"
-        : "已恢复删除的内容。",
-    );
-  });
-  let showPublishErrors = false;
-  const readiness = document.createElement("details");
-  readiness.className = "publish-readiness";
-  readiness.innerHTML =
-    '<summary id="publish-status"></summary><p id="publish-hint">标有 * 的项目为发布必填，草稿可在资料未齐全时保存。</p><ul id="publish-issues"></ul>';
-  if (draft) form.prepend(readiness);
+    // Keep keyboard focus in the history controls when one becomes disabled.
+    (from.length
+      ? from === past
+        ? undoButton
+        : redoButton
+      : from === past
+        ? redoButton
+        : undoButton
+    ).focus();
+  }
+  undoButton.addEventListener("click", () => restoreBlocks(past, future));
+  redoButton.addEventListener("click", () => restoreBlocks(future, past));
+  const publishButton = host.querySelector<HTMLButtonElement>("#publish-task");
+  let deadlineTimer: ReturnType<typeof setTimeout>;
   for (const name of [
     "title",
     "incidentId",
@@ -165,12 +194,21 @@ export function mountEditor(
     const field = form.elements.namedItem(name) as HTMLInputElement;
     const label = form.querySelector<HTMLLabelElement>(`label[for="${name}"]`)!;
     field.setAttribute("aria-label", label.textContent || "");
-    if (draft) field.setAttribute("aria-describedby", "publish-hint");
     label.insertAdjacentHTML("beforeend", ' <span aria-hidden="true">*</span>');
   }
-  type PublishIssue = { field: string; message: string };
-  function publicationIssues(): PublishIssue[] {
-    const issues: PublishIssue[] = [];
+  type PublishCheck = { field: string; message: string; complete: boolean };
+  function publicationChecks(): PublishCheck[] {
+    const checks: PublishCheck[] = [];
+    const check = (field: string, complete: boolean, message: string) =>
+      checks.push({ field, complete, message });
+    const invalidate = (field: string, message: string) => {
+      const existing = checks.find((item) => item.field === field);
+      if (existing) {
+        if (!existing.complete) return;
+        existing.complete = false;
+        existing.message = message;
+      } else check(field, false, message);
+    };
     const required = {
       title: "任务标题",
       incidentId: "所属事件",
@@ -180,106 +218,91 @@ export function mountEditor(
       location: "服务地点",
     };
     for (const [field, label] of Object.entries(required))
-      if (!value(field).trim())
-        issues.push({ field, message: `请填写${label}` });
+      check(field, !!value(field).trim(), `请填写${label}`);
+    for (const field of ["endsAt", "capacity"])
+      if (value(field)) check(field, true, "");
     if (
       value("deadline") &&
       Date.parse(`${value("deadline")}:00+08:00`) <= Date.now()
     )
-      issues.push({ field: "deadline", message: "报名截止时间须晚于当前时间" });
+      invalidate("deadline", "报名截止时间须晚于当前时间");
     if (
       value("deadline") &&
       value("startsAt") &&
       value("deadline") > value("startsAt")
     )
-      issues.push({
-        field: "deadline",
-        message: "报名截止时间不能晚于服务开始时间",
-      });
+      invalidate("deadline", "报名截止时间不能晚于服务开始时间");
     if (
       value("endsAt") &&
       value("startsAt") &&
       value("endsAt") <= value("startsAt")
     )
-      issues.push({ field: "endsAt", message: "服务结束时间须晚于开始时间" });
-    if (!form.querySelector('[name="requiredFields"]:checked'))
-      issues.push({
-        field: "required-fields",
-        message: "请至少选择一项报名必填资料",
-      });
-    if (!form.querySelector('[name="contactFields"]:checked'))
-      issues.push({
-        field: "contact-fields",
-        message: "请至少选择一种通过后开放的联系方式",
-      });
+      invalidate("endsAt", "服务结束时间须晚于开始时间");
+    check(
+      "required-fields",
+      !!form.querySelector('[name="requiredFields"]:checked'),
+      "请至少选择一项报名必填资料",
+    );
+    check(
+      "contact-fields",
+      !!form.querySelector('[name="contactFields"]:checked'),
+      "请至少选择一种联系方式",
+    );
     blocks.forEach((block, index) => {
-      if (
-        (block.type === "image" || block.type === "video") &&
-        (!block.url || uploads.get(block)?.pending || uploads.get(block)?.error)
-      )
-        issues.push({
-          field: "blocks",
-          message: `请完成第 ${index + 1} 段${blockNames[block.type]}上传，或删除该内容块`,
-        });
-      if (
-        block.type === "map" &&
-        (block.latitude === undefined || block.longitude === undefined)
-      )
-        issues.push({
-          field: `block-lat-${index}`,
-          message: `请标记第 ${index + 1} 段地图的位置`,
-        });
+      if (block.type === "image" || block.type === "video")
+        check(
+          `block-file-${index}`,
+          !!block.url &&
+            !uploads.get(block)?.pending &&
+            !uploads.get(block)?.error,
+          `请完成第 ${index + 1} 段${blockNames[block.type]}上传，或删除该内容块`,
+        );
+      if (block.type === "map")
+        check(
+          `block-lat-${index}`,
+          block.latitude !== undefined && block.longitude !== undefined,
+          `请标记第 ${index + 1} 段地图的位置`,
+        );
     });
-    if (!workspace.organization.verified)
-      issues.push({ field: "settings", message: "请先完成组织认证" });
-    if (!workspace.organization.contacts.length)
-      issues.push({
-        field: "settings",
-        message: "请在组织设置中填写至少一种公开联系方式",
-      });
+    check(
+      "organization-verified",
+      workspace.organization.verified,
+      "请先完成组织认证",
+    );
+    check(
+      "organization-contacts",
+      !!workspace.organization.contacts.length,
+      "请在组织设置中填写至少一种公开联系方式",
+    );
     for (const field of form.querySelectorAll<HTMLInputElement>(
       "input:invalid, select:invalid, textarea:invalid",
     )) {
-      if (!issues.some((issue) => issue.field === field.id))
-        issues.push({
-          field: field.id,
-          message:
-            field.id === "capacity"
-              ? "计划招募人数须为 1 至 10000 的整数"
-              : `请检查${field.getAttribute("aria-label") || form.querySelector(`label[for="${field.id}"]`)?.textContent || "此项内容"}`,
-        });
+      invalidate(
+        field.id,
+        field.id === "capacity"
+          ? "计划招募人数须为 1 至 10000 的整数"
+          : `请检查${field.getAttribute("aria-label") || form.querySelector(`label[for="${field.id}"]`)?.textContent || "此项内容"}`,
+      );
     }
-    return issues;
+    return checks;
   }
-  function focusIssue(field: string) {
-    const target = form.querySelector<HTMLElement>(`#${field}`);
-    if (!target) return;
-    target.tabIndex = target.matches("input, select, textarea")
-      ? target.tabIndex
-      : -1;
-    target.scrollIntoView({ block: "center", behavior: "instant" });
-    target.focus({ preventScroll: true });
-  }
-  readiness.addEventListener("click", (event) => {
-    const button = (event.target as Element).closest<HTMLElement>(
-      "[data-publish-field]",
-    );
-    if (button) focusIssue(button.dataset.publishField!);
-  });
   function updateReadiness() {
-    if (!draft) return;
-    const issues = publicationIssues();
-    readiness.querySelector("summary")!.textContent = issues.length
-      ? `发布还需完成 ${issues.length} 项`
-      : "发布准备已完成";
-    const list = issues
-      .map(
-        (issue) =>
-          `<li>${issue.field === "settings" ? `<a href="#/settings">${h(issue.message)}</a>` : `<button type="button" class="transparent" data-publish-field="${issue.field}">${h(issue.message)}</button>`}</li>`,
-      )
-      .join("");
-    const listElement = readiness.querySelector("ul")!;
-    if (listElement.innerHTML !== list) listElement.innerHTML = list;
+    if (!publishButton) return;
+    const checks = publicationChecks();
+    const issues = checks.filter((item) => !item.complete);
+    publishButton.disabled = issues.length > 0;
+    publishButton.textContent = issues.length
+      ? `发布招募 (${checks.length - issues.length}/${checks.length})`
+      : "发布招募";
+    publishButton.title = issues.map((issue) => issue.message).join("\n");
+    clearTimeout(deadlineTimer);
+    const untilDeadline =
+      Date.parse(`${value("deadline")}:00+08:00`) - Date.now();
+    if (untilDeadline > 0)
+      deadlineTimer = setTimeout(
+        updateReadiness,
+        Math.min(untilDeadline + 1, 2147483647),
+      );
     form.querySelectorAll(".field-error").forEach((e) => e.remove());
     form.querySelectorAll('[aria-invalid="true"]').forEach((e) => {
       e.removeAttribute("aria-invalid");
@@ -290,21 +313,25 @@ export function mountEditor(
       if (described) e.setAttribute("aria-describedby", described);
       else e.removeAttribute("aria-describedby");
     });
-    if (showPublishErrors)
-      for (const issue of issues) {
-        const field = form.querySelector<HTMLElement>(`#${issue.field}`);
-        if (!field || field.hasAttribute("aria-invalid")) continue;
-        field.setAttribute("aria-invalid", "true");
-        const error = document.createElement("p");
-        error.className = "field-error";
-        error.id = `${issue.field}-publish-error`;
-        error.textContent = issue.message;
-        field.setAttribute(
-          "aria-describedby",
-          `${field.getAttribute("aria-describedby") || ""} ${error.id}`.trim(),
-        );
-        (field.closest(".field") || field).after(error);
-      }
+    for (const issue of issues) {
+      const field = form.querySelector<HTMLElement>(`#${issue.field}`);
+      if (
+        !field ||
+        !value(issue.field).trim() ||
+        field.hasAttribute("aria-invalid")
+      )
+        continue;
+      field.setAttribute("aria-invalid", "true");
+      const error = document.createElement("p");
+      error.className = "field-error";
+      error.id = `${issue.field}-publish-error`;
+      error.textContent = issue.message;
+      field.setAttribute(
+        "aria-describedby",
+        `${field.getAttribute("aria-describedby") || ""} ${error.id}`.trim(),
+      );
+      (field.closest(".field") || field).after(error);
+    }
   }
   const value = (name: string) => String(new FormData(form).get(name) || "");
   function readBlocks() {
@@ -405,13 +432,15 @@ export function mountEditor(
           if (!disposed) refreshUpload(block);
         },
       );
-      if (disposed || !blocks.includes(block)) return;
+      if (disposed || !blocks.includes(block) || uploads.get(block) !== job)
+        return;
       block.url = result.url;
       job.pending = false;
       changed();
       refreshUpload(block);
     } catch (error) {
-      if (disposed || !blocks.includes(block)) return;
+      if (disposed || !blocks.includes(block) || uploads.get(block) !== job)
+        return;
       job.pending = false;
       job.error = errorText(error);
       refreshUpload(block);
@@ -448,17 +477,10 @@ export function mountEditor(
           readBlocks();
           const index = Number(button.dataset.removeBlock);
           const removed = blocks.splice(index, 1)[0];
-          deletedBlocks.push({
-            block: structuredClone(removed),
-            index,
-            uploadCancelled: !!uploads.get(removed)?.pending,
-          });
           uploads.get(removed)?.controller.abort();
           uploads.delete(removed);
           drawBlocks();
           changed();
-          undoRegion.hidden = false;
-          undoStatus.textContent = `已删除第 ${index + 1} 段 · 本次编辑可撤销`;
           undoButton.focus();
         }),
       );
@@ -486,7 +508,7 @@ export function mountEditor(
       endsAt: utcInput(value("endsAt")),
       deadline: utcInput(value("deadline")),
       location: value("location").trim(),
-      meetingPoint: value("meetingPoint").trim(),
+      meetingPoint: source?.meetingPoint || "",
       blocks,
       requiredFields: Array.from(
         form.querySelectorAll<HTMLInputElement>(
@@ -508,7 +530,7 @@ export function mountEditor(
       ["服务结束（北京时间）", value("endsAt").replace("T", " ")],
       ["报名截止（北京时间）", value("deadline").replace("T", " ")],
       ["服务地点", value("location")],
-      ["集合地点", value("meetingPoint")],
+      ["集合地点", source?.meetingPoint || ""],
       ["招募人数", value("capacity")],
     ].filter(([, text]) => text);
     const metadata: ContentBlock[] = rows.length
@@ -557,7 +579,7 @@ export function mountEditor(
       return;
     }
     if (!input.contactFields.length) {
-      if (!automatic) formError(form, "请至少选择一种通过后开放的联系方式。");
+      if (!automatic) formError(form, "请至少选择一种联系方式。");
       return;
     }
     if (!form.checkValidity()) {
@@ -601,10 +623,11 @@ export function mountEditor(
     })();
     await saving;
   }
-  function changed() {
+  function changed(event?: Event) {
     revision++;
     dirty = true;
     preview();
+    recordBlocks(event);
     updateReadiness();
     status.textContent = draft ? "有未保存的更改…" : "更改尚未保存";
     clearTimeout(timer);
@@ -615,6 +638,7 @@ export function mountEditor(
   }
   drawBlocks();
   preview();
+  current = snapshot();
   updateReadiness();
   form.addEventListener("input", changed);
   form.addEventListener("change", changed);
@@ -624,90 +648,66 @@ export function mountEditor(
     autoSaveStopped = false;
     void save().catch(() => {});
   });
-  host.querySelector("#add-block")!.addEventListener("click", () => {
-    readBlocks();
-    if (blocks.length >= 50) return toast("最多添加 50 段内容。");
-    blocks.push({
-      type: value("add-block-type") as ContentBlock["type"],
-      text: "",
-    });
-    drawBlocks();
-    changed();
-  });
-  host.querySelector("#mark-location")!.addEventListener("click", () => {
-    readBlocks();
-    let index = blocks.findIndex((block) => block.type === "map");
-    if (index < 0) {
-      if (blocks.length >= 50) return toast("最多添加 50 段内容。");
-      index = blocks.length;
-      blocks.push({
-        type: "map",
-        text: value("meetingPoint") || value("location"),
-      });
-      drawBlocks();
-      changed();
-    }
-    const map = blockHost.querySelector<HTMLElement>(
-      `[data-map-index="${index}"]`,
-    )!;
-    map.scrollIntoView({ block: "center", behavior: "instant" });
-    form
-      .querySelector<HTMLInputElement>(`#block-lat-${index}`)!
-      .focus({ preventScroll: true });
-  });
+  host
+    .querySelectorAll<HTMLButtonElement>("[data-add-block]")
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        readBlocks();
+        if (blocks.length >= 50) return toast("最多添加 50 段内容。");
+        blocks.push({
+          type: button.dataset.addBlock as ContentBlock["type"],
+          text: "",
+        });
+        drawBlocks();
+        changed();
+        blockHost.lastElementChild
+          ?.querySelector<HTMLElement>('input:not([type="file"]), textarea')
+          ?.focus();
+      }),
+    );
   host.querySelector("#preview-task")!.addEventListener("click", () => {
     openDialog(
       "志愿者端内容预览",
       `<div class="preview-phone">${previewHTML()}</div><div class="dialog-actions"><button data-close-dialog>返回编辑</button></div>`,
     );
   });
-  host
-    .querySelector<HTMLButtonElement>("#publish-task")
-    ?.addEventListener("click", async () => {
-      showPublishErrors = true;
-      updateReadiness();
-      const issues = publicationIssues();
-      if (issues.length) {
-        readiness.open = true;
-        if (issues[0].field === "settings")
-          readiness.querySelector<HTMLAnchorElement>("a")?.focus();
-        else focusIssue(issues[0].field);
-        return;
-      }
-      clearTimeout(timer);
-      try {
-        await save();
-      } catch {
-        return;
-      }
-      if (
-        !id ||
-        dirty ||
-        [...uploads.values()].some((job) => job.pending || job.error)
-      )
-        return;
-      const input = data();
-      const dialog = openDialog(
-        "确认发布这份招募？",
-        `<p class="dialog-copy"><strong>${h(input.title)}</strong><br>${workspace.organization.demo ? "仅在演示空间发布。" : "公开任务并接收报名。"}</p><div class="dialog-actions"><button class="border" data-close-dialog>继续检查</button><button id="confirm-publish">确认发布</button></div>`,
-      );
-      dialog
-        .querySelector<HTMLButtonElement>("#confirm-publish")!
-        .addEventListener("click", async (event) => {
-          const button = event.currentTarget as HTMLButtonElement;
-          button.disabled = true;
-          try {
-            await api(`/tasks/${id}/state`, "POST", { state: "open", version });
-            dirty = false;
-            closeDialog();
-            toast("招募已发布。");
-            location.hash = `/tasks/${id}`;
-          } catch (error) {
-            formError(dialog, errorText(error));
-            button.disabled = false;
-          }
-        });
-    });
+  publishButton?.addEventListener("click", async () => {
+    updateReadiness();
+    if (publishButton.disabled) return;
+    clearTimeout(timer);
+    try {
+      await save();
+    } catch {
+      return;
+    }
+    if (
+      !id ||
+      dirty ||
+      [...uploads.values()].some((job) => job.pending || job.error)
+    )
+      return;
+    const input = data();
+    const dialog = openDialog(
+      "确认发布这份招募？",
+      `<p class="dialog-copy"><strong>${h(input.title)}</strong><br>${workspace.organization.demo ? "仅在演示空间发布。" : "公开任务并接收报名。"}</p><div class="dialog-actions"><button class="border" data-close-dialog>继续检查</button><button id="confirm-publish">确认发布</button></div>`,
+    );
+    dialog
+      .querySelector<HTMLButtonElement>("#confirm-publish")!
+      .addEventListener("click", async (event) => {
+        const button = event.currentTarget as HTMLButtonElement;
+        button.disabled = true;
+        try {
+          await api(`/tasks/${id}/state`, "POST", { state: "open", version });
+          dirty = false;
+          closeDialog();
+          toast("招募已发布。");
+          location.hash = `/tasks/${id}`;
+        } catch (error) {
+          formError(dialog, errorText(error));
+          button.disabled = false;
+        }
+      });
+  });
   if (copy) {
     dirty = true;
     revision++;
@@ -733,6 +733,7 @@ export function mountEditor(
     dispose: () => {
       disposed = true;
       clearTimeout(timer);
+      clearTimeout(deadlineTimer);
       uploads.forEach((job) => job.controller.abort());
     },
   };

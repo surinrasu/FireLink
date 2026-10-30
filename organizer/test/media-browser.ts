@@ -47,7 +47,7 @@ try {
   await page.getByLabel("任务标题", { exact: true }).fill("地图与附件验证");
   await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
   await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
-  await page.getByRole("button", { name: "地图标记", exact: true }).click();
+  await page.getByRole("button", { name: "添加地图位置", exact: true }).click();
   const map = page.locator("#blocks firelink-map");
   await map.locator(".leaflet-container").waitFor();
   assert.equal(await page.getByLabel("纬度", { exact: true }).inputValue(), "");
@@ -76,8 +76,7 @@ try {
       .evaluate((el) => (el as HTMLElement & { preserved: string }).preserved),
     "yes",
   );
-  await page.getByLabel("添加内容", { exact: true }).selectOption("image");
-  await page.locator("#add-block").click();
+  await page.getByRole("button", { name: "添加图片", exact: true }).click();
   const png = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 640;
@@ -108,8 +107,7 @@ try {
         .naturalWidth === 640,
   );
   assert.equal(await page.getByLabel("HTTPS 媒体链接").count(), 0);
-  await page.getByLabel("添加内容", { exact: true }).selectOption("video");
-  await page.locator("#add-block").click();
+  await page.getByRole("button", { name: "添加视频", exact: true }).click();
   const videoUpload = page.waitForResponse(
     (r) =>
       r.url().endsWith("/api/organizer/media") &&
@@ -174,7 +172,7 @@ try {
   assert.equal(await page.locator(".media-upload-preview video").count(), 1);
   for (const width of [320, 390, 834, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    await page.locator("#mark-location").click();
+    await page.getByLabel("纬度", { exact: true }).focus();
     assert.ok(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,
