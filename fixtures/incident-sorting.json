@@ -1,7 +1,7 @@
 [
   {
     "id": "incident-hangzhou",
-    "title": "杭州西湖区 · 安置协助",
+    "title": "杭州西湖区火情安置协助",
     "region": "浙江省 杭州市 西湖区",
     "latitude": 30.2741,
     "longitude": 120.1551,
@@ -96,7 +96,7 @@
   },
   {
     "id": "incident-nanjing",
-    "title": "南京鼓楼区 · 社区支援",
+    "title": "南京鼓楼区社区支援",
     "region": "江苏省 南京市 鼓楼区",
     "latitude": 32.0603,
     "longitude": 118.7969,
@@ -133,7 +133,7 @@
   },
   {
     "id": "incident-closed",
-    "title": "杭州西湖区 · 安置协助",
+    "title": "杭州西湖区火情安置协助",
     "region": "浙江省 杭州市 西湖区",
     "latitude": 30.2741,
     "longitude": 120.1551,

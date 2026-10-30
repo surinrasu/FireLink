@@ -197,7 +197,15 @@ try {
     await reviewer.getByRole("link", { name: "新建任务", exact: true }).count(),
     0,
   );
-  await reviewer.getByRole("button", { name: "账号菜单" }).click();
+  await reviewer.getByRole("link", { name: "当前账户设置" }).click();
+  await reviewer.locator("#current-member").waitFor();
+  assert.equal(
+    await reviewer
+      .locator('#current-member [data-action="member"]')
+      .isDisabled(),
+    true,
+  );
+  assert.equal(await reviewer.getByRole("dialog").count(), 0);
   await reviewer.getByRole("button", { name: "退出登录", exact: true }).click();
   await reviewer.getByLabel("登录邮箱", { exact: true }).fill(reviewerEmail);
   await reviewer
@@ -209,17 +217,27 @@ try {
     .waitFor();
   await reviewerContext.close();
   await page.getByRole("button", { name: "完成", exact: true }).click();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "编辑浏览器审核员的权限", exact: true })
+    .click();
+  await page
+    .getByRole("heading", { name: "成员权限 · 浏览器审核员", exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "取消", exact: true }).click();
   await page.locator('.sidebar a[href="#/incidents"]').click();
-  await page.getByRole("heading", { name: "事件协作", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "活跃事件", exact: true }).waitFor();
   await page.locator('.sidebar a[href="#/notices"]').click();
   await page
     .getByRole("heading", { name: "已发送通知", exact: true })
     .waitFor();
   assert.ok((await page.locator(".notice").count()) > 0);
-  await page.getByRole("button", { name: "外观与阅读设置" }).click();
-  await page.getByLabel("主题", { exact: true }).selectOption("dark");
-  await page.getByLabel("文字大小", { exact: true }).selectOption("large");
-  await page.getByRole("button", { name: "完成", exact: true }).click();
+  await page.getByRole("button", { name: "主题", exact: true }).click();
+  await page.getByRole("radio", { name: "深色", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "文字大小", exact: true }).click();
+  await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+  await page.keyboard.press("Escape");
   await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
   await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
   await page.screenshot({

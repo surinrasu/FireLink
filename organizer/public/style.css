@@ -290,6 +290,7 @@ video {
 }
 .org-switch {
   max-width: 360px;
+  min-width: 0;
   flex: 1;
   display: flex;
   align-items: center;
@@ -301,6 +302,8 @@ video {
   color: var(--on-surface);
   min-height: 44px;
   width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
   font-size: 0.87rem;
   cursor: pointer;
 }
@@ -308,6 +311,55 @@ video {
   flex: 1;
 }
 .topbar .circle {
+  margin: 0;
+  flex-shrink: 0;
+}
+.preference-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--on-surface);
+  box-shadow: 0 8px 24px #0002;
+}
+.preference-popover fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.preference-popover legend {
+  padding: 0 10px 8px;
+  font-size: 0.8rem;
+  color: var(--on-surface-variant);
+}
+.preference-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.preference-choice:hover,
+.preference-choice:focus-within {
+  background: var(--surface-container);
+}
+.preference-choice:has(:checked) {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+.preference-choice input {
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
   margin: 0;
 }
 .avatar {
@@ -1238,15 +1290,39 @@ th {
   gap: 24px;
   align-items: start;
 }
+.settings-grid:not(:has(> aside > *)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings-grid > aside:empty {
+  display: none;
+}
 .member-row {
   display: flex;
   gap: 12px;
   align-items: center;
   padding: 17px 0;
   border-bottom: 1px solid var(--outline-variant);
+  scroll-margin-block: 24px;
+}
+.member-row:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.member-actions > button {
+  margin: 0;
 }
 .member-row:last-child {
   border-bottom: 0;
+}
+.member-row > .avatar {
+  align-self: flex-start;
 }
 .member-info {
   flex: 1;
@@ -1518,6 +1594,15 @@ dialog::backdrop {
   }
   .topbar-spacer {
     display: none;
+  }
+  .member-row {
+    flex-wrap: wrap;
+  }
+  .member-actions {
+    margin-left: auto;
+  }
+  #current-member .member-info {
+    flex-basis: calc(100% - 50px);
   }
   .app-shell > main.content {
     padding: 23px 16px calc(100px + env(safe-area-inset-bottom));
