@@ -316,7 +316,7 @@ function tasksPage(params: URLSearchParams) {
   );
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active">72 小时内截止</a>' : ""}</div>
-  <div class="toolbar"><div class="field border round prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])])}</div>
+  <div class="toolbar"><div class="field border round prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
   <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
@@ -356,9 +356,33 @@ function attachTaskSearch() {
       if (show) visible++;
     });
     root.querySelector<HTMLElement>("#task-empty")!.hidden = visible > 0;
+    const incidentTasks = workspace.tasks.filter(
+      (task) => !filter.value || task.incidentId === filter.value,
+    );
+    root
+      .querySelectorAll<HTMLAnchorElement>(".filter-chips a")
+      .forEach((link) => {
+        const route = new URL(link.hash.slice(1), location.origin);
+        if (filter.value) route.searchParams.set("incident", filter.value);
+        else route.searchParams.delete("incident");
+        link.setAttribute("href", `#${route.pathname}${route.search}`);
+        const count = link.querySelector("span");
+        const state = route.searchParams.get("state");
+        if (count)
+          count.textContent = String(
+            incidentTasks.filter((task) => !state || task.state === state)
+              .length,
+          );
+      });
   };
   search.addEventListener("input", apply);
-  filter.addEventListener("change", apply);
+  filter.addEventListener("change", () => {
+    const route = routeInfo();
+    if (filter.value) route.searchParams.set("incident", filter.value);
+    else route.searchParams.delete("incident");
+    history.replaceState(null, "", `#${route.pathname}${route.search}`);
+    apply();
+  });
   root.querySelector("#clear-task-filters")?.addEventListener("click", () => {
     search.value = "";
     filter.value = "";
@@ -368,6 +392,7 @@ function attachTaskSearch() {
       search.focus();
     }
   });
+  apply();
 }
 function taskDetail(task: OrganizerTask, tab: string) {
   const actions = canEdit()
@@ -675,7 +700,17 @@ function incidentsPage() {
   return `${heading("活跃事件", "", canEdit() ? '<button data-action="incident-request" class="border">' + icon("add_location_alt") + "新增事件 / 信息纠错</button>" : "")}<div class="incident-grid">${workspace.incidents
     .map((incident) => {
       const tasks = workspace.tasks.filter((t) => t.incidentId === incident.id);
-      return `<section class="panel"><div class="incident-header">${icon("location_on")}<h2>${h(incident.title)}</h2><p>${h(incident.region)}</p></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>本组织关联任务 · ${tasks.length}</h3>${canEdit() ? `<a href="#/tasks/new?incident=${incident.id}">创建关联任务 ${icon("arrow_forward")}</a>` : ""}</div>${tasks.length ? tasks.map((t) => `<div class="task-row"><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a></div>${badge(t.state)}</div>`).join("") : '<p class="muted">暂无关联任务。</p>'}</section>`;
+      return `<section class="panel"><div class="incident-header">${icon("location_on")}<h2>${h(incident.title)}</h2></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
+        tasks.length
+          ? tasks
+              .slice(0, 2)
+              .map(
+                (t) =>
+                  `<div class="task-row"><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a></div>${badge(t.state)}</div>`,
+              )
+              .join("")
+          : '<p class="muted">暂无关联任务。</p>'
+      }</section>`;
     })
     .join("")}</div>${requestHistory("incident")}`;
 }
