@@ -46,6 +46,12 @@ let currentOrg = "";
 let generation = 0;
 let taskView: "cards" | "compact" = "cards";
 let dashboardSort: "updated" | "pending" | "deadline" = "updated";
+let disposeDashboardTasks: (() => void) | null = null;
+const dashboardSortOptions = [
+  ["updated", "最近更新"],
+  ["pending", "待审核人数"],
+  ["deadline", "距截止时间"],
+] as const;
 let editor: EditorHandle | null = null;
 const reviewDrafts = new Map<string, { response: string; note: string }>();
 const organizationDrafts = new Map<string, Record<string, string>>();
@@ -145,57 +151,137 @@ function dashboardTasks() {
     const value = Date.parse(task.deadline);
     return Number.isNaN(value) ? Infinity : value;
   };
-  const rows = tasks
-    .sort((a, b) => {
-      const updated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-      if (dashboardSort === "pending") return b.pending - a.pending || updated;
-      if (dashboardSort === "deadline")
-        return deadline(a) - deadline(b) || updated;
-      return updated;
-    })
-    .slice(0, 5);
-  return rows.length
-    ? rows
-        .map(
-          (t) =>
-            `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a><p>${h(t.incidentTitle)}</p></div><div class="task-row-end">${badge(t.state)}<small>${t.pending ? `<a href="${applicationsLink(t.id)}">${t.pending} 份待审核 →</a>` : `已通过 ${t.accepted}${t.capacity ? ` / ${t.capacity}` : ""}`}</small></div></div>`,
-        )
-        .join("")
-    : empty(
-        "暂无任务",
-        "",
-        canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "",
-        "add_task",
-      );
+  return tasks.sort((a, b) => {
+    const updated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    if (dashboardSort === "pending") return b.pending - a.pending || updated;
+    if (dashboardSort === "deadline")
+      return deadline(a) - deadline(b) || updated;
+    return updated;
+  });
+}
+function dashboardTaskRow(task: OrganizerTask) {
+  return `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
+}
+function attachDashboardTasks() {
+  const list = root.querySelector<HTMLElement>("#dashboard-tasks")!;
+  const more = root.querySelector<HTMLButtonElement>("#dashboard-more")!;
+  const mobileNav = root.querySelector<HTMLElement>(".mobile-nav")!;
+  let tasks: OrganizerTask[] = [];
+  let shown = 0;
+  let frame = 0;
+  let disposed = false;
+  const viewportBottom = () => {
+    const navigation = mobileNav.getBoundingClientRect();
+    return navigation.height ? navigation.top : window.innerHeight;
+  };
+  const fill = (bottom = viewportBottom()) => {
+    if (disposed || !list.isConnected) return;
+    const firstNew = shown;
+    const restoreFocus = document.activeElement === more;
+    // Measure actual rows so wrapping, font size and viewport height set the batch size.
+    while (
+      shown < tasks.length &&
+      (shown === 0 || list.getBoundingClientRect().bottom < bottom)
+    ) {
+      list.insertAdjacentHTML("beforeend", dashboardTaskRow(tasks[shown++]));
+    }
+    more.hidden = shown === tasks.length;
+    if (restoreFocus && shown > firstNew)
+      list.children[firstNew]
+        .querySelector("a")
+        ?.focus({ preventScroll: true });
+  };
+  const scheduleFill = () => {
+    if (disposed || frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      fill();
+    });
+  };
+  const reset = () => {
+    tasks = dashboardTasks();
+    shown = 0;
+    list.innerHTML = tasks.length
+      ? ""
+      : empty(
+          "暂无任务",
+          "",
+          canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "",
+          "add_task",
+        );
+    fill();
+  };
+  more.addEventListener("click", () =>
+    fill(
+      Math.max(viewportBottom(), list.getBoundingClientRect().bottom) +
+        window.innerHeight,
+    ),
+  );
+  const resize = new ResizeObserver(scheduleFill);
+  resize.observe(list);
+  window.addEventListener("resize", scheduleFill);
+  window.addEventListener("scroll", scheduleFill, { passive: true });
+  disposeDashboardTasks = () => {
+    disposed = true;
+    cancelAnimationFrame(frame);
+    resize.disconnect();
+    window.removeEventListener("resize", scheduleFill);
+    window.removeEventListener("scroll", scheduleFill);
+  };
+  reset();
+  return reset;
 }
 function attachDashboardSort() {
-  root
-    .querySelector<HTMLSelectElement>("#dashboard-sort")!
-    .addEventListener("change", (event) => {
-      const value = (event.target as HTMLSelectElement).value;
-      dashboardSort =
-        value === "pending" || value === "deadline" ? value : "updated";
-      root.querySelector("#dashboard-tasks")!.innerHTML = dashboardTasks();
+  const resetTasks = attachDashboardTasks();
+  const control = root.querySelector<HTMLElement>("#dashboard-sort")!;
+  const buttons = Array.from(
+    control.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+  );
+  const choose = (index: number) => {
+    dashboardSort = dashboardSortOptions[index][0];
+    control.style.setProperty("--sort-index", String(index));
+    buttons.forEach((button, i) => {
+      button.setAttribute("aria-checked", String(i === index));
+      button.tabIndex = i === index ? 0 : -1;
     });
+    resetTasks();
+  };
+  buttons.forEach((button, index) => {
+    button.addEventListener("click", () => choose(index));
+    button.addEventListener("keydown", (event) => {
+      let next = index;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown")
+        next = (index + 1) % buttons.length;
+      else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
+        next = (index + buttons.length - 1) % buttons.length;
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      choose(next);
+      buttons[next].focus();
+    });
+  });
 }
 function dashboard() {
+  const draftCount = workspace.tasks.filter(
+    (task) => task.state === "draft",
+  ).length;
   const today = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
     weekday: "long",
     timeZone: "Asia/Shanghai",
   }).format(new Date());
-  return `${heading("工作台", "", canEdit() ? `<a class="button border" href="#/tasks?state=draft">${icon("edit_note")}<span>草稿</span></a><a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
-  <div class="dashboard-grid"><div><section class="panel"><div class="panel-header dashboard-task-header"><h2>需要关注的任务</h2><div class="dashboard-task-controls">${select(
-    "dashboard-sort",
-    "排序方式",
-    [
-      ["updated", "按最近更新"],
-      ["pending", "按待审核人数"],
-      ["deadline", "按距截止时间"],
-    ],
-    dashboardSort,
-  )}<a href="#/tasks">全部任务 ${icon("arrow_forward")}</a></div></div><div id="dashboard-tasks">${dashboardTasks()}</div></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
+  return `${heading("工作台", "", canEdit() ? `<a class="button border" href="#/tasks?state=draft">${icon("edit_note")}<span>草稿 ${draftCount}</span></a><a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
+  <div class="dashboard-grid"><div><section class="panel"><div class="panel-header dashboard-task-header"><h2>需要关注的任务</h2><a href="#/tasks">全部任务 ${icon("arrow_forward")}</a><div id="dashboard-sort" class="dashboard-sort" role="radiogroup" aria-label="排序方式" style="--sort-index:${dashboardSortOptions.findIndex(([value]) => value === dashboardSort)}">${dashboardSortOptions
+    .map(
+      ([value, label]) =>
+        `<button type="button" role="radio" aria-label="按${label}" aria-checked="${value === dashboardSort}" aria-controls="dashboard-tasks" tabindex="${value === dashboardSort ? 0 : -1}">${label}</button>`,
+    )
+    .join(
+      "",
+    )}</div></div><div id="dashboard-tasks"></div><button type="button" class="border dashboard-more" id="dashboard-more" aria-controls="dashboard-tasks" hidden>显示更多任务</button></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
 }
 function taskCard(task: OrganizerTask) {
   return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}<span class="muted">${icon(task.state === "draft" ? "edit_note" : "assignment")}</span></div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)} · 负责人</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
@@ -1008,6 +1094,8 @@ async function renderRoute() {
   }
 }
 async function renderPage(turn: number) {
+  disposeDashboardTasks?.();
+  disposeDashboardTasks = null;
   editor?.dispose();
   editor = null;
   const route = routeInfo();
@@ -1096,6 +1184,7 @@ async function renderPage(turn: number) {
       attachSettings();
     } else {
       shell(dashboard(), "dashboard");
+      window.scrollTo({ top: 0, behavior: "instant" });
       attachDashboardSort();
     }
     if (turn === generation) {
