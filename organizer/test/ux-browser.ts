@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, mkdir } from "node:fs/promises";
 import { chromium, type Page, type BrowserContext } from "playwright";
+import type { Workspace } from "../../shared/organizer";
 
 const base = process.env.TEST_URL || "http://127.0.0.1:8787/mng-dash";
 let executablePath = process.env.BROWSER_EXECUTABLE;
@@ -39,6 +40,138 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "dashboard-fill": async (page) => {
+    let mode = "pending";
+    const total = 40;
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data = (await response.json()) as Workspace;
+      const task = data.tasks.find((task) => task.state === "open")!;
+      data.tasks =
+        mode === "empty"
+          ? []
+          : Array.from({ length: total }, (_, i) => ({
+              ...task,
+              id: `viewport-task-${i}`,
+              title: `关注任务 ${i + 1} · 社区物资整理与配送协调`,
+              pending: mode === "pending" ? i + 1 : 0,
+              updatedAt: new Date(Date.UTC(2026, 0, total - i)).toISOString(),
+              deadline: new Date(Date.UTC(2099, 0, i + 1)).toISOString(),
+            }));
+      await route.fulfill({ response, json: data });
+    });
+    const rows = page.locator("#dashboard-tasks .task-row");
+    const titles = page.locator("#dashboard-tasks .task-info > a");
+    const filled = () =>
+      page.waitForFunction(() => {
+        const list = document.querySelector("#dashboard-tasks");
+        const nav = document
+          .querySelector(".mobile-nav")
+          ?.getBoundingClientRect();
+        const bottom = nav?.height ? nav.top : innerHeight;
+        return !!list && list.getBoundingClientRect().bottom >= bottom;
+      });
+    await page.reload();
+    await filled();
+    const initial = await rows.count();
+    assert.ok(
+      initial > 5 && initial < total,
+      "fill the viewport without a fixed five-row cap or rendering everything",
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/dashboard-fill-desktop.png",
+    });
+    await page.setViewportSize({ width: 1440, height: 1400 });
+    await filled();
+    assert.ok(
+      (await rows.count()) > initial,
+      "a taller window should show more tasks",
+    );
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page
+      .getByRole("radio", { name: "按待审核人数", exact: true })
+      .click();
+    await filled();
+    assert.match(await titles.first().innerText(), /^关注任务 40 ·/);
+    assert.ok(
+      (await rows.count()) < total,
+      "sorting resets progressive rendering",
+    );
+    const beforeMore = await rows.count();
+    await page
+      .locator("#dashboard-more")
+      .evaluate((element) =>
+        (element as HTMLElement).focus({ preventScroll: true }),
+      );
+    await page.keyboard.press("Enter");
+    assert.ok(
+      (await rows.count()) > beforeMore,
+      "keyboard users can reveal another screen of tasks",
+    );
+    assert.equal(
+      await page.evaluate(() =>
+        document.activeElement?.matches("#dashboard-tasks .task-info > a"),
+      ),
+      true,
+    );
+    while ((await rows.count()) < total) {
+      const before = await rows.count();
+      await page.evaluate(() =>
+        window.scrollTo(0, document.documentElement.scrollHeight),
+      );
+      await page.waitForFunction(
+        (count) =>
+          document.querySelectorAll("#dashboard-tasks .task-row").length >
+          count,
+        before,
+      );
+    }
+    assert.equal(await rows.count(), total);
+    assert.equal(new Set(await titles.allTextContents()).size, total);
+    assert.match(await titles.last().innerText(), /^关注任务 1 ·/);
+    assert.equal(await page.locator("#dashboard-more").isVisible(), false);
+    await page
+      .getByRole("radio", { name: "按距截止时间", exact: true })
+      .click();
+    await filled();
+    assert.match(await titles.first().innerText(), /^关注任务 1 ·/);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.getByRole("button", { name: "外观与阅读设置" }).click();
+    await page.getByLabel("文字大小", { exact: true }).selectOption("large");
+    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await page.reload();
+    await filled();
+    assert.ok((await rows.count()) < total);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/dashboard-fill-mobile.png",
+    });
+    await page.getByRole("button", { name: "外观与阅读设置" }).click();
+    await page.getByLabel("文字大小", { exact: true }).selectOption("normal");
+    await page.getByRole("button", { name: "完成", exact: true }).click();
+    await filled();
+    mode = "open";
+    await page.reload();
+    await filled();
+    assert.equal(await rows.getByRole("link", { name: /份待审核/ }).count(), 0);
+    mode = "empty";
+    await page.reload();
+    await page
+      .getByRole("heading", { name: "暂无任务", exact: true })
+      .waitFor();
+    assert.equal(await rows.count(), 0);
+    assert.equal(await page.locator("#dashboard-more").isVisible(), false);
+    await page.getByRole("link", { name: "全部任务", exact: false }).click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  },
   "date-years": async (page) => {
     // Beijing has entered 2027 while UTC is still in 2026.
     await page.clock.setFixedTime(new Date("2026-12-31T16:00:00Z"));

@@ -54,7 +54,7 @@ try {
     await page.locator('.sidebar a[href="#/tasks"] .count').textContent(),
     "6",
   );
-  await page.getByRole("link", { name: "草稿", exact: true }).click();
+  await page.getByRole("link", { name: "草稿 1", exact: true }).click();
   await page.getByRole("heading", { name: "任务管理", exact: true }).waitFor();
   assert.equal(await page.locator(".task-card").count(), 1);
   assert.equal(await page.locator(".task-card .status-draft").count(), 1);
@@ -92,19 +92,19 @@ try {
     "临时服务点信息登记",
     "物资运输协助",
   ]);
-  await page.getByLabel("排序方式", { exact: true }).selectOption("pending");
+  await page.getByRole("radio", { name: "按待审核人数", exact: true }).click();
   assert.deepEqual(await taskTitles(), [
     "物资运输协助",
     "临时服务点信息登记",
     "安置点物资整理",
   ]);
-  await page.getByLabel("排序方式", { exact: true }).selectOption("deadline");
+  await page.getByRole("radio", { name: "按距截止时间", exact: true }).click();
   assert.deepEqual(await taskTitles(), [
     "临时服务点信息登记",
     "物资运输协助",
     "安置点物资整理",
   ]);
-  await page.getByLabel("排序方式", { exact: true }).selectOption("updated");
+  await page.getByRole("radio", { name: "按最近更新", exact: true }).click();
   assert.deepEqual(await taskTitles(), [
     "安置点物资整理",
     "临时服务点信息登记",
