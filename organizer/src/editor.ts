@@ -90,7 +90,7 @@ export function mountEditor(
   const fields = source?.requiredFields || ["realName", "region"];
   const contacts = source?.contactFields || ["phone"];
   const fieldGroups: [string, string[]][] = [
-    ["身份与地区", ["username", "realName", "region", "pronouns"]],
+    ["身份信息", ["username", "realName", "region", "pronouns"]],
     ["个人情况", ["age", "gender", "body"]],
     ["能力与资源", ["equipment", "vehicles", "skills"]],
   ];
@@ -106,7 +106,7 @@ export function mountEditor(
     )
     .join("");
   host.innerHTML = `<form id="task-form"><div class="editor-layout"><div>
-    <section class="panel editor-section"><h2><span class="step-number">1</span>基本信息</h2>${input("title", "任务标题", copy ? `${copy.title}（副本）` : task?.title || "", 'required maxlength="100"')}${textarea("summary", "一句话介绍任务", source?.summary || "", 'maxlength="500"')}
+    <section class="panel editor-section"><h2><span class="step-number">1</span>基本信息</h2>${input("title", "任务标题", copy ? `${copy.title}（副本）` : task?.title || "", 'required maxlength="100"')}<div class="task-summary"><label for="summary">一句话说明志愿者大概要做什么、有什么基本要求</label><div class="field textarea border"><textarea id="summary" name="summary" maxlength="500" rows="3">${h(source?.summary || "")}</textarea></div></div>
     <div class="form-grid">${select("incidentId", "所属事件", [["", "请选择事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], incidentId || source?.incidentId || "", "required")}${select(
       "ownerId",
       "任务负责人",
@@ -124,7 +124,7 @@ export function mountEditor(
           `<button class="border" type="button" data-add-block="${type}" aria-label="添加${label}">${icon("add")}${label}</button>`,
       )
       .join("")}</div></section>
-    <section class="panel editor-section"><h2><span class="step-number">4</span>报名资料与授权</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}</fieldset><fieldset id="contact-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>联系方式</legend><div class="check-grid">${["phone", "wechat", "email"].map((key) => `<label class="checkbox"><input type="checkbox" name="contactFields" value="${key}" ${contacts.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`).join("")}</div></fieldset></section>
+    <section class="panel editor-section"><h2><span class="step-number">4</span>报名资料与授权</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}<fieldset id="contact-fields" class="requirement-group" tabindex="-1"><legend>联系方式</legend><div class="check-grid">${["phone", "wechat", "email"].map((key) => `<label class="checkbox"><input type="checkbox" name="contactFields" value="${key}" ${contacts.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`).join("")}</div></fieldset></fieldset></section>
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
     <footer class="editor-footer"><small id="save-status" role="status">${draft ? "草稿填写后自动保存" : "已发布任务的更改需要手动保存"}</small><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;

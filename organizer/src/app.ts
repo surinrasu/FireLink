@@ -1,4 +1,5 @@
 import { mapPreview } from "./maps";
+import "./selects";
 import type {
   Activity,
   ApplicationPage,
@@ -123,7 +124,7 @@ function heading(title: string, description = "", actions = "", eyebrow = "") {
 }
 function timeline(activities: Activity[]) {
   return activities.length
-    ? `<ol class="timeline">${activities.map((a) => `<li><strong>${h(a.actor)}</strong> · ${h(a.action)}<p>${h(a.subject)}</p><small>${formatDate(a.createdAt)}</small></li>`).join("")}</ol>`
+    ? `<ol class="timeline">${activities.map((a) => `<li><strong>${h(a.actor)}</strong> ${h(a.action)}<p>${h(a.subject)}</p><small>${formatDate(a.createdAt)}</small></li>`).join("")}</ol>`
     : `<p class="muted">暂时没有操作记录。</p>`;
 }
 function taskProgress(task: OrganizerTask) {
@@ -132,10 +133,21 @@ function taskProgress(task: OrganizerTask) {
     : 0;
   return `<div class="task-progress"><div class="progress-label"><span>已通过 <strong>${task.accepted}</strong>${task.capacity ? ` / ${task.capacity} 人` : " 人"}</span><span class="muted">${task.pending} 份待审核</span></div>${task.capacity ? `<div class="progress-track" role="meter" aria-label="已通过报名人数" aria-valuemin="0" aria-valuemax="${task.capacity}" aria-valuenow="${task.accepted}"><span style="width:${percentage}%"></span></div>` : ""}</div>`;
 }
+const mobileOrganization = matchMedia("(max-width: 699px)");
+function positionOrganizationSwitcher() {
+  const control = root.querySelector(".org-switch");
+  const target = root.querySelector(
+    mobileOrganization.matches ? ".topbar" : ".sidebar-footer",
+  );
+  if (control && target && control.parentElement !== target)
+    target.prepend(control);
+}
+mobileOrganization.addEventListener("change", positionOrganizationSwitcher);
+
 function shell(body: string, section: string) {
   const pending = workspace.tasks.reduce((n, task) => n + task.pending, 0);
-  root.innerHTML = `<aside class="sidebar" aria-label="工作台导航"><a class="brand" href="#/dashboard"><strong>FireLink</strong></a>${canEdit() ? `<a class="button primary-container create-button" href="#/tasks/new" aria-label="新建任务">${icon("add")}<span>新建任务</span></a>` : ""}<nav class="side-links">${destinations.map(([id, symbol, label]) => `<a class="side-link ${section === id ? "active" : ""}" href="#/${id}" ${section === id ? 'aria-current="page"' : ""} title="${label}">${icon(symbol)}<span>${label}</span>${id === "tasks" ? `<span class="count">${workspace.tasks.length}</span>` : id === "applications" && pending ? `<span class="count">${pending}</span>` : ""}</a>`).join("")}</nav><div class="sidebar-footer"><span class="workspace-label">${workspace.organization.demo ? "演示环境" : workspace.organization.verified ? "已认证组织" : "组织待认证"}</span></div></aside>
-  <div class="app-shell"><header class="topbar"><div class="org-switch">${icon("domain")}<select aria-label="切换组织" id="org-switch">${session!.memberships.map((m) => `<option value="${h(m.organizationId)}" ${m.organizationId === currentOrg ? "selected" : ""}>${h(m.organizationName)}</option>`).join("")}</select></div><span class="topbar-spacer"></span>${preferenceButtons()}<a class="button transparent circle" href="#/settings?member=me" data-action="account" aria-label="当前账户设置" title="当前账户设置"><span class="avatar">${h(session!.account.name.slice(0, 1))}</span></a></header><main class="content" id="main">${body}</main></div>
+  root.innerHTML = `<aside class="sidebar" aria-label="工作台导航"><a class="brand" href="#/dashboard"><strong>FireLink</strong></a>${canEdit() ? `<a class="button primary-container create-button" href="#/tasks/new" aria-label="新建任务">${icon("add")}<span>新建任务</span></a>` : ""}<nav class="side-links">${destinations.map(([id, symbol, label]) => `<a class="side-link ${section === id ? "active" : ""}" href="#/${id}" ${section === id ? 'aria-current="page"' : ""} title="${label}">${icon(symbol)}<span>${label}</span>${id === "tasks" ? `<span class="count">${workspace.tasks.length}</span>` : id === "applications" && pending ? `<span class="count">${pending}</span>` : ""}</a>`).join("")}</nav><div class="sidebar-footer"><div class="org-switch" title="${h(workspace.organization.name)}"><span class="org-monogram" aria-hidden="true">${h(workspace.organization.name.slice(0, 1))}</span><div class="org-details" aria-hidden="true"><strong>${h(workspace.organization.name)}</strong><span class="workspace-label">${workspace.organization.demo ? "演示环境" : workspace.organization.verified ? "已认证组织" : "组织待认证"}</span></div>${icon("more_horiz")}<select aria-label="切换组织" id="org-switch" data-menu-width="260">${session!.memberships.map((m) => `<option value="${h(m.organizationId)}" ${m.organizationId === currentOrg ? "selected" : ""}>${h(m.organizationName)}</option>`).join("")}</select></div></div></aside>
+  <div class="app-shell"><header class="topbar"><span class="topbar-spacer"></span>${preferenceButtons()}<a class="button transparent circle" href="#/settings?member=me" data-action="account" aria-label="当前账户设置" title="当前账户设置"><span class="avatar">${h(session!.account.name.slice(0, 1))}</span></a></header><main class="content" id="main">${body}</main></div>
   <nav class="mobile-nav" aria-label="主要导航">${destinations
     .slice(0, 3)
     .map(
@@ -145,6 +157,7 @@ function shell(body: string, section: string) {
     .join(
       "",
     )}<button class="${["incidents", "notices", "settings"].includes(section) ? "active" : ""}" data-action="more">${icon("more_horiz")}<span>更多</span></button></nav>`;
+  positionOrganizationSwitcher();
   document.title = `${destinations.find(([id]) => id === section)?.[2] || "工作台"} · FireLink`;
   root
     .querySelector<HTMLSelectElement>("#org-switch")
@@ -177,7 +190,7 @@ function dashboardTasks() {
   });
 }
 function dashboardTaskRow(task: OrganizerTask) {
-  return `<div class="task-row"><div class="task-symbol">${icon("assignment")}</div><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
+  return `<div class="task-row"><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
 }
 function attachDashboardTasks() {
   const list = root.querySelector<HTMLElement>("#dashboard-tasks")!;
@@ -301,7 +314,7 @@ function dashboard() {
     )}</div></div><div id="dashboard-tasks"></div><button type="button" class="border dashboard-more" id="dashboard-more" aria-controls="dashboard-tasks" hidden>显示更多任务</button></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
 }
 function taskCard(task: OrganizerTask) {
-  return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}<span class="muted">${icon(task.state === "draft" ? "edit_note" : "assignment")}</span></div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)}</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
+  return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}</div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="task-meta"><div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div></div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)}</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
 }
 function tasksPage(params: URLSearchParams) {
   const state = params.get("state") || "all",
@@ -316,7 +329,7 @@ function tasksPage(params: URLSearchParams) {
   );
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active">72 小时内截止</a>' : ""}</div>
-  <div class="toolbar"><div class="field border round prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
+  <div class="toolbar task-toolbar"><div class="field border prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
   <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
@@ -700,7 +713,7 @@ function incidentsPage() {
   return `${heading("活跃事件", "", canEdit() ? '<button data-action="incident-request" class="border">' + icon("add_location_alt") + "新增事件 / 信息纠错</button>" : "")}<div class="incident-grid">${workspace.incidents
     .map((incident) => {
       const tasks = workspace.tasks.filter((t) => t.incidentId === incident.id);
-      return `<section class="panel"><div class="incident-header">${icon("location_on")}<h2>${h(incident.title)}</h2></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
+      return `<section class="panel"><div class="incident-header"><h2>${h(incident.title)}</h2></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
         tasks.length
           ? tasks
               .slice(0, 2)
@@ -718,7 +731,7 @@ async function noticesPage(turn: number) {
   const notices = await api<ResultNotice[]>("/notices");
   if (turn !== generation) return;
   shell(
-    `${heading("已发送通知", "最近 200 条 · 已读状态来自志愿者端", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}<section class="panel">${notices.length ? notices.map((n) => `<article class="notice"><div class="task-symbol">${icon("notifications_none")}</div><div class="notice-body"><h2>${h(n.title)}</h2><p>${h(n.taskTitle)} · ${h(n.body)}</p><small>${formatDate(n.createdAt, true)}</small></div><span class="status">${n.readAt ? "已读" : "未读"}</span></article>`).join("") : empty("还没有发送通知", "审核结果通知会显示在这里。", "", "notifications_none")}</section>`,
+    `${heading("已发送通知", "最近 200 条 · 已读状态来自志愿者端", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}<section class="panel">${notices.length ? notices.map((n) => `<article class="notice"><div class="notice-body"><h2>${h(n.title)}</h2><p>${h(n.taskTitle)} · ${h(n.body)}</p><small>${formatDate(n.createdAt, true)}</small></div><span class="status">${n.readAt ? "已读" : "未读"}</span></article>`).join("") : empty("还没有发送通知", "审核结果通知会显示在这里。", "", "notifications_none")}</section>`,
     "notices",
   );
 }
@@ -1138,7 +1151,7 @@ async function showLogin() {
   } catch {
     /* Login stays available when config cannot load. */
   }
-  root.innerHTML = `<div class="login-layout"><div class="login-brand"><a href="#/login" aria-label="FireLink">FireLink</a></div><main id="main" class="login-main"><h1>${joinToken ? "加入组织" : "组织者登录"}</h1>${joinToken ? "<p>已有账号请使用原密码。</p>" : ""}<form id="login-form">${joinToken ? input("name", "你的姓名", "", 'required maxlength="60" autocomplete="name"') : input("email", "登录邮箱", "", 'required autocomplete="username"', "email")}${input("password", joinToken ? "密码（至少 12 个字符）" : "密码", "", `required ${joinToken ? 'minlength="12" autocomplete="new-password"' : 'autocomplete="current-password"'} maxlength="200"`, "password")}<button type="submit" class="full">${joinToken ? "接受邀请并进入" : "登录工作台"}</button></form>${demo && !joinToken ? '<button id="demo-login" class="border full">进入演示工作台</button>' : ""}<div class="login-tools"><button class="transparent" data-action="login-help">账号帮助</button>${preferenceButtons()}</div></main></div>`;
+  root.innerHTML = `<div class="login-layout"><div class="login-brand"><a href="#/login" aria-label="FireLink">FireLink</a></div><main id="main" class="login-main"><h1>${joinToken ? "加入组织" : "组织者登录"}</h1>${joinToken ? "<p>已有账号请使用原密码。</p>" : ""}<form id="login-form">${joinToken ? input("name", "你的姓名", "", 'required maxlength="60" autocomplete="name"') : input("email", "登录邮箱", "", 'required autocomplete="username"', "email")}${input("password", joinToken ? "密码（至少 12 个字符）" : "密码", "", `required ${joinToken ? 'minlength="12" autocomplete="new-password"' : 'autocomplete="current-password"'} maxlength="200"`, "password")}<button type="submit" class="full">${joinToken ? "接受邀请并进入" : "登录工作台"}</button></form>${demo && !joinToken ? '<button id="demo-login" class="border full">进入演示工作台</button>' : ""}<div class="login-tools"><button class="transparent" data-action="login-help">账号帮助</button><div class="login-preferences" role="group" aria-label="显示设置">${preferenceButtons()}</div></div></main></div>`;
   document.title = "登录 · FireLink 组织者工作台";
   const form = root.querySelector<HTMLFormElement>("#login-form")!;
   form.addEventListener("submit", async (event) => {

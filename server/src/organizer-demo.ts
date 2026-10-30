@@ -46,14 +46,14 @@ export async function createDemo(c: OrgContext) {
       .bind(memberId, orgId, accountId),
   ];
   const records = [
-    { source: 0, title: "安置点物资整理", state: "open", capacity: 8, days: 2 },
-    { source: 1, title: "物资运输协助", state: "open", capacity: 4, days: 3 },
+    { source: 0, title: "安置点物资整理", state: "open", capacity: 8, days: 3 },
+    { source: 1, title: "物资运输协助", state: "open", capacity: 4, days: 4 },
     {
       source: 2,
       title: "临时服务点信息登记",
       state: "open",
       capacity: 6,
-      days: 4,
+      days: 2,
     },
     { source: 0, title: "社区物资打包", state: "draft", capacity: 12, days: 7 },
     {
@@ -115,11 +115,18 @@ export async function createDemo(c: OrgContext) {
     "李言",
     "赵晓",
   ];
+  // Give each dashboard sort a distinct order while keeping five pending applications.
+  const pendingTaskIndices = [1, 0, 1, 2, 2];
   for (const [index, name] of names.entries()) {
     const userId = crypto.randomUUID(),
       applicationId = crypto.randomUUID();
-    const taskIndex = index % 3,
-      status = index < 5 ? "pending" : index < 8 ? "accepted" : "rejected";
+    const taskIndex = pendingTaskIndices[index] ?? index % 3,
+      status =
+        index < pendingTaskIndices.length
+          ? "pending"
+          : index < 8
+            ? "accepted"
+            : "rejected";
     const contacts = {
       phone: `1380000000${index}`,
       wechat: `firelink_demo_${index}`,
