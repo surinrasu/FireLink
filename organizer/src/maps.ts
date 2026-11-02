@@ -107,16 +107,17 @@ class LocationMap extends HTMLElement {
       :host([editable]) .canvas{height:300px;cursor:crosshair}.status,.hint{padding:9px 14px;font-size:.78rem;line-height:1.6;margin:0}.status:empty{display:none}.hint{color:var(--on-surface-variant,#646b63)}
       .tools,.coordinate-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px}.tools button{flex:1}.tools [data-action=finish]{flex-basis:100%}
       button,input{font:inherit;font-size:.82rem;color:inherit}button{min-height:44px;border:1px solid var(--outline-variant,#d5d9ce);border-radius:12px;padding:8px 12px;background:transparent;cursor:pointer}
-      button[aria-pressed=true]{background:var(--primary-container,#f8e1d8);color:var(--on-primary-container,#762b1b);border-color:var(--primary,#a83924)}button:disabled{opacity:.5;cursor:not-allowed}
+      button[aria-pressed=true]{background:var(--primary-container,#f8e1d8);color:var(--on-primary-container,#762b1b);border-color:currentColor;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;font-weight:650}button:disabled{opacity:.5;cursor:not-allowed}
       button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--primary,#a83924);outline-offset:2px}
       .annotation-list{padding:0 14px}.annotation-row{display:flex;gap:8px;margin-top:8px}.annotation-row>button:first-child{flex:1;text-align:left}.vertices{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.vertices button{min-width:44px}.selection{margin:12px 14px 0;font-size:.8rem}.selection button{margin-top:8px}
       .precise{margin:12px 14px}.precise summary{min-height:44px;display:list-item;padding:10px 0;cursor:pointer;font-size:.82rem}.coordinates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.coordinates label{font-size:.8rem;min-width:0}.coordinates input{display:block;width:100%;min-height:44px;margin-top:6px;border:1px solid var(--outline,#7a8178);border-radius:8px;padding:8px;background:var(--surface,#fbf8f4)}.coordinate-actions{padding:0}.coordinate-actions button{flex:1}
       .leaflet-control-zoom a,.leaflet-touch .leaflet-bar a{width:44px;height:44px;line-height:44px;color:#263026;background:#fff}.leaflet-control-attribution{font:10px/1.5 system-ui,sans-serif;max-width:100%;color:#333}.leaflet-control-attribution a{color:#265a52}
-      .pin{display:block;width:24px;height:24px;background:var(--primary,#a3452d);border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px #0005}.pin:after{content:"";display:block;width:6px;height:6px;background:var(--on-primary,#fff);border-radius:50%;margin:6px}
-      .vertex{display:grid;place-items:center;width:24px;height:24px;background:var(--primary,#a3452d);color:var(--on-primary,#fff);border:2px solid white;border-radius:50%;font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 6px #0003}
+      .pin{display:grid;place-items:center;width:24px;height:24px;background:#762b1b;color:white;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px #0005;font:650 11px/1 system-ui,sans-serif}.pin>span{transform:rotate(45deg)}
+      .vertex{display:grid;place-items:center;width:24px;height:24px;background:#762b1b;color:white;border:2px solid white;border-radius:50%;font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 6px #0003}
+      .location-marker:is([data-selected=true],:focus-visible)::after{content:"";position:absolute;inset:-6px;border:2px solid #17231a;outline:2px solid white;border-radius:50%;pointer-events:none}
       @media(max-width:360px){.coordinates{grid-template-columns:1fr}.tools,.coordinate-actions{gap:6px}.tools button{padding-inline:8px}}
       @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-      @media(forced-colors:active){.pin,.vertex{background:Highlight;color:HighlightText;border-color:CanvasText}.frame{border-color:CanvasText}}
+      @media(forced-colors:active){.pin,.vertex{background:Highlight;color:HighlightText;border-color:Canvas;forced-color-adjust:none}.frame{border-color:CanvasText}button[aria-pressed=true]{border:3px double Highlight}.location-marker:is([data-selected=true],:focus-visible)::after{border-color:CanvasText;outline-color:Canvas}.location-outline{stroke:Canvas;forced-color-adjust:none}.location-path,.location-area{stroke:CanvasText;forced-color-adjust:none}}
     </style><div class="frame"><div class="heading"><span class="label"></span><a class="external" target="_blank" rel="noopener noreferrer"></a></div>${
       editable
         ? `<div class="tools" role="group" aria-label="标注类型">${Object.entries(
@@ -250,6 +251,17 @@ class LocationMap extends HTMLElement {
     this.root.querySelector<HTMLButtonElement>(
       '[data-action="update-coordinate"]',
     )!.hidden = !point;
+    this.updateMarkerSelection();
+  }
+  private updateMarkerSelection() {
+    this.root
+      .querySelectorAll<HTMLElement>(".location-marker")
+      .forEach((marker) => {
+        marker.dataset.selected = String(
+          Number(marker.dataset.annotation) === this.active &&
+            Number(marker.dataset.point) === this.selectedPoint,
+        );
+      });
   }
   private controlClick(event: Event) {
     const button = (event.target as Element).closest<HTMLButtonElement>(
@@ -436,20 +448,31 @@ class LocationMap extends HTMLElement {
       ]);
       allPoints.push(...points);
       if (mark.type !== "point" && points.length > 1) {
+        const polygon = mark.type === "area" && completeMapAnnotation(mark);
+        const draw = (options: L.PolylineOptions) =>
+          polygon ? L.polygon(points, options) : L.polyline(points, options);
+        // The basemap stays light in both themes. A white casing and dark stroke
+        // remain distinguishable over light streets and dark map features.
+        draw({
+          color: "#fff",
+          weight: 7,
+          opacity: 1,
+          fill: false,
+          interactive: false,
+          className: "location-outline",
+        }).addTo(this.layers!);
         const options = {
-          color: "var(--primary, #a83924)",
+          color: "#762b1b",
           weight: 3,
           fillOpacity: 0.16,
+          dashArray: !completeMapAnnotation(mark)
+            ? "4 4"
+            : polygon
+              ? "8 5"
+              : undefined,
           className: mark.type === "area" ? "location-area" : "location-path",
         };
-        const shape =
-          mark.type === "area" && completeMapAnnotation(mark)
-            ? L.polygon(points, options)
-            : L.polyline(points, {
-                ...options,
-                dashArray: completeMapAnnotation(mark) ? undefined : "6 6",
-              });
-        shape.addTo(this.layers!);
+        draw(options).addTo(this.layers!);
       }
       points.forEach((point, pointIndex) => {
         const label = `${mapAnnotationLabels[mark.type]} ${index + 1}，第 ${pointIndex + 1} 个点`;
@@ -460,13 +483,18 @@ class LocationMap extends HTMLElement {
           icon: L.divIcon({
             html:
               mark.type === "point"
-                ? '<span class="pin"></span>'
+                ? `<span class="pin"><span>${index + 1}</span></span>`
                 : `<span class="vertex">${pointIndex + 1}</span>`,
             className: "location-marker",
             iconSize: [24, 28],
             iconAnchor: [12, mark.type === "point" ? 26 : 12],
           }),
         }).addTo(this.layers!);
+        const element = marker.getElement();
+        if (element) {
+          element.dataset.annotation = String(index);
+          element.dataset.point = String(pointIndex);
+        }
         if (this.hasAttribute("editable")) {
           marker.on("click", () => {
             if (this.drawing && this.mode !== "point") {
@@ -505,6 +533,7 @@ class LocationMap extends HTMLElement {
         }
       });
     });
+    this.updateMarkerSelection();
     if (fit && allPoints.length)
       this.map.fitBounds(L.latLngBounds(allPoints), {
         padding: [28, 28],

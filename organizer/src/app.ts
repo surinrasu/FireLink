@@ -99,8 +99,8 @@ async function confirmDiscardDrafts() {
 }
 const roles = {
   admin: "组织管理员",
-  manager: "任务负责人",
-  reviewer: "审核员",
+  manager: "任务管理员",
+  reviewer: "任务审核员",
 };
 const destinations = [
   ["dashboard", "space_dashboard", "工作台"],
@@ -328,7 +328,7 @@ function tasksPage(params: URLSearchParams) {
           Date.parse(t.deadline) - Date.now() < 3 * 86400000)),
   );
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
-  <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active">72 小时内截止</a>' : ""}</div>
+  <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active" aria-current="true">72 小时内截止</a>' : ""}</div>
   <div class="toolbar task-toolbar"><div class="field border prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
   <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
@@ -467,7 +467,7 @@ function taskDetail(task: OrganizerTask, tab: string) {
           .join(
             "",
           )}</dl><p class="muted" style="font-size:.72rem;margin-top:18px">北京时间（UTC+8）</p></section>${canEdit() && stateActions[task.state].length ? `<section class="panel"><h2>招募状态</h2><div class="page-actions" style="margin-top:14px">${stateActions[task.state].map(([state, label]) => `<button class="border" data-action="task-state" data-id="${task.id}" data-state="${state}">${label}</button>`).join("")}</div></section>` : ""}</aside></div>`;
-  return `${heading(task.title, task.incidentTitle, actions)}<div class="tabs" aria-label="任务页面">${tabs.map(([id, label]) => `<a class="${tab === id ? "active" : ""}" href="${id === "applications" ? applicationsLink(task.id) : id === "accepted" ? applicationsLink(task.id, "accepted") : `${taskLink(task)}?tab=${id}`}">${label}</a>`).join("")}</div>${body}`;
+  return `${heading(task.title, task.incidentTitle, actions)}<div class="tabs" aria-label="任务页面">${tabs.map(([id, label]) => `<a class="${tab === id ? "active" : ""}" ${tab === id ? 'aria-current="page"' : ""} href="${id === "applications" ? applicationsLink(task.id) : id === "accepted" ? applicationsLink(task.id, "accepted") : `${taskLink(task)}?tab=${id}`}">${label}</a>`).join("")}</div>${body}`;
 }
 function applicationName(item: OrganizerApplication) {
   return (
@@ -559,7 +559,7 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
       : `<nav class="review-navigation" aria-label="逐份审核">${selectedIndex > 0 ? `<a class="button border" data-review-step="previous" aria-keyshortcuts="Alt+ArrowUp" title="上一份（Alt + ↑）" href="${link(status, filtered[selectedIndex - 1].id)}">上一份</a>` : ""}${selectedIndex + 1 < filtered.length ? `<a class="button border" data-review-step="next" aria-keyshortcuts="Alt+ArrowDown" title="下一份（Alt + ↓）" href="${link(status, filtered[selectedIndex + 1].id)}">下一份</a>` : ""}</nav>`;
   const body = `${heading(status === "accepted" ? "已通过报名" : "报名审核", task ? task.title : "", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}${outcome}
   <form class="toolbar" id="application-filter">${select("application-task", "所属任务", [["", "全部任务"], ...workspace.tasks.map((t) => [t.id, t.title] as [string, string])], taskId)}<div class="field border round prefix search">${icon("search")}<input id="application-search" name="q" value="${h(searchTerm)}" type="search" placeholder="搜索姓名、昵称或地区" aria-label="搜索报名资料"></div><button class="border" type="submit">搜索</button></form>
-  <div class="filter-chips" aria-label="报名状态">${["pending", "accepted", "rejected", "withdrawn", "all"].map((s) => `<a href="${link(s)}" class="${s === status ? "active" : ""}">${s === "all" ? "全部" : stateLabels[s as keyof typeof stateLabels]} <span>${s === "all" ? Object.values(page.counts).reduce((a, b) => a + b, 0) : page.counts[s as keyof typeof page.counts]}</span></a>`).join("")}</div>
+  <div class="filter-chips" aria-label="报名状态">${["pending", "accepted", "rejected", "withdrawn", "all"].map((s) => `<a href="${link(s)}" class="${s === status ? "active" : ""}" ${s === status ? 'aria-current="true"' : ""}>${s === "all" ? "全部" : stateLabels[s as keyof typeof stateLabels]} <span>${s === "all" ? Object.values(page.counts).reduce((a, b) => a + b, 0) : page.counts[s as keyof typeof page.counts]}</span></a>`).join("")}</div>
   ${filtered.length || selected ? `<div class="review-layout ${explicitId && selected ? "has-selection" : ""}"><div class="application-list" aria-label="报名列表">${filtered.map((a) => `<a class="application-row ${a.id === selected?.id ? "active" : ""}" href="${link(status, a.id)}" data-search="${h(`${applicationName(a)} ${a.profile.region ?? ""}`.toLowerCase())}" ${a.id === selected?.id ? 'aria-current="true"' : ""}><div class="row"><strong>${h(applicationName(a))}</strong>${badge(a.status)}</div><p>${h(a.taskTitle)}</p><small>${formatDate(a.createdAt)} 提交</small></a>`).join("")}<p id="application-search-empty" hidden class="muted">没有匹配的报名资料。</p></div><section class="review-detail" aria-label="报名详情" id="review-detail">${selected ? '<p role="status">正在加载授权资料…</p>' : empty("选择报名查看资料", "", "", "person_search")}</section></div>` : empty("无匹配报名", "", "", "fact_check")}`;
   const pagination =
     page.total > page.pageSize || pageNumber > 1
@@ -744,7 +744,7 @@ function settingsPage() {
   <section class="panel"><div class="panel-header"><h2>组织成员</h2>${isAdmin() ? '<button class="border" data-action="invite">' + icon("person_add") + "邀请成员</button>" : ""}</div>${workspace.members
     .map((member) => {
       const current = member.id === workspace.membership.id;
-      return `<div class="member-row" ${current ? 'id="current-member" tabindex="-1" aria-label="当前账户"' : ""}><span class="avatar">${h(member.name.slice(0, 1))}</span><div class="member-info"><strong>${h(member.name)} ${current ? "<small>（你）</small>" : ""}</strong><p>${roles[member.role]}${member.active ? "" : " · 已停用"}${member.email ? ` · ${h(member.email)}` : ""}</p><small>${member.role === "admin" ? "全部任务" : `${member.taskIds.length} 个指定任务`}${member.canViewContacts ? " · 可查看已通过报名的联系方式" : ""}</small></div>${isAdmin() || current ? `<div class="member-actions"><button class="transparent circle" data-action="member" data-id="${member.id}" aria-label="编辑${h(member.name)}的权限" ${current ? 'disabled title="无法修改自己的权限"' : ""}>${icon("manage_accounts")}</button>${current ? '<button class="border" data-action="logout">退出登录</button>' : ""}</div>` : ""}</div>`;
+      return `<div class="member-row" ${current ? 'id="current-member" tabindex="-1" aria-label="当前账户"' : ""}><span class="avatar">${h(member.name.slice(0, 1))}</span><div class="member-info"><strong>${h(member.name)} ${current ? "<small>（你）</small>" : ""}</strong><p>${roles[member.role]}${member.active ? "" : " · 已停用"}${member.email ? ` · ${h(member.email)}` : ""}</p><small>${member.role === "admin" ? "全部任务" : `${member.taskIds.length} 个指定任务`}${member.canViewContacts ? "，可查看已通过报名的联系方式" : ""}</small></div>${isAdmin() || current ? `<div class="member-actions"><button class="transparent circle" data-action="member" data-id="${member.id}" aria-label="编辑${h(member.name)}的权限" ${current ? 'disabled title="无法修改自己的权限"' : ""}>${icon("manage_accounts")}</button>${current ? '<button class="border" data-action="logout">退出登录</button>' : ""}</div>` : ""}</div>`;
     })
     .join(
       "",
@@ -819,7 +819,68 @@ function attachSettings() {
 }
 function permissionsFields(member?: Member) {
   return `${select("member-role", "成员角色", Object.entries(roles), member?.role || "reviewer")}
-  <label class="checkbox"><input type="checkbox" name="member-contacts" ${member?.canViewContacts ? "checked" : ""}><span>允许查看已通过报名的授权联系方式</span></label><p class="help" style="margin:12px 0">管理员可管理全部任务；其他角色只访问下方分配的任务。</p><fieldset style="border:0;padding:0"><legend>分配任务</legend><div class="check-grid">${workspace.tasks.map((task) => `<label class="checkbox"><input type="checkbox" name="member-tasks" value="${task.id}" ${member?.taskIds.includes(task.id) ? "checked" : ""}><span>${h(task.title)}</span></label>`).join("")}</div></fieldset>${member ? `<label class="checkbox"><input type="checkbox" name="member-active" ${member.active ? "checked" : ""}><span>成员可以访问工作台</span></label>` : ""}`;
+  <label class="checkbox"><input type="checkbox" name="member-contacts" ${member?.canViewContacts ? "checked" : ""}><span>允许查看已通过报名的授权联系方式</span></label><p class="help" style="margin:12px 0">组织管理员可管理全部任务，其他角色只访问分配的任务。</p><fieldset class="task-assignment"><legend>分配任务</legend><ul id="assigned-tasks" aria-label="已分配任务"></ul><p class="task-assignment-empty" id="assigned-tasks-empty">尚未分配任务</p><div class="task-assignment-add">${select("member-task-choice", "选择要添加的任务", [["", "请选择任务"]])}<button class="border" type="button" id="add-member-task" disabled>${icon("add")}添加任务</button></div><span class="sr-only" role="status" id="assignment-status"></span></fieldset>${member ? `<label class="checkbox"><input type="checkbox" name="member-active" ${member.active ? "checked" : ""}><span>成员可以访问工作台</span></label>` : ""}`;
+}
+function attachTaskAssignment(form: HTMLFormElement, member?: Member) {
+  const assigned = new Set(member?.taskIds || []);
+  const list = form.querySelector<HTMLUListElement>("#assigned-tasks")!;
+  const empty = form.querySelector<HTMLElement>("#assigned-tasks-empty")!;
+  const choice = form.querySelector<HTMLSelectElement>("#member-task-choice")!;
+  const add = form.querySelector<HTMLButtonElement>("#add-member-task")!;
+  const status = form.querySelector<HTMLElement>("#assignment-status")!;
+  const render = () => {
+    const selected = workspace.tasks.filter((task) => assigned.has(task.id));
+    const available = workspace.tasks.filter((task) => !assigned.has(task.id));
+    list.innerHTML = selected
+      .map(
+        (task) =>
+          `<li><div><strong>${h(task.title)}</strong><small>${h(task.incidentTitle)}</small></div><input type="hidden" name="member-tasks" value="${h(task.id)}"><button class="transparent" type="button" data-remove-task="${h(task.id)}" aria-label="移除${h(task.title)}">移除</button></li>`,
+      )
+      .join("");
+    list.hidden = !selected.length;
+    empty.hidden = !!selected.length;
+    choice.replaceChildren(
+      new Option(
+        available.length
+          ? "请选择任务"
+          : workspace.tasks.length
+            ? "所有任务均已添加"
+            : "暂无可分配任务",
+        "",
+      ),
+      ...available.map((task) => new Option(task.title, task.id)),
+    );
+    choice.disabled = !available.length;
+    add.disabled = true;
+  };
+  choice.addEventListener("change", () => {
+    add.disabled = !choice.value;
+  });
+  add.addEventListener("click", () => {
+    const task = workspace.tasks.find((task) => task.id === choice.value);
+    if (!task || assigned.has(task.id)) return;
+    assigned.add(task.id);
+    render();
+    status.textContent = `已添加${task.title}`;
+    if (!choice.disabled) choice.focus();
+    else list.querySelector<HTMLButtonElement>("li:last-child button")?.focus();
+  });
+  list.addEventListener("click", (event) => {
+    const button = (event.target as Element).closest<HTMLButtonElement>(
+      "[data-remove-task]",
+    );
+    if (!button) return;
+    const index = Array.from(list.querySelectorAll("button")).indexOf(button);
+    const task = workspace.tasks.find(
+      (task) => task.id === button.dataset.removeTask,
+    );
+    assigned.delete(button.dataset.removeTask!);
+    render();
+    status.textContent = `已移除${task?.title || "任务"}`;
+    const buttons = list.querySelectorAll<HTMLButtonElement>("button");
+    (buttons[Math.min(index, buttons.length - 1)] || choice).focus();
+  });
+  render();
 }
 function memberDialog(member?: Member) {
   if (member?.id === workspace.membership.id) return;
@@ -829,6 +890,7 @@ function memberDialog(member?: Member) {
     true,
   );
   const form = dialog.querySelector<HTMLFormElement>("form")!;
+  attachTaskAssignment(form, member);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     setBusy(form, true);
