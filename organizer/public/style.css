@@ -122,13 +122,14 @@ a.button.circle {
 .field > select[data-custom-select],
 .org-switch > select[data-custom-select] {
   appearance: none;
-  padding-inline-end: 42px;
+  padding-inline-end: 3rem;
   cursor: pointer;
 }
-.field > .select-arrow,
-.org-switch > .select-arrow {
+.field > i.select-arrow,
+.org-switch > i.select-arrow {
   position: absolute;
-  inset: 50% 12px auto auto;
+  inset: calc(var(--_input, 3rem) / 2) 1rem auto auto;
+  margin: 0;
   transform: translateY(-50%);
   color: var(--on-surface-variant);
   pointer-events: none;
@@ -303,6 +304,7 @@ video {
   min-height: 50px;
   padding: 0 17px;
   border-radius: 26px;
+  border: 2px solid transparent;
   color: var(--on-surface-variant);
   font-size: 0.92rem;
 }
@@ -316,6 +318,7 @@ video {
   background: var(--primary-container);
   color: var(--on-primary-container);
   font-weight: 650;
+  border-color: currentColor;
 }
 .side-link:hover {
   background: var(--surface-container-high);
@@ -761,8 +764,12 @@ video {
 }
 .filter-chips a.active {
   background: var(--secondary-container);
-  border-color: var(--secondary-container);
+  border-color: var(--on-secondary-container);
   color: var(--on-secondary-container);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 .task-grid {
   display: grid;
@@ -781,7 +788,10 @@ video {
 .task-view-controls [aria-pressed="true"] {
   background: var(--secondary-container);
   color: var(--on-secondary-container);
-  border-color: var(--secondary-container);
+  border-color: var(--on-secondary-container);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 #task-grid.compact {
   grid-template-columns: 1fr;
@@ -1019,9 +1029,9 @@ video {
 }
 .application-row {
   display: block;
-  padding: 17px 14px;
+  padding: 16px 13px;
   border-radius: 13px;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   margin-bottom: 5px;
   color: var(--on-surface);
 }
@@ -1030,8 +1040,9 @@ video {
 }
 .application-row.active {
   background: var(--primary-container);
-  border-color: var(--primary-container);
+  border-color: var(--on-primary-container);
 }
+.application-row.active > p,
 .application-row.active > small {
   color: var(--on-primary-container);
 }
@@ -1200,7 +1211,8 @@ video {
 .form-error {
   padding: 12px 15px;
   margin: 14px 0;
-  border-left: 3px solid var(--error);
+  border: 1px solid var(--error);
+  border-radius: 8px;
   background: var(--primary-container);
   color: var(--error);
   font-size: 0.88rem;
@@ -1213,6 +1225,9 @@ video {
 }
 .form-grid .full {
   grid-column: 1 / -1;
+}
+#task-form .form-grid > .field {
+  margin: 20px 0;
 }
 .help {
   color: var(--on-surface-variant);
@@ -1452,6 +1467,68 @@ th {
 .member-info strong {
   font-size: 0.9rem;
 }
+.task-assignment {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 22px 0;
+}
+#assigned-tasks {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 20px;
+}
+#assigned-tasks > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--outline-variant);
+}
+#assigned-tasks > li > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+#assigned-tasks strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+#assigned-tasks small {
+  color: var(--on-surface-variant);
+}
+#assigned-tasks button {
+  margin: 0;
+  flex-shrink: 0;
+  padding-inline: 12px;
+}
+.task-assignment-empty {
+  padding-block: 20px;
+  color: var(--on-surface-variant);
+  font-size: 0.9rem;
+}
+.task-assignment-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.task-assignment-add > .field {
+  flex: 1 1 220px;
+  margin: 0;
+  min-width: 0;
+}
+.task-assignment-add > button {
+  margin: 0;
+}
+form:has(> .task-assignment) > .checkbox {
+  min-height: 44px;
+  height: auto;
+  white-space: normal;
+}
 .incident-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1474,6 +1551,7 @@ th {
 dialog {
   padding: 28px;
   width: min(560px, calc(100vw - 32px));
+  min-inline-size: 0;
   max-height: calc(100dvh - 32px);
   border: 1px solid var(--outline-variant);
   color: var(--on-surface);
@@ -1852,6 +1930,7 @@ dialog::backdrop {
   .mobile-nav button {
     display: flex;
     flex: 1;
+    min-inline-size: 0;
     flex-direction: column;
     gap: 3px;
     padding: 6px 2px;
@@ -1861,14 +1940,18 @@ dialog::backdrop {
     color: var(--on-surface-variant);
     background: transparent;
     border-radius: 15px;
+    border: 2px solid transparent;
     line-height: 1.4;
   }
   .mobile-nav span {
     font-size: 0.875rem;
+    letter-spacing: 0;
+    white-space: nowrap;
   }
   .mobile-nav .active {
     background: var(--primary-container);
     color: var(--on-primary-container);
+    border-color: currentColor;
   }
   .form-grid {
     grid-template-columns: 1fr;
@@ -1909,6 +1992,7 @@ dialog::backdrop {
   }
   dialog {
     padding: 22px;
+    inset-block-start: 16px;
   }
   .login-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -1939,6 +2023,31 @@ dialog::backdrop {
   }
 }
 @media (forced-colors: active) {
+  /* Custom controls inherit the user's system palette, regardless of app theme. */
+  body:is(.light, .dark) {
+    --primary: LinkText;
+    --on-primary: Canvas;
+    --primary-container: Canvas;
+    --on-primary-container: CanvasText;
+    --secondary: LinkText;
+    --secondary-container: Canvas;
+    --on-secondary-container: CanvasText;
+    --surface: Canvas;
+    --surface-container-low: Canvas;
+    --surface-container: Canvas;
+    --surface-container-high: Canvas;
+    --background: Canvas;
+    --on-background: CanvasText;
+    --on-surface: CanvasText;
+    --on-surface-variant: CanvasText;
+    --outline: CanvasText;
+    --outline-variant: CanvasText;
+    --error: CanvasText;
+    --success: CanvasText;
+    --success-bg: Canvas;
+    --warning: CanvasText;
+    --warning-bg: Canvas;
+  }
   .dashboard-sort > button[aria-checked="true"] {
     background: Highlight;
     color: HighlightText;
@@ -1946,10 +2055,37 @@ dialog::backdrop {
   }
   .panel,
   .task-card,
-  .status,
-  .application-row,
-  .side-link.active {
+  .status {
     border: 1px solid CanvasText;
+  }
+  .side-link.active,
+  .mobile-nav .active,
+  .application-row.active,
+  .filter-chips a.active,
+  .task-view-controls [aria-pressed="true"] {
+    border-color: Highlight;
+    border-style: double;
+    border-width: 3px;
+  }
+  .select-popover,
+  .preference-popover {
+    border-color: CanvasText;
+  }
+  .select-popover.keyboard .select-option.active {
+    outline-color: Highlight;
+  }
+  .progress-track {
+    border: 1px solid CanvasText;
+  }
+  .progress-track > span {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
+@media (prefers-contrast: more) {
+  body:is(.light, .dark) {
+    --outline: var(--on-surface);
+    --outline-variant: var(--on-surface-variant);
   }
 }
 @media print {

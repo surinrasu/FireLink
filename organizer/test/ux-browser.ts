@@ -90,7 +90,7 @@ const cases: Record<
     await page.keyboard.press("Escape");
     assert.equal(await page.getByRole("dialog").isVisible(), true);
     await role.click();
-    await menu.getByRole("option", { name: "任务负责人", exact: true }).click();
+    await menu.getByRole("option", { name: "任务管理员", exact: true }).click();
     assert.equal(await role.inputValue(), "manager");
     await page.getByRole("button", { name: "取消", exact: true }).click();
     await page.locator('.sidebar a[href="#/tasks/new"]').click();

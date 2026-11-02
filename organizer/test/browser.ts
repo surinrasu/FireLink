@@ -173,9 +173,26 @@ try {
   await page.getByRole("button", { name: "恢复招募", exact: true }).waitFor();
   await page.locator('.sidebar a[href="#/settings"]').click();
   await page.getByRole("heading", { name: "组织设置", exact: true }).waitFor();
+  assert.match(
+    await page.locator("#current-member .member-info").innerText(),
+    /全部任务，可查看已通过报名的联系方式/,
+  );
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const reviewerEmail = `browser-${crypto.randomUUID()}@example.invalid`;
   await page.getByLabel("受邀成员邮箱").fill(reviewerEmail);
+  const assignTask = async (title: string) => {
+    await page.getByLabel("选择要添加的任务", { exact: true }).click();
+    await page
+      .getByRole("listbox", { name: "选择要添加的任务选项", exact: true })
+      .getByRole("option", { name: title, exact: true })
+      .click();
+    await page.getByRole("button", { name: "添加任务", exact: true }).click();
+  };
+  await assignTask("安置点物资整理");
+  await assignTask("物资运输协助");
+  await page
+    .getByRole("button", { name: "移除安置点物资整理", exact: true })
+    .click();
   await page.getByRole("button", { name: "生成邀请链接", exact: true }).click();
   await page.getByRole("heading", { name: "邀请链接已生成" }).waitFor();
   const invitationURL = await page
@@ -197,6 +214,13 @@ try {
     await reviewer.getByRole("link", { name: "新建任务", exact: true }).count(),
     0,
   );
+  await reviewer.locator('.sidebar a[href="#/tasks"]').click();
+  await reviewer
+    .getByRole("heading", { name: "任务管理", exact: true })
+    .waitFor();
+  assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
+    "物资运输协助",
+  ]);
   await reviewer.getByRole("link", { name: "当前账户设置" }).click();
   await reviewer.locator("#current-member").waitFor();
   assert.equal(
@@ -215,7 +239,6 @@ try {
   await reviewer
     .getByRole("heading", { name: "工作台", exact: true })
     .waitFor();
-  await reviewerContext.close();
   await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.reload();
   await page
@@ -224,6 +247,50 @@ try {
   await page
     .getByRole("heading", { name: "成员权限 · 浏览器审核员", exact: true })
     .waitFor();
+  assert.deepEqual(
+    await page.locator("#assigned-tasks strong").allTextContents(),
+    ["物资运输协助"],
+  );
+  await page
+    .getByRole("button", { name: "移除物资运输协助", exact: true })
+    .click();
+  await assignTask("安置点物资整理");
+  await page
+    .getByLabel("成员角色", { exact: true })
+    .selectOption({ label: "任务管理员" });
+  await page
+    .getByText("允许查看已通过报名的授权联系方式", { exact: true })
+    .click();
+  assert.equal(
+    await page.getByLabel("允许查看已通过报名的授权联系方式").isChecked(),
+    true,
+  );
+  await page.getByRole("button", { name: "保存权限", exact: true }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
+  const member = page
+    .locator(".member-row")
+    .filter({ hasText: "浏览器审核员" });
+  await member.getByText("任务管理员", { exact: false }).waitFor();
+  assert.match(
+    await member.innerText(),
+    /1 个指定任务，可查看已通过报名的联系方式/,
+  );
+  await reviewer.reload();
+  await reviewer.locator('.sidebar a[href="#/tasks"]').click();
+  await reviewer
+    .getByRole("heading", { name: "任务管理", exact: true })
+    .waitFor();
+  assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
+    "安置点物资整理",
+  ]);
+  await reviewerContext.close();
+  await page
+    .getByRole("button", { name: "编辑浏览器审核员的权限", exact: true })
+    .click();
+  assert.deepEqual(
+    await page.locator("#assigned-tasks strong").allTextContents(),
+    ["安置点物资整理"],
+  );
   await page.getByRole("button", { name: "取消", exact: true }).click();
   await page.locator('.sidebar a[href="#/incidents"]').click();
   await page.getByRole("heading", { name: "活跃事件", exact: true }).waitFor();
