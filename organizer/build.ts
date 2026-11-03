@@ -21,12 +21,12 @@ await writeFile(
     defaultColors.background,
   ),
 );
-// Reuse the flame geometry, with the organizer's H266 identity.
+// Match the wordmark to the workspace's startup surface and text colors.
 await writeFile(
   `${output}/assets/firelink.svg`,
   (await readFile(`${root}../assets/firelink.svg`, "utf8"))
-    .replaceAll("#B73D25", defaultColors.primary)
-    .replaceAll("#FFF", defaultColors["on-primary"]),
+    .replaceAll("#F3F3FA", defaultColors.background)
+    .replaceAll("#1A1B20", defaultColors["on-surface"]),
 );
 const vendor = `${root}node_modules/beercss/dist/cdn`;
 for (const name of await readdir(vendor)) {

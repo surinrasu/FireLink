@@ -1,0 +1,135 @@
+name: FireLink
+options:
+  bundleIdPrefix: cn.firelink
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: '17.0'
+    macOS: '14.0'
+    visionOS: '1.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_CFBundleDisplayName: FireLink
+    INFOPLIST_KEY_NSLocalNetworkUsageDescription: Connect to FireLink to load tasks and submit applications.
+    INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+    FIRELINK_UI_TEST_SERVER: http://localhost:8787
+targetTemplates:
+  VolunteerApp:
+    type: application
+    productName: FireLink
+    sources:
+      - FireLink
+      - path: ../shared/regions.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cn.firelink.volunteer
+        PRODUCT_NAME: FireLink
+        PRODUCT_MODULE_NAME: FireLink
+        INFOPLIST_FILE: FireLink/Info.plist
+        CODE_SIGN_ENTITLEMENTS: FireLink/FireLink.entitlements
+  VolunteerTests:
+    type: bundle.unit-test
+    sources:
+      - FireLinkTests
+      - path: ../fixtures/application-results.json
+        buildPhase: resources
+      - path: ../fixtures/incident-sorting.json
+        buildPhase: resources
+      - path: ../fixtures/map-annotations.json
+        buildPhase: resources
+targets:
+  FireLink:
+    templates: [VolunteerApp]
+    platform: iOS
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: '1,2'
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+  FireLinkMac:
+    templates: [VolunteerApp]
+    platform: macOS
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: MacAppIcon
+        CODE_SIGN_ENTITLEMENTS: FireLink/FireLinkMac.entitlements
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.lifestyle
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+  FireLinkVision:
+    templates: [VolunteerApp]
+    platform: visionOS
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: VisionAppIcon
+        TARGETED_DEVICE_FAMILY: '7'
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+  FireLinkTests:
+    templates: [VolunteerTests]
+    platform: iOS
+    dependencies:
+      - target: FireLink
+  FireLinkMacTests:
+    templates: [VolunteerTests]
+    platform: macOS
+    dependencies:
+      - target: FireLinkMac
+  FireLinkVisionTests:
+    templates: [VolunteerTests]
+    platform: visionOS
+    dependencies:
+      - target: FireLinkVision
+  FireLinkUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [FireLinkUITests, AppleUITests]
+    dependencies:
+      - target: FireLink
+  FireLinkMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [AppleUITests]
+    dependencies:
+      - target: FireLinkMac
+schemes:
+  FireLink:
+    build:
+      targets:
+        FireLink: all
+    test:
+      targets: [FireLinkTests]
+  FireLinkUI:
+    build:
+      targets:
+        FireLink: all
+    test:
+      targets: [FireLinkUITests]
+      environmentVariables:
+        FIRELINK_UI_TEST_SERVER: $(FIRELINK_UI_TEST_SERVER)
+  FireLinkMac:
+    build:
+      targets:
+        FireLinkMac: all
+    test:
+      targets: [FireLinkMacTests]
+  FireLinkVision:
+    build:
+      targets:
+        FireLinkVision: all
+    test:
+      targets: [FireLinkVisionTests]
+  FireLinkMacUI:
+    build:
+      targets:
+        FireLinkMac: all
+    test:
+      targets: [FireLinkMacUITests]
+      environmentVariables:
+        FIRELINK_UI_TEST_SERVER: $(FIRELINK_UI_TEST_SERVER)
+        FIRELINK_UI_TEST_APP_PATH: $(BUILT_PRODUCTS_DIR)/FireLink.app

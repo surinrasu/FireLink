@@ -15,7 +15,6 @@ export interface Scene {
   route: string;
   expected: string[];
   cue: string;
-  icon: string;
   status?: ApplicationStatus;
   notices?: boolean;
 }

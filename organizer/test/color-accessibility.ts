@@ -300,6 +300,7 @@ try {
       .fill("2020-01-01T12:00");
     await page.locator(".field-error").waitFor();
     await scan(page, `${name}-editor-error`);
+    await page.locator("#task-details > summary").click();
     await page.getByRole("button", { name: "添加地图", exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 1400 });
     const map = page.locator("#blocks firelink-map");
@@ -452,6 +453,7 @@ try {
           "border",
         );
         await goto("tasks/new", "新建任务");
+        await page.locator("#task-schedule > summary").click();
         await page
           .getByLabel("报名截止", { exact: false })
           .fill("2020-01-01T12:00");

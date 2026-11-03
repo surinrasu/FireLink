@@ -512,6 +512,64 @@ test("task drafts publish, pause and close with optimistic edit conflicts and lo
     409,
   );
 });
+test("location descriptions are optional when publishing and editing published tasks", async () => {
+  const identity = await demo();
+  const sample = (await workspace(identity)).tasks.find(
+    (t) => t.state === "open",
+  )!;
+  const created = await request<{ id: string }>("/tasks", identity, {
+    ...taskInput(sample),
+    location: "",
+  });
+  assert.equal(created.status, 201);
+  const current = async () =>
+    (await workspace(identity)).tasks.find((t) => t.id === created.data.id)!;
+  let task = await current();
+  assert.equal(
+    (
+      await request(`/tasks/${task.id}/state`, identity, {
+        state: "open",
+        version: task.version,
+      })
+    ).status,
+    200,
+  );
+  for (const location of ["社区服务中心", ""]) {
+    task = await current();
+    assert.equal(
+      (
+        await request(
+          `/tasks/${task.id}`,
+          identity,
+          {
+            ...taskInput(task),
+            location,
+          },
+          "PUT",
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await current()).location, location);
+  }
+  task = await current();
+  assert.equal(task.state, "open");
+  assert.equal(
+    (
+      await request(
+        `/tasks/${task.id}`,
+        identity,
+        {
+          ...taskInput(task),
+          summary: "",
+        },
+        "PUT",
+      )
+    ).status,
+    400,
+    "other publication requirements remain mandatory",
+  );
+});
 test("task changes notify only pending applications; accepted communication is out of scope", async () => {
   const identity = await demo(),
     ws = await workspace(identity);

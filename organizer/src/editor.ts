@@ -89,24 +89,30 @@ export function mountEditor(
     !!task && task.pending + task.accepted + task.rejected + task.withdrawn > 0;
   const fields = source?.requiredFields || ["realName", "region"];
   const contacts = source?.contactFields || ["phone"];
+  const requirementOptions = (
+    name: string,
+    keys: string[],
+    selected: string[],
+  ) =>
+    keys
+      .map(
+        (key) =>
+          `<label class="requirement-option"><input class="sr-only" type="checkbox" name="${name}" value="${key}" ${selected.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`,
+      )
+      .join("");
   const fieldGroups: [string, string[]][] = [
-    ["身份信息", ["username", "realName", "region", "pronouns"]],
-    ["个人情况", ["age", "gender", "body"]],
-    ["能力与资源", ["equipment", "vehicles", "skills"]],
+    ["身份信息", ["realName", "age", "gender"]],
+    ["个人情况", ["username", "pronouns", "region", "body"]],
+    ["资质与资源", ["equipment", "vehicles", "skills"]],
   ];
   const requirements = fieldGroups
     .map(
-      ([label, keys]) =>
-        `<fieldset class="requirement-group"><legend>${label}</legend><div class="check-grid">${keys
-          .map(
-            (key) =>
-              `<label class="checkbox"><input type="checkbox" name="requiredFields" value="${key}" ${fields.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`,
-          )
-          .join("")}</div></fieldset>`,
+      ([label, keys], index) =>
+        `<div class="requirement-group" role="group" aria-labelledby="requirement-label-${index}"><span id="requirement-label-${index}" class="requirement-label">${label}</span><div class="requirement-options">${requirementOptions("requiredFields", keys, fields)}</div></div>`,
     )
     .join("");
   host.innerHTML = `<form id="task-form"><div class="editor-layout"><div>
-    <section class="panel editor-section"><h2><span class="step-number">1</span>基本信息</h2>${input("title", "任务标题", copy ? `${copy.title}（副本）` : task?.title || "", 'required maxlength="100"')}<div class="task-summary"><label for="summary">一句话说明志愿者大概要做什么、有什么基本要求</label><div class="field textarea border"><textarea id="summary" name="summary" maxlength="500" rows="3">${h(source?.summary || "")}</textarea></div></div>
+    <section class="panel editor-section"><h2><span class="step-number">1</span>基本信息</h2>${input("title", "任务标题", copy ? `${copy.title}（副本）` : task?.title || "", 'required maxlength="100"')}<div class="task-summary"><label for="summary">工作内容与能力要求摘要</label><div class="field textarea border"><textarea id="summary" name="summary" maxlength="500" rows="3">${h(source?.summary || "")}</textarea></div></div>
     <div class="form-grid">${select("incidentId", "所属事件", [["", "请选择事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], incidentId || source?.incidentId || "", "required")}${select(
       "ownerId",
       "任务负责人",
@@ -115,19 +121,29 @@ export function mountEditor(
         .map((m) => [m.id, m.name]),
       source?.ownerId || workspace.membership.id,
     )}</div></section>
-    <section class="panel editor-section"><h2><span class="step-number">2</span>时间与地点</h2><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "任务开始时间", beijingInput(times.startsAt), "", "datetime-local")}${input("endsAt", "任务结束时间", beijingInput(times.endsAt), "", "datetime-local")}${input("deadline", "报名截止时间", beijingInput(times.deadline), "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "服务地点", source?.location || "", 'maxlength="300"')}</section>
-    <section class="panel editor-section"><div class="block-section-heading"><h2><span class="step-number">3</span>工作内容与参与要求</h2><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
+    <details class="panel editor-section" id="task-schedule"><summary class="editor-section-toggle"><h2><span class="step-number">2</span>时间与地点</h2>${icon("expand_more")}</summary><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "任务开始时间", beijingInput(times.startsAt), "", "datetime-local")}${input("endsAt", "任务结束时间", beijingInput(times.endsAt), "", "datetime-local")}${input("deadline", "报名截止时间", beijingInput(times.deadline), "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "地点描述", source?.location || "", 'maxlength="300" aria-describedby="location-help"')}<p class="help" id="location-help">选填</p></details>
+    <details class="panel editor-section" id="task-details"><summary class="editor-section-toggle"><h2><span class="step-number">3</span>任务详细信息</h2>${icon("expand_more")}</summary><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
       blockNames,
     )
       .map(
         ([type, label]) =>
           `<button class="border" type="button" data-add-block="${type}" aria-label="添加${label}">${icon("add")}${label}</button>`,
       )
-      .join("")}</div></section>
-    <section class="panel editor-section"><h2><span class="step-number">4</span>报名资料与授权</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}<fieldset id="contact-fields" class="requirement-group" tabindex="-1"><legend>联系方式</legend><div class="check-grid">${["phone", "wechat", "email"].map((key) => `<label class="checkbox"><input type="checkbox" name="contactFields" value="${key}" ${contacts.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`).join("")}</div></fieldset></fieldset></section>
+      .join("")}</div></details>
+    <section class="panel editor-section"><h2><span class="step-number">4</span>志愿者上传资料</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}<div id="contact-fields" class="requirement-group" role="group" aria-labelledby="contact-fields-label" tabindex="-1"><span id="contact-fields-label" class="requirement-label">联系方式</span><div class="requirement-options">${requirementOptions("contactFields", ["phone", "wechat", "email"], contacts)}</div></div></fieldset></section>
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
     <footer class="editor-footer"><small id="save-status" role="status">${draft ? "草稿填写后自动保存" : "已发布任务的更改需要手动保存"}</small><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
+  form.addEventListener(
+    "invalid",
+    (event) => {
+      const section = (event.target as HTMLElement).closest<HTMLDetailsElement>(
+        "details.editor-section",
+      );
+      if (section) section.open = true;
+    },
+    true,
+  );
   const footer = form.querySelector<HTMLElement>(".editor-footer")!;
   let focusFrame = 0;
   const revealFocus = () => {
@@ -236,7 +252,6 @@ export function mountEditor(
     "summary",
     "startsAt",
     "deadline",
-    "location",
   ]) {
     const field = form.elements.namedItem(name) as HTMLInputElement;
     const label = form.querySelector<HTMLLabelElement>(`label[for="${name}"]`)!;
@@ -259,10 +274,9 @@ export function mountEditor(
     const required = {
       title: "任务标题",
       incidentId: "所属事件",
-      summary: "一句话介绍任务",
+      summary: "工作内容与能力要求摘要",
       startsAt: "任务开始时间",
       deadline: "报名截止时间",
-      location: "服务地点",
     };
     for (const [field, label] of Object.entries(required))
       check(field, !!value(field).trim(), `请填写${label}`);
@@ -569,7 +583,7 @@ export function mountEditor(
       ["任务开始（北京时间）", value("startsAt").replace("T", " ")],
       ["任务结束（北京时间）", value("endsAt").replace("T", " ")],
       ["报名截止（北京时间）", value("deadline").replace("T", " ")],
-      ["服务地点", value("location")],
+      ["地点描述", value("location")],
       ["集合地点", source?.meetingPoint || ""],
       ["招募人数", value("capacity")],
     ].filter(([, text]) => text);

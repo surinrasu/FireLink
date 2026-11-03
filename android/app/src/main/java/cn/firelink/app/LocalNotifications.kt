@@ -49,7 +49,7 @@ fun rememberAuthNotification(): (Int, String, String) -> Unit {
             manager.notify(
                 message.id,
                 Notification.Builder(context, channel)
-                    .setSmallIcon(R.drawable.ic_firelink)
+                    .setSmallIcon(R.drawable.ic_firelink_notification)
                     .setContentTitle(message.title)
                     .setContentText(message.body)
                     .setStyle(Notification.BigTextStyle().bigText(message.body))

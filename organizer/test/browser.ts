@@ -141,8 +141,9 @@ try {
     .fill("浏览器验证 · 社区物资整理");
   await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
   await page
-    .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
+    .getByLabel("工作内容与能力要求摘要")
     .fill("协助社区清点和分类物资，招募 3 位志愿者。");
+  await page.locator("#task-schedule > summary").click();
   const start = new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10);
   const deadline = new Date(Date.now() + 3 * 86400000)
     .toISOString()
@@ -153,7 +154,8 @@ try {
     .getByLabel("报名截止时间", { exact: true })
     .fill(`${deadline}T18:00`);
   await page.getByLabel("计划招募人数", { exact: true }).fill("3");
-  await page.getByLabel("服务地点", { exact: true }).fill("西湖区社区服务中心");
+  await page.getByLabel("地点描述", { exact: true }).fill("西湖区社区服务中心");
+  await page.locator("#task-details > summary").click();
   await page
     .getByLabel("段落内容", { exact: true })
     .fill("按类别清点物资，做好登记。具体安排由双方沟通确认。");

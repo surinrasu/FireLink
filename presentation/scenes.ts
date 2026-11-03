@@ -14,7 +14,6 @@ export const SCENES: Scene[] = [
     route: "home",
     expected: ["实用指南", "杭州西湖区"],
     cue: "从首页，找到身边的行动机会。",
-    icon: "local_fire_department",
   },
   {
     id: "discover",
@@ -26,7 +25,6 @@ export const SCENES: Scene[] = [
     route: "incidents",
     expected: ["杭州西湖区", "最近更新"],
     cue: "点开一处事件，查看正在招募的任务。",
-    icon: "explore",
   },
   {
     id: "task",
@@ -38,7 +36,6 @@ export const SCENES: Scene[] = [
     route: "task/task-supply",
     expected: ["青禾志愿服务中心", "联系发布者", "安置点物资整理"],
     cue: "可点击「联系发布者」，展开联系方式。",
-    icon: "assignment",
   },
   {
     id: "profile",
@@ -50,7 +47,6 @@ export const SCENES: Scene[] = [
     route: "profile",
     expected: ["林小满", "技能"],
     cue: "进入个人信息或技能资质，查看已准备的资料。",
-    icon: "person",
   },
   {
     id: "consent",
@@ -62,7 +58,6 @@ export const SCENES: Scene[] = [
     route: "apply/task-supply",
     expected: ["安置点物资整理", "必需"],
     cue: "向下滑动，查看联系授权并提交报名。",
-    icon: "shield",
   },
   {
     id: "pending",
@@ -75,7 +70,6 @@ export const SCENES: Scene[] = [
     status: "pending",
     expected: ["待审核", "撤回"],
     cue: "可以现场撤回；「重置本页」恢复待审核状态。",
-    icon: "schedule",
   },
   {
     id: "accepted",
@@ -88,7 +82,6 @@ export const SCENES: Scene[] = [
     status: "accepted",
     expected: ["已通过", "已按授权提供"],
     cue: "这一页固定展示已通过的申请与组织者回应。",
-    icon: "task_alt",
   },
   {
     id: "notifications",
@@ -102,6 +95,5 @@ export const SCENES: Scene[] = [
     notices: true,
     expected: ["报名已通过", "出发前的小提醒"],
     cue: "点击未读通知，查看这次报名的最新结果。",
-    icon: "notifications",
   },
 ];

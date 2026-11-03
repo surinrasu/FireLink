@@ -48,7 +48,9 @@ try {
   await page.goto(`${url}/#/tasks/new`);
   await page.getByLabel("任务标题", { exact: true }).fill("地图与附件验证");
   await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
-  await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+  await page.locator("#task-schedule > summary").click();
+  await page.getByLabel("地点描述", { exact: true }).fill("社区服务中心");
+  await page.locator("#task-details > summary").click();
   await page.getByRole("button", { name: "添加地图", exact: true }).click();
   const map = page.locator("#blocks firelink-map");
   await map.locator(".leaflet-container").waitFor();
@@ -168,6 +170,7 @@ try {
   });
   await page.getByRole("link", { name: "编辑任务", exact: true }).click();
   await page.locator("#task-form").waitFor();
+  await page.locator("#task-details > summary").click();
   await map.getByRole("button", { name: "位置 1", exact: true }).click();
   await map.locator(".precise summary").click();
   assert.equal(

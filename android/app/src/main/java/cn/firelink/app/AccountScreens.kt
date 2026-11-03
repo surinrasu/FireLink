@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,11 +60,11 @@ fun LoginScreen(model: AppModel, demoDone: () -> Unit, done: () -> Unit) {
             }
     }
     Page {
-        Icon(
-            Icons.Outlined.LocalFireDepartment,
-            null,
-            Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.primary,
+        Text(
+            "FireLink",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.04).em,
         )
         Text(
             if (registration == null) strings.getString(R.string.welcome)
