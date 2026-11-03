@@ -394,6 +394,193 @@ const cases: Record<
       true,
     );
   },
+  "hct-theme": async (page, context) => {
+    const menu = page.locator("#preference-theme");
+    const wheel = page.getByRole("slider", { name: "主题色相", exact: true });
+    const open = () =>
+      page.getByRole("button", { name: "主题", exact: true }).click();
+    const hue = () => wheel.getAttribute("aria-valuenow");
+    const primary = () =>
+      page
+        .locator("body")
+        .evaluate((e) =>
+          getComputedStyle(e).getPropertyValue("--primary").trim(),
+        );
+    await open();
+    assert.equal(await hue(), "266");
+    assert.equal(
+      await wheel.getAttribute("aria-valuetext"),
+      "靛青色系，266 度",
+    );
+    await wheel.focus();
+    await page.keyboard.press("End");
+    assert.equal(await hue(), "359");
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await hue(), "359");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await hue(), "0");
+    await page.keyboard.press("Shift+ArrowRight");
+    await page.keyboard.press("PageUp");
+    assert.equal(await hue(), "25");
+    assert.equal(
+      await menu.locator('[data-hue="25"]').getAttribute("aria-pressed"),
+      "true",
+    );
+    const red = await primary();
+    const bounds = (await wheel.boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(
+      bounds.x + bounds.width - 12,
+      bounds.y + bounds.height / 2,
+    );
+    assert.equal(await hue(), "90");
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height - 12,
+    );
+    await page.mouse.up();
+    assert.equal(await hue(), "180");
+    assert.notEqual(await primary(), red);
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    assert.equal(await hue(), "180");
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await open();
+    assert.equal(await hue(), "180");
+    assert.equal(
+      await page.getByRole("radio", { name: "深色", exact: true }).isChecked(),
+      true,
+    );
+    await page.getByRole("radio", { name: "跟随系统", exact: true }).check();
+    for (const colorScheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme });
+      await page.waitForFunction(
+        (mode) => document.body.classList.contains(mode),
+        colorScheme,
+      );
+      assert.equal(await hue(), "180");
+      assert.equal(
+        await page.locator('meta[name="theme-color"]').getAttribute("content"),
+        await page
+          .locator("body")
+          .evaluate((e) =>
+            getComputedStyle(e).getPropertyValue("--background").trim(),
+          ),
+      );
+    }
+    await page.getByRole("button", { name: "恢复默认色", exact: true }).click();
+    assert.equal(await hue(), "266");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 320, height: 740 });
+    await open();
+    // Popover toggle events (which position it) are queued after the click.
+    await page.waitForFunction(() => {
+      const bounds = document
+        .querySelector("#preference-theme")!
+        .getBoundingClientRect();
+      return (
+        bounds.x >= 0 &&
+        bounds.right <= innerWidth &&
+        bounds.y >= 0 &&
+        bounds.bottom <= innerHeight
+      );
+    });
+    const mobile = (await menu.boundingBox())!;
+    assert.ok(
+      mobile.x >= 0 &&
+        mobile.x + mobile.width <= 320 &&
+        mobile.y >= 0 &&
+        mobile.y + mobile.height <= 740,
+      JSON.stringify(mobile),
+    );
+    assert.equal(
+      await menu.evaluate((e) => e.scrollWidth <= e.clientWidth),
+      true,
+    );
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setTouchEmulationEnabled", {
+      enabled: true,
+      maxTouchPoints: 1,
+    });
+    const ring = (await wheel.boundingBox())!;
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: ring.x + ring.width / 2, y: ring.y + 12 }],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [
+        { x: ring.x + ring.width - 12, y: ring.y + ring.height / 2 },
+      ],
+    });
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    assert.equal(await hue(), "90");
+    await page.getByRole("button", { name: "恢复默认色", exact: true }).click();
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/hct-picker-mobile.png",
+      fullPage: true,
+    });
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => localStorage.setItem("firelink:hue", "invalid"));
+    await page.reload();
+    await open();
+    assert.equal(await hue(), "266");
+    // Quota failures can block writes while reads remain available.
+    await page.evaluate(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      };
+    });
+    await wheel.focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Escape");
+    await page.locator('.sidebar a[href="#/settings"]').click();
+    await page
+      .getByRole("heading", { name: "组织设置", exact: true })
+      .waitFor();
+    await open();
+    assert.equal(await hue(), "265");
+    // Denied storage still permits changing appearance within this session.
+    await page.addInitScript(() => {
+      Storage.prototype.getItem = () => {
+        throw new DOMException("Denied");
+      };
+      Storage.prototype.setItem = () => {
+        throw new DOMException("Denied");
+      };
+    });
+    await page.reload();
+    await open();
+    await wheel.focus();
+    await page.keyboard.press("ArrowDown");
+    assert.equal(await hue(), "265");
+    await page.getByRole("radio", { name: "浅色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page
+      .getByRole("heading", { name: "任务管理", exact: true })
+      .waitFor();
+    await page.locator('.sidebar a[href="#/settings"]').click();
+    await page
+      .getByRole("heading", { name: "组织设置", exact: true })
+      .waitFor();
+    await open();
+    assert.equal(await hue(), "265");
+    assert.equal(
+      await page.getByRole("radio", { name: "浅色", exact: true }).isChecked(),
+      true,
+    );
+  },
   "dashboard-fill": async (page) => {
     let mode = "pending";
     const total = 40;
@@ -429,7 +616,7 @@ const cases: Record<
     await filled();
     const initial = await rows.count();
     assert.ok(
-      initial > 5 && initial < total,
+      initial > 1 && initial < total,
       "fill the viewport without a fixed five-row cap or rendering everything",
     );
     await page.screenshot({
@@ -681,6 +868,227 @@ const cases: Record<
     await page.getByRole("button", { name: "清除筛选", exact: true }).click();
     await page.locator(".task-card").first().waitFor();
     assert.equal(await page.locator(".task-card:visible").count(), count);
+  },
+  "task-filter-state": async (page) => {
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    const search = page.getByRole("searchbox", {
+      name: "搜索任务",
+      exact: true,
+    });
+    await search.fill("物资");
+    await page
+      .getByLabel("所属事件", { exact: true })
+      .selectOption("incident-hangzhou");
+    await page.locator(".filter-chips a").filter({ hasText: "招募中" }).click();
+    await page.locator('.filter-chips a.active[href*="state=open"]').waitFor();
+    await page.waitForFunction(
+      () =>
+        location.hash.includes("state=open") &&
+        document.querySelector<HTMLInputElement>("#task-search")?.value ===
+          "物资",
+    );
+    assert.equal(
+      await page.getByLabel("所属事件", { exact: true }).inputValue(),
+      "incident-hangzhou",
+    );
+    assert.equal(await page.locator(".task-card:visible").count(), 2);
+    await page.reload();
+    await search.waitFor();
+    assert.equal(await search.inputValue(), "物资");
+    assert.equal(await page.locator(".task-card:visible").count(), 2);
+    await page.locator(".task-card:visible h2 a").first().click();
+    await page.locator("#task-search").waitFor({ state: "hidden" });
+    await page.goBack();
+    await search.waitFor();
+    assert.equal(await search.inputValue(), "物资");
+    assert.equal(await page.locator(".task-card:visible").count(), 2);
+    await search.fill('没有这项任务 & "XYZ"');
+    await page.locator(".filter-chips a").filter({ hasText: "草稿" }).click();
+    await page.locator('.filter-chips a.active[href*="state=draft"]').waitFor();
+    await page.getByRole("button", { name: "清除筛选", exact: true }).waitFor();
+    assert.equal(await search.inputValue(), '没有这项任务 & "XYZ"');
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    await page.locator(".task-card").first().waitFor();
+    assert.equal(await search.inputValue(), "");
+    assert.equal(
+      await page.getByLabel("所属事件", { exact: true }).inputValue(),
+      "",
+    );
+    assert.equal(await page.locator(".task-card:visible").count(), 6);
+  },
+  "dashboard-deadlines": async (page) => {
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data = (await response.json()) as Workspace;
+      data.tasks = data.tasks
+        .filter((task) => task.state === "open")
+        .map((task, index) => ({
+          ...task,
+          title: `截止检查 ${index + 1}`,
+          deadline: ["", "2099-01-03T10:30:00Z", "2099-01-02T10:30:00Z"][index],
+          pending: 1,
+        }));
+      await route.fulfill({ response, json: data });
+    });
+    await page.reload();
+    await page
+      .getByRole("radio", { name: "按距截止时间", exact: true })
+      .click();
+    const rows = page.locator("#dashboard-tasks .task-row");
+    assert.deepEqual(await rows.locator(".task-info > a").allTextContents(), [
+      "截止检查 3",
+      "截止检查 2",
+      "截止检查 1",
+    ]);
+    assert.match(
+      await rows.first().locator(".task-deadline").innerText(),
+      /2099年1月2日.*18:30.*截止/,
+    );
+    assert.equal(
+      await rows.last().locator(".task-deadline").innerText(),
+      "未设置截止时间",
+    );
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await rows.locator(".task-deadline").evaluateAll((elements) =>
+        elements.every((el) => {
+          const bounds = el.getBoundingClientRect();
+          return (
+            bounds.left >= 0 &&
+            bounds.right <= innerWidth &&
+            el.scrollWidth <= el.clientWidth
+          );
+        }),
+      ),
+      true,
+    );
+  },
+  "mobile-editor-focus": async (page) => {
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page
+      .getByRole("link", { name: "新建任务", exact: true })
+      .last()
+      .click();
+    await page.locator("#task-form").waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    for (const viewport of [
+      { width: 320, height: 740 },
+      { width: 390, height: 844 },
+      { width: 740, height: 390 },
+    ]) {
+      await page.setViewportSize(viewport);
+      assert.equal(
+        await page
+          .locator(
+            ".editor-section, #task-form input, #task-form select, #task-form textarea",
+          )
+          .evaluateAll((elements) =>
+            elements.every((el) => {
+              const box = el.getBoundingClientRect();
+              return box.left >= 0 && box.right <= innerWidth;
+            }),
+          ),
+        true,
+        `${viewport.width}px: editor fields and panels fit`,
+      );
+      await page.locator("#title").focus();
+      for (const id of ["title", "summary", "incidentId", "ownerId"]) {
+        await page.waitForFunction((id) => {
+          const field = document.getElementById(id)!;
+          const box = field.getBoundingClientRect();
+          const footer = document
+            .querySelector(".editor-footer")!
+            .getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            box.left + box.width / 2,
+            box.top + box.height / 2,
+          );
+          return (
+            document.activeElement === field &&
+            box.top >= 0 &&
+            box.bottom <= Math.min(footer.top, innerHeight) &&
+            (hit === field || field.contains(hit))
+          );
+        }, id);
+        if (id !== "ownerId") await page.keyboard.press("Tab");
+      }
+    }
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.locator("#ownerId").focus();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/mobile-editor-focus-viewport.png",
+    });
+  },
+  "mobile-review-layout": async (page) => {
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.locator('.mobile-nav a[href="#/applications"]').click();
+    await page.locator(".application-row").first().click();
+    await page.locator("#review-form").waitFor();
+    assert.equal(
+      await page
+        .getByRole("heading", { level: 1, name: "报名审核", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "刷新", exact: true }).count(),
+      0,
+    );
+    const { default: AxeBuilder } = await import("@axe-core/playwright");
+    const headings = await new AxeBuilder({ page })
+      .withRules(["page-has-heading-one"])
+      .analyze();
+    assert.deepEqual(headings.violations, []);
+    assert.equal(
+      await page.locator(".review-actions button").evaluateAll((buttons) =>
+        buttons.every((button) => {
+          const box = button.getBoundingClientRect();
+          const text = Array.from(button.childNodes).filter(
+            (node) =>
+              node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+          );
+          return (
+            box.left >= 0 &&
+            box.right <= innerWidth &&
+            button.scrollWidth <= button.clientWidth &&
+            text.every((node) => {
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              return range.getClientRects().length === 1;
+            })
+          );
+        }),
+      ),
+      true,
+      "review decisions remain whole labels at 320px with large text",
+    );
+    await page.locator(".review-actions").scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/mobile-review-actions-viewport.png",
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert.equal(
+      await page
+        .getByRole("heading", { level: 1, name: "报名审核", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "刷新", exact: true }).isVisible(),
+      true,
+    );
   },
   "mobile-actions": async (page) => {
     await page

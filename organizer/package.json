@@ -10,9 +10,11 @@
     "test:browser": "bun test/browser.ts",
     "test:ux": "bun test/ux-browser.ts",
     "test:colors": "bun test/color-accessibility.ts",
+    "test:theme": "bun test test/theme.test.ts",
     "test:media": "bun test/media-browser.ts"
   },
   "dependencies": {
+    "@material/material-color-utilities": "0.4.0",
     "beercss": "5.0.3",
     "leaflet": "1.9.4"
   },

@@ -1,5 +1,6 @@
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_HUE, themeColors, themeCss } from "./src/theme";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const output = `${root}build/mng-dash`;
 await rm(`${root}build`, { recursive: true, force: true });
@@ -11,7 +12,22 @@ for (const name of await readdir(`${root}public`)) {
     recursive: true,
   });
 }
-await cp(`${root}../assets/firelink.svg`, `${output}/assets/firelink.svg`);
+const defaultColors = themeColors(DEFAULT_HUE, false);
+await writeFile(`${output}/theme.css`, themeCss());
+await writeFile(
+  `${output}/index.html`,
+  (await readFile(`${output}/index.html`, "utf8")).replace(
+    "__THEME_BACKGROUND__",
+    defaultColors.background,
+  ),
+);
+// Reuse the flame geometry, with the organizer's H266 identity.
+await writeFile(
+  `${output}/assets/firelink.svg`,
+  (await readFile(`${root}../assets/firelink.svg`, "utf8"))
+    .replaceAll("#B73D25", defaultColors.primary)
+    .replaceAll("#FFF", defaultColors["on-primary"]),
+);
 const vendor = `${root}node_modules/beercss/dist/cdn`;
 for (const name of await readdir(vendor)) {
   if (/^(beer\.min\.(css|js)|.*\.woff2)$/.test(name))

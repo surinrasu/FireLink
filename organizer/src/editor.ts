@@ -128,6 +128,42 @@ export function mountEditor(
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
     <footer class="editor-footer"><small id="save-status" role="status">${draft ? "草稿填写后自动保存" : "已发布任务的更改需要手动保存"}</small><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
+  const footer = form.querySelector<HTMLElement>(".editor-footer")!;
+  let focusFrame = 0;
+  const revealFocus = () => {
+    cancelAnimationFrame(focusFrame);
+    // Native focus scrolling does not account for the sticky action bar.
+    focusFrame = requestAnimationFrame(() => {
+      const focused = document.activeElement;
+      if (
+        disposed ||
+        !(focused instanceof HTMLElement) ||
+        !form.contains(focused) ||
+        footer.contains(focused)
+      )
+        return;
+      const viewport = window.visualViewport;
+      const top = (viewport?.offsetTop ?? 0) + 12;
+      const bottom =
+        Math.min(
+          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight),
+          footer.getBoundingClientRect().top,
+        ) - 12;
+      const bounds = (
+        focused.closest(".field") || focused
+      ).getBoundingClientRect();
+      const delta =
+        bounds.top < top || bounds.height > bottom - top
+          ? bounds.top - top
+          : Math.max(0, bounds.bottom - bottom);
+      if (delta) window.scrollBy({ top: delta, behavior: "instant" });
+    });
+  };
+  const footerResize = new ResizeObserver(revealFocus);
+  footerResize.observe(footer);
+  form.addEventListener("focusin", revealFocus);
+  window.addEventListener("resize", revealFocus);
+  window.visualViewport?.addEventListener("resize", revealFocus);
   const status = host.querySelector<HTMLElement>("#save-status")!;
   const blockHost = host.querySelector<HTMLElement>("#blocks")!;
   const undoButton = host.querySelector<HTMLButtonElement>("#undo-block")!;
@@ -737,6 +773,10 @@ export function mountEditor(
     },
     dispose: () => {
       disposed = true;
+      cancelAnimationFrame(focusFrame);
+      footerResize.disconnect();
+      window.removeEventListener("resize", revealFocus);
+      window.visualViewport?.removeEventListener("resize", revealFocus);
       clearTimeout(timer);
       clearTimeout(deadlineTimer);
       uploads.forEach((job) => job.controller.abort());

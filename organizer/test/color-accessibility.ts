@@ -75,7 +75,13 @@ async function selectedIndicator(
 }
 const scan = async (page: Page, name: string) => {
   const result = await new AxeBuilder({ page })
-    .withRules(["color-contrast", "link-in-text-block"])
+    .withRules([
+      "color-contrast",
+      "link-in-text-block",
+      "aria-input-field-name",
+      "aria-required-attr",
+      "aria-valid-attr-value",
+    ])
     .analyze();
   const compact = (items: typeof result.violations) =>
     items.map((item) => ({
@@ -214,6 +220,10 @@ try {
       .click();
     await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
     await scan(page, `${name}-dashboard`);
+    await page.screenshot({
+      path: `${output}/${name}-h266-dashboard.png`,
+      fullPage: true,
+    });
     const goto = async (route: string, heading: string) => {
       await page.goto(`${base}/#/${route}`);
       await page.getByRole("heading", { name: heading, exact: true }).waitFor();
@@ -403,6 +413,117 @@ try {
         path: `${output}/${name}-mobile-achromatopsia.png`,
         fullPage: true,
       });
+    }
+    if (!baseline) {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.getByRole("button", { name: "文字大小", exact: true }).click();
+      await page.getByRole("radio", { name: "标准字号", exact: true }).check();
+      await page.keyboard.press("Escape");
+      for (const hue of [25, 90, 155, 320, 266]) {
+        await goto("tasks", "任务管理");
+        await page.getByRole("button", { name: "主题", exact: true }).click();
+        await page.locator(`.hue-preset[data-hue="${hue}"]`).click();
+        assert.equal(
+          await page
+            .getByRole("slider", { name: "主题色相" })
+            .getAttribute("aria-valuenow"),
+          String(hue),
+        );
+        await scan(page, `${name}-h${hue}-picker`);
+        await page.screenshot({
+          path: `${output}/${name}-h${hue}-picker.png`,
+          fullPage: true,
+        });
+        await page.keyboard.press("Escape");
+        await scan(page, `${name}-h${hue}-tasks`);
+        await selectedIndicator(
+          page.locator('.sidebar .side-link[aria-current="page"]'),
+          "border",
+        );
+        await selectedIndicator(
+          page.locator('.filter-chips [aria-current="true"]'),
+          "underline",
+        );
+        await goto("applications", "报名审核");
+        await page.locator("#review-form").waitFor();
+        await scan(page, `${name}-h${hue}-review`);
+        await selectedIndicator(
+          page.locator('.application-row[aria-current="true"]'),
+          "border",
+        );
+        await goto("tasks/new", "新建任务");
+        await page
+          .getByLabel("报名截止", { exact: false })
+          .fill("2020-01-01T12:00");
+        await page.locator(".field-error").waitFor();
+        // Also exercise the reusable server-error surface without a failed write.
+        await page.locator("#task-form").evaluate((form) => {
+          const error = document.createElement("p");
+          error.className = "form-error";
+          error.setAttribute("role", "alert");
+          error.textContent = "提交失败，请重试。";
+          form.prepend(error);
+        });
+        await scan(page, `${name}-h${hue}-errors`);
+        await goto("tasks", "任务管理");
+        for (const type of [
+          "achromatopsia",
+          "deuteranopia",
+          "protanopia",
+          "tritanopia",
+        ] as const) {
+          await cdp.send("Emulation.setEmulatedVisionDeficiency", { type });
+          await page.screenshot({
+            path: `${output}/${name}-h${hue}-${type}.png`,
+            fullPage: true,
+          });
+        }
+        await cdp.send("Emulation.setEmulatedVisionDeficiency", {
+          type: "none",
+        });
+      }
+      // Dynamic CSS must not override the user's system palette, even on input.
+      await page.getByRole("button", { name: "主题", exact: true }).click();
+      await page.emulateMedia({ forcedColors: "active" });
+      await page.locator('.hue-preset[data-hue="155"]').click();
+      await scan(page, `${name}-custom-forced-colors`);
+      assert.ok(
+        await page
+          .locator(".page-actions a.button, .page-actions a.button > *")
+          .evaluateAll(
+            (elements) =>
+              elements.length > 0 &&
+              elements.every(
+                (element) =>
+                  getComputedStyle(element).forcedColorAdjust === "none",
+              ),
+          ),
+        "System-colored buttons must not acquire opaque browser text backplates",
+      );
+      assert.equal(
+        await page
+          .locator("body")
+          .evaluate((e) =>
+            getComputedStyle(e).getPropertyValue("--primary").trim(),
+          ),
+        "LinkText",
+      );
+      await page.screenshot({
+        path: `${output}/${name}-custom-forced-colors.png`,
+        fullPage: true,
+      });
+      await page.emulateMedia({ forcedColors: "none", contrast: "more" });
+      assert.equal(
+        await page.locator("body").evaluate((e) => {
+          const s = getComputedStyle(e);
+          return (
+            s.getPropertyValue("--outline").trim() ===
+            s.getPropertyValue("--on-surface").trim()
+          );
+        }),
+        true,
+      );
+      await scan(page, `${name}-custom-more-contrast`);
     }
     assert.deepEqual(errors, []);
     await context.close();
