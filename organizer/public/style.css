@@ -1,75 +1,8 @@
 :root {
   --font:
     "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
-  --primary: #a83924;
-  --on-primary: #fff;
-  --primary-container: #f8e1d8;
-  --on-primary-container: #762b1b;
-  --secondary: #48634c;
-  --secondary-container: #e0eadb;
-  --on-secondary-container: #263e29;
-  --surface: #fffcf9;
-  --surface-container-low: #fbf8f4;
-  --surface-container: #f2eee8;
-  --surface-container-high: #eae5dd;
-  --background: #fbf8f4;
-  --on-surface: #282e29;
-  --on-surface-variant: #646b63;
-  --outline: #7a8178;
-  --outline-variant: #dedfd5;
-  --error: #b3261e;
-  --success: #386342;
-  --success-bg: #e8f0e5;
-  --warning: #855e1d;
-  --warning-bg: #f8edce;
   --rail-width: 246px;
   font-size: 16px;
-  color-scheme: light;
-}
-body.light {
-  color-scheme: light;
-  --primary: #a83924;
-  --on-primary: #fff;
-  --primary-container: #f8e1d8;
-  --on-primary-container: #762b1b;
-  --secondary: #48634c;
-  --secondary-container: #e0eadb;
-  --on-secondary-container: #263e29;
-  --surface: #fffcf9;
-  --surface-container-low: #fbf8f4;
-  --surface-container: #f2eee8;
-  --surface-container-high: #eae5dd;
-  --background: #fbf8f4;
-  --on-background: #282e29;
-  --on-surface: #282e29;
-  --on-surface-variant: #646b63;
-  --outline: #7a8178;
-  --outline-variant: #dedfd5;
-  --error: #b3261e;
-}
-body.dark {
-  color-scheme: dark;
-  --primary: #ffb5a0;
-  --on-primary: #542312;
-  --primary-container: #503026;
-  --on-primary-container: #ffdbce;
-  --secondary: #b8cbb0;
-  --secondary-container: #32432f;
-  --on-secondary-container: #dce8d4;
-  --surface: #222621;
-  --surface-container-low: #191c19;
-  --surface-container: #2b3029;
-  --surface-container-high: #353b32;
-  --background: #191c19;
-  --on-surface: #e7e9de;
-  --on-surface-variant: #b1b9ab;
-  --outline: #87937f;
-  --outline-variant: #424a3d;
-  --error: #ffb4ab;
-  --success: #b6d4b3;
-  --success-bg: #2b3e2b;
-  --warning: #e4c780;
-  --warning-bg: #443d25;
 }
 * {
   box-sizing: border-box;
@@ -423,6 +356,8 @@ video {
   width: max-content;
   min-width: 180px;
   max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--outline-variant);
   border-radius: 16px;
@@ -463,6 +398,126 @@ video {
   height: 18px;
   flex-shrink: 0;
   margin: 0;
+}
+#preference-theme {
+  width: 290px;
+}
+.preference-popover .hue-picker {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--outline-variant);
+}
+.hue-wheel {
+  position: relative;
+  width: 156px;
+  height: 156px;
+  margin: 4px auto 12px;
+  border-radius: 50%;
+  background: var(--hue-gradient);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.hue-wheel::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.hue-wheel:focus-visible {
+  outline: 3px solid var(--on-surface);
+  outline-offset: 5px;
+}
+.hue-readout {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+.hue-readout > span {
+  color: var(--on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.hue-handle {
+  position: absolute;
+  left: calc(50% - 9px);
+  top: calc(50% - 9px);
+  width: 18px;
+  height: 18px;
+  border: 2px solid #111;
+  outline: 2px solid #fff;
+  border-radius: 50%;
+  background: #fff;
+  transform: rotate(var(--hue-angle)) translateY(-66px);
+  pointer-events: none;
+}
+.hue-help,
+.forced-colors-note {
+  color: var(--on-surface-variant);
+  font-size: 0.8rem;
+  text-align: center;
+}
+.hue-presets {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 10px;
+}
+.hue-presets > button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  margin: 0;
+  padding: 8px 2px;
+  min-width: 44px;
+  height: auto;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.hue-swatch {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--swatch);
+  color: #fff;
+}
+.hue-swatch > i {
+  visibility: hidden;
+  font-size: 18px;
+}
+.hue-preset[aria-pressed="true"] .hue-swatch {
+  outline: 2px solid var(--on-surface);
+  outline-offset: 3px;
+}
+.hue-preset[aria-pressed="true"] i {
+  visibility: visible;
+}
+.hue-reset {
+  width: 100%;
+  margin: 12px 0 0;
+}
+.forced-colors-note {
+  display: none;
+  margin-top: 12px;
+}
+::selection {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+input,
+textarea {
+  caret-color: var(--on-surface);
 }
 .avatar {
   background: var(--secondary-container);
@@ -596,6 +651,9 @@ video {
 }
 .dashboard-sort > button[aria-checked="true"] {
   color: var(--on-primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
 }
 .dashboard-sort > button:focus-visible {
   outline-offset: 0;
@@ -670,8 +728,8 @@ video {
   color: var(--warning);
 }
 .status-rejected {
-  background: var(--primary-container);
-  color: var(--on-primary-container);
+  background: var(--error-container);
+  color: var(--on-error-container);
 }
 .timeline {
   list-style: none;
@@ -978,7 +1036,7 @@ video {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: contain;
-  background: #191c19;
+  background: var(--media-backdrop);
 }
 #main .incident-grid > .panel {
   margin: 0;
@@ -1213,8 +1271,8 @@ video {
   margin: 14px 0;
   border: 1px solid var(--error);
   border-radius: 8px;
-  background: var(--primary-container);
-  color: var(--error);
+  background: var(--error-container);
+  color: var(--on-error-container);
   font-size: 0.88rem;
   white-space: pre-wrap;
 }
@@ -1263,6 +1321,10 @@ video {
   grid-template-columns: minmax(0, 1fr) 310px;
   gap: 24px;
   align-items: start;
+}
+.editor-layout > *,
+#task-form .form-grid > * {
+  min-width: 0;
 }
 .task-summary {
   margin-top: 20px;
@@ -1562,7 +1624,7 @@ dialog.wide {
   width: min(760px, calc(100vw - 32px));
 }
 dialog::backdrop {
-  background: #10181066;
+  background: #0006;
   backdrop-filter: blur(3px);
 }
 .dialog-header {
@@ -1755,7 +1817,7 @@ dialog::backdrop {
     gap: 18px;
   }
   .editor-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .editor-preview {
     display: none;
@@ -1893,7 +1955,17 @@ dialog::backdrop {
   .review-layout.has-selection .application-list {
     display: none;
   }
-  .content:has(.review-layout.has-selection) > .page-heading,
+  /* Retain the main heading without taking space from the mobile detail. */
+  .content:has(.review-layout.has-selection) > .page-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .content:has(.review-layout.has-selection) > .page-heading .page-actions,
   .content:has(.review-layout.has-selection) > .toolbar,
   .content:has(.review-layout.has-selection) > .filter-chips,
   .content:has(.review-layout.has-selection) > .pagination {
@@ -1910,6 +1982,14 @@ dialog::backdrop {
   }
   .review-heading {
     margin-top: 14px;
+  }
+  .review-actions {
+    flex-wrap: wrap;
+  }
+  .review-actions button {
+    flex: 1 0 auto;
+    margin: 0;
+    white-space: nowrap;
   }
   .mobile-only {
     display: inline-flex;
@@ -1954,7 +2034,7 @@ dialog::backdrop {
     border-color: currentColor;
   }
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .check-grid {
     gap: 4px;
@@ -2030,8 +2110,13 @@ dialog::backdrop {
     --primary-container: Canvas;
     --on-primary-container: CanvasText;
     --secondary: LinkText;
+    --on-secondary: Canvas;
     --secondary-container: Canvas;
     --on-secondary-container: CanvasText;
+    --tertiary: LinkText;
+    --on-tertiary: Canvas;
+    --tertiary-container: Canvas;
+    --on-tertiary-container: CanvasText;
     --surface: Canvas;
     --surface-container-low: Canvas;
     --surface-container: Canvas;
@@ -2040,13 +2125,50 @@ dialog::backdrop {
     --on-background: CanvasText;
     --on-surface: CanvasText;
     --on-surface-variant: CanvasText;
+    --surface-variant: Canvas;
+    --surface-container-lowest: Canvas;
+    --surface-container-highest: Canvas;
+    --surface-dim: Canvas;
+    --surface-bright: Canvas;
+    --inverse-surface: CanvasText;
+    --inverse-on-surface: Canvas;
+    --inverse-primary: LinkText;
     --outline: CanvasText;
     --outline-variant: CanvasText;
     --error: CanvasText;
+    --on-error: Canvas;
+    --error-container: Canvas;
+    --on-error-container: CanvasText;
     --success: CanvasText;
     --success-bg: Canvas;
     --warning: CanvasText;
     --warning-bg: Canvas;
+  }
+  /* These controls already use system colors. Prevent browser text backplates
+     from covering light labels on filled buttons. Descendants inherit this. */
+  button,
+  a.button {
+    forced-color-adjust: none;
+  }
+  .hue-wheel {
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  .hue-wheel::before {
+    border: 1px solid CanvasText;
+  }
+  .hue-handle {
+    background: CanvasText;
+    border-color: Canvas;
+    outline-color: CanvasText;
+  }
+  .hue-swatch {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  .forced-colors-note {
+    display: block;
   }
   .dashboard-sort > button[aria-checked="true"] {
     background: Highlight;

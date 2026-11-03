@@ -5,6 +5,7 @@ import type {
 } from "../../shared/organizer";
 import { h } from "./html";
 import { mapPreview } from "./maps";
+import { DEFAULT_HUE, normalizeHue, themeColors, themeCss } from "./theme";
 export { h } from "./html";
 export const icon = (name: string) => `<i aria-hidden="true">${h(name)}</i>`;
 export const stateLabels: Record<TaskState | ApplicationState, string> = {
@@ -182,20 +183,34 @@ export function renderBlocks(blocks: ContentBlock[]) {
     })
     .join("");
 }
+let memoryPreferences = { theme: "system", text: "normal", hue: DEFAULT_HUE };
+let preferenceStorageAvailable = true;
 export function preferences() {
+  if (!preferenceStorageAvailable) return memoryPreferences;
   try {
     return {
       theme: localStorage.getItem("firelink:theme") || "system",
       text: localStorage.getItem("firelink:text") || "normal",
+      hue: normalizeHue(localStorage.getItem("firelink:hue")),
     };
   } catch {
-    return { theme: "system", text: "normal" };
+    preferenceStorageAvailable = false;
+    return memoryPreferences;
   }
 }
+let appliedHue: number | undefined;
 export function applyPreferences(
   theme = preferences().theme,
   text = preferences().text,
+  hue = preferences().hue,
 ) {
+  hue = normalizeHue(hue);
+  memoryPreferences = { theme, text, hue };
+  if (hue !== appliedHue) {
+    document.querySelector<HTMLStyleElement>("#theme-colors")!.textContent =
+      themeCss(hue);
+    appliedHue = hue;
+  }
   const dark =
     theme === "dark" ||
     (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -204,11 +219,13 @@ export function applyPreferences(
   document.documentElement.classList.toggle("large-text", text === "large");
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#191c19" : "#fbf8f4");
+    ?.setAttribute("content", themeColors(hue, dark).background);
   try {
     localStorage.setItem("firelink:theme", theme);
     localStorage.setItem("firelink:text", text);
+    localStorage.setItem("firelink:hue", String(hue));
   } catch {
     /* Private browsing can disallow storage. */
+    preferenceStorageAvailable = false;
   }
 }

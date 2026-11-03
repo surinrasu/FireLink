@@ -10,6 +10,7 @@ import {
   validCoordinates,
 } from "../../shared/maps";
 import { h } from "./html";
+import { MAP_INK } from "./theme";
 export { validCoordinates } from "../../shared/maps";
 
 export function mapPreview(
@@ -99,22 +100,22 @@ class LocationMap extends HTMLElement {
     if (this.map || this.observer) return;
     const editable = this.hasAttribute("editable");
     this.root.innerHTML = `<link rel="stylesheet" href="/mng-dash/assets/leaflet.css"><style>
-      :host{display:block;min-width:0;margin:16px 0;color:var(--on-surface,#242722);font:inherit}
-      *{box-sizing:border-box}[hidden]{display:none!important}.frame{border:1px solid var(--outline-variant,#d5d9ce);border-radius:16px;overflow:hidden;background:var(--surface,#fbf8f4)}
+      :host{display:block;min-width:0;margin:16px 0;color:var(--on-surface,#1a1b20);font:inherit}
+      *{box-sizing:border-box}[hidden]{display:none!important}.frame{border:1px solid var(--outline-variant,#c4c6d0);border-radius:16px;overflow:hidden;background:var(--surface,#f9f9ff)}
       .heading{display:flex;align-items:center;gap:12px;padding:12px 14px;font-size:.82rem;line-height:1.5}.label{flex:1;overflow-wrap:anywhere;font-weight:600}
-      a{color:var(--primary,#93462e);text-underline-offset:3px}.external{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center}
-      .canvas{height:240px;isolation:isolate;background:#e7e9df;color:#232923;font:14px/1.5 system-ui,sans-serif}
-      :host([editable]) .canvas{height:300px;cursor:crosshair}.status,.hint{padding:9px 14px;font-size:.78rem;line-height:1.6;margin:0}.status:empty{display:none}.hint{color:var(--on-surface-variant,#646b63)}
+      a{color:var(--primary,#445e91);text-underline-offset:3px}.external{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center}
+      .canvas{height:240px;isolation:isolate;background:var(--map-background,#e9e7ec);color:#1a1b20;font:14px/1.5 system-ui,sans-serif}
+      :host([editable]) .canvas{height:300px;cursor:crosshair}.status,.hint{padding:9px 14px;font-size:.78rem;line-height:1.6;margin:0}.status:empty{display:none}.hint{color:var(--on-surface-variant,#44474f)}
       .tools,.coordinate-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px}.tools button{flex:1}.tools [data-action=finish]{flex-basis:100%}
-      button,input{font:inherit;font-size:.82rem;color:inherit}button{min-height:44px;border:1px solid var(--outline-variant,#d5d9ce);border-radius:12px;padding:8px 12px;background:transparent;cursor:pointer}
-      button[aria-pressed=true]{background:var(--primary-container,#f8e1d8);color:var(--on-primary-container,#762b1b);border-color:currentColor;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;font-weight:650}button:disabled{opacity:.5;cursor:not-allowed}
-      button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--primary,#a83924);outline-offset:2px}
+      button,input{font:inherit;font-size:.82rem;color:inherit}button{min-height:44px;border:1px solid var(--outline-variant,#c4c6d0);border-radius:12px;padding:8px 12px;background:transparent;cursor:pointer}
+      button[aria-pressed=true]{background:var(--primary-container,#d8e2ff);color:var(--on-primary-container,#2b4678);border-color:currentColor;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;font-weight:650}button:disabled{opacity:.5;cursor:not-allowed}
+      button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--primary,#445e91);outline-offset:2px}
       .annotation-list{padding:0 14px}.annotation-row{display:flex;gap:8px;margin-top:8px}.annotation-row>button:first-child{flex:1;text-align:left}.vertices{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.vertices button{min-width:44px}.selection{margin:12px 14px 0;font-size:.8rem}.selection button{margin-top:8px}
-      .precise{margin:12px 14px}.precise summary{min-height:44px;display:list-item;padding:10px 0;cursor:pointer;font-size:.82rem}.coordinates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.coordinates label{font-size:.8rem;min-width:0}.coordinates input{display:block;width:100%;min-height:44px;margin-top:6px;border:1px solid var(--outline,#7a8178);border-radius:8px;padding:8px;background:var(--surface,#fbf8f4)}.coordinate-actions{padding:0}.coordinate-actions button{flex:1}
-      .leaflet-control-zoom a,.leaflet-touch .leaflet-bar a{width:44px;height:44px;line-height:44px;color:#263026;background:#fff}.leaflet-control-attribution{font:10px/1.5 system-ui,sans-serif;max-width:100%;color:#333}.leaflet-control-attribution a{color:#265a52}
-      .pin{display:grid;place-items:center;width:24px;height:24px;background:#762b1b;color:white;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px #0005;font:650 11px/1 system-ui,sans-serif}.pin>span{transform:rotate(45deg)}
-      .vertex{display:grid;place-items:center;width:24px;height:24px;background:#762b1b;color:white;border:2px solid white;border-radius:50%;font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 6px #0003}
-      .location-marker:is([data-selected=true],:focus-visible)::after{content:"";position:absolute;inset:-6px;border:2px solid #17231a;outline:2px solid white;border-radius:50%;pointer-events:none}
+      .precise{margin:12px 14px}.precise summary{min-height:44px;display:list-item;padding:10px 0;cursor:pointer;font-size:.82rem}.coordinates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.coordinates label{font-size:.8rem;min-width:0}.coordinates input{display:block;width:100%;min-height:44px;margin-top:6px;border:1px solid var(--outline,#75777f);border-radius:8px;padding:8px;background:var(--surface,#f9f9ff)}.coordinate-actions{padding:0}.coordinate-actions button{flex:1}
+      .leaflet-control-zoom a,.leaflet-touch .leaflet-bar a{width:44px;height:44px;line-height:44px;color:#1a1b20;background:#fff}.leaflet-control-attribution{font:10px/1.5 system-ui,sans-serif;max-width:100%;color:#333}.leaflet-control-attribution a{color:#0f448e}
+      .pin{display:grid;place-items:center;width:24px;height:24px;background:var(--map-ink,#0f448e);color:white;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px #0005;font:650 11px/1 system-ui,sans-serif}.pin>span{transform:rotate(45deg)}
+      .vertex{display:grid;place-items:center;width:24px;height:24px;background:var(--map-ink,#0f448e);color:white;border:2px solid white;border-radius:50%;font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 6px #0003}
+      .location-marker:is([data-selected=true],:focus-visible)::after{content:"";position:absolute;inset:-6px;border:2px solid #1a1b20;outline:2px solid white;border-radius:50%;pointer-events:none}
       @media(max-width:360px){.coordinates{grid-template-columns:1fr}.tools,.coordinate-actions{gap:6px}.tools button{padding-inline:8px}}
       @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
       @media(forced-colors:active){.pin,.vertex{background:Highlight;color:HighlightText;border-color:Canvas;forced-color-adjust:none}.frame{border-color:CanvasText}button[aria-pressed=true]{border:3px double Highlight}.location-marker:is([data-selected=true],:focus-visible)::after{border-color:CanvasText;outline-color:Canvas}.location-outline{stroke:Canvas;forced-color-adjust:none}.location-path,.location-area{stroke:CanvasText;forced-color-adjust:none}}
@@ -462,7 +463,7 @@ class LocationMap extends HTMLElement {
           className: "location-outline",
         }).addTo(this.layers!);
         const options = {
-          color: "#762b1b",
+          color: MAP_INK,
           weight: 3,
           fillOpacity: 0.16,
           dashArray: !completeMapAnnotation(mark)

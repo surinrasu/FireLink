@@ -34,6 +34,7 @@ import {
   vehicleLabels,
 } from "./ui";
 import { mountEditor, type EditorHandle } from "./editor";
+import { bindHuePicker, huePicker } from "./hue-picker";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
 const routeStatus = document.createElement("div");
@@ -190,7 +191,11 @@ function dashboardTasks() {
   });
 }
 function dashboardTaskRow(task: OrganizerTask) {
-  return `<div class="task-row"><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
+  const deadline =
+    task.deadline && !Number.isNaN(Date.parse(task.deadline))
+      ? `<time datetime="${h(task.deadline)}">${formatDate(task.deadline)}</time> 截止`
+      : "未设置截止时间";
+  return `<div class="task-row"><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p><p class="task-deadline">${deadline}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
 }
 function attachDashboardTasks() {
   const list = root.querySelector<HTMLElement>("#dashboard-tasks")!;
@@ -329,7 +334,7 @@ function tasksPage(params: URLSearchParams) {
   );
   return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active" aria-current="true">72 小时内截止</a>' : ""}</div>
-  <div class="toolbar task-toolbar"><div class="field border prefix search">${icon("search")}<input id="task-search" type="search" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
+  <div class="toolbar task-toolbar"><div class="field border prefix search">${icon("search")}<input id="task-search" type="search" value="${h(params.get("q") || "")}" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
   <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
@@ -378,6 +383,8 @@ function attachTaskSearch() {
         const route = new URL(link.hash.slice(1), location.origin);
         if (filter.value) route.searchParams.set("incident", filter.value);
         else route.searchParams.delete("incident");
+        if (search.value) route.searchParams.set("q", search.value);
+        else route.searchParams.delete("q");
         link.setAttribute("href", `#${route.pathname}${route.search}`);
         const count = link.querySelector("span");
         const state = route.searchParams.get("state");
@@ -388,19 +395,24 @@ function attachTaskSearch() {
           );
       });
   };
-  search.addEventListener("input", apply);
-  filter.addEventListener("change", () => {
+  const updateFilters = () => {
     const route = routeInfo();
     if (filter.value) route.searchParams.set("incident", filter.value);
     else route.searchParams.delete("incident");
+    if (search.value) route.searchParams.set("q", search.value);
+    else route.searchParams.delete("q");
     history.replaceState(null, "", `#${route.pathname}${route.search}`);
     apply();
-  });
+  };
+  search.addEventListener("input", updateFilters);
+  filter.addEventListener("change", updateFilters);
   root.querySelector("#clear-task-filters")?.addEventListener("click", () => {
     search.value = "";
     filter.value = "";
-    if (routeInfo().search) location.hash = "/tasks";
+    const params = routeInfo().searchParams;
+    if (params.has("state") || params.has("ending")) location.hash = "/tasks";
     else {
+      history.replaceState(null, "", "#/tasks");
       apply();
       search.focus();
     }
@@ -1021,7 +1033,7 @@ function preferenceButtons() {
   )
     .map(
       ([key, label, symbol, options]) =>
-        `<button class="transparent circle" type="button" popovertarget="preference-${key}" aria-label="${label}" title="${label}">${icon(symbol)}</button><div class="preference-popover" id="preference-${key}" popover><fieldset><legend>${label}</legend>${options.map(([value, name]) => `<label class="preference-choice"><input type="radio" name="preference-${key}" data-preference="${key}" value="${value}" ${settings[key] === value ? "checked" : ""}><span>${name}</span></label>`).join("")}</fieldset></div>`,
+        `<button class="transparent circle" type="button" popovertarget="preference-${key}" aria-label="${label}" title="${label}">${icon(symbol)}</button><div class="preference-popover" id="preference-${key}" popover><fieldset><legend>${label}</legend>${options.map(([value, name]) => `<label class="preference-choice"><input type="radio" name="preference-${key}" data-preference="${key}" value="${value}" ${settings[key] === value ? "checked" : ""}><span>${name}</span></label>`).join("")}</fieldset>${key === "theme" ? huePicker(settings.hue) : ""}</div>`,
     )
     .join("");
 }
@@ -1070,6 +1082,10 @@ root.addEventListener("change", (event) => {
   );
   const popover = input.closest<HTMLElement>(".preference-popover")!;
   positionPreference(popover);
+});
+bindHuePicker(root, (hue) => {
+  const settings = preferences();
+  applyPreferences(settings.theme, settings.text, hue);
 });
 function focusCurrentMember() {
   const member = root.querySelector<HTMLElement>("#current-member");
