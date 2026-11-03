@@ -192,3 +192,6 @@
 
 "refresh" = "刷新";
 "sign_in_passkey" = "使用通行密钥登录";
+
+"select_opportunity" = "选择志愿机会";
+"select_opportunity_hint" = "从列表中选择事件或任务，查看详细信息。";

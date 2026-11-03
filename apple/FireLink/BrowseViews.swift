@@ -4,110 +4,181 @@ import SwiftUI
 
 struct HomeView: View {
   @EnvironmentObject var model: AppModel
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @ScaledMetric(relativeTo: .body) private var minimumColumnsWidth = 760
+  let navigation: AppNavigation
   @State private var showNotifications = false
   @State private var showApplications = false
-  @State private var openingNotice = false
-  @AppStorage("nearbyEnabled") var nearbyEnabled = true
-  var unread: [Notice] { Array(model.notifications.filter { $0.readAt == nil }.prefix(2)) }
-  var nearby: Incident? {
+  @AppStorage("nearbyEnabled") private var nearbyEnabled = true
+
+  private var nearby: Incident? {
     guard nearbyEnabled, let region = model.profile?.region, !region.isEmpty else { return nil }
     return model.incidents.first { incident in
       incident.region.split(separator: " ").contains { $0.count >= 2 && region.contains($0) }
     }
   }
+
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
-        if !unread.isEmpty {
-          VStack(spacing: 0) {
-            ForEach(unread) { notice in
-              if notice.id != unread.first?.id { Divider().padding(.horizontal, 14) }
-              Button {
-                openingNotice = true
-                Task {
-                  defer { openingNotice = false }
-                  do {
-                    try await model.markNotificationRead(notice.id)
-                    if notice.applicationId != nil {
-                      showApplications = true
-                    } else {
-                      showNotifications = true
-                    }
-                  } catch { model.error = error.localizedDescription }
-                }
-              } label: {
-                HStack(spacing: 8) {
-                  Image(systemName: "bell.badge").foregroundStyle(.tint)
-                  (Text(notice.title).bold() + Text("  " + notice.body).foregroundColor(.secondary))
-                    .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                  Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.font(.subheadline).padding(.horizontal, 14).padding(.vertical, 12)
-                  .frame(minHeight: 44)
-              }
-              .buttonStyle(.plain).disabled(openingNotice)
-              .accessibilityLabel(L10n.text("unread_notice", notice.title, notice.body))
-              .accessibilityIdentifier("unread-notice-" + notice.id)
+    GeometryReader { geometry in
+      let contentWidth = min(1200, max(0, geometry.size.width - 48))
+      let columns = contentWidth >= minimumColumnsWidth && !dynamicTypeSize.isAccessibilitySize
+      let layout =
+        columns
+        ? AnyLayout(HStackLayout(alignment: .top, spacing: 32))
+        : AnyLayout(VStackLayout(alignment: .leading, spacing: 32))
+      ScrollView {
+        VStack(alignment: .leading, spacing: 24) {
+          HomeNotices(showNotifications: $showNotifications, showApplications: $showApplications)
+          layout {
+            if let incident = nearby ?? model.incidents.first {
+              FeaturedOpportunity(
+                incident: incident, isNearby: nearby != nil, navigation: navigation
+              )
+              .frame(maxWidth: columns ? contentWidth * 0.58 : .infinity, alignment: .leading)
             }
-          }.background(.tint.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+            VolunteerGuides(articles: model.articles)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          if model.incidents.isEmpty && !model.loading {
+            ContentUnavailableView(
+              L10n.text("no_content"), systemImage: "wifi",
+              description: Text(L10n.text("refresh_later")))
+          }
         }
-        if let incident = nearby ?? model.incidents.first {
-          Text(nearby == nil ? L10n.text("recruiting") : L10n.text("nearby_opportunities")).font(
-            .title2.bold())
-          NavigationLink {
-            IncidentView(incident: incident)
-          } label: {
-            IncidentCard(incident: incident)
-          }.buttonStyle(.plain).accessibilityIdentifier("incident-" + incident.id)
-        }
-        Text(L10n.text("guides")).font(.title2.bold())
-        ForEach(model.articles) { article in
-          NavigationLink {
-            ScrollView { ContentBlocks(blocks: article.blocks).padding().readableContent() }
-              .navigationTitle(
-                article.title
-              ).inlineNavigationTitle()
-          } label: {
-            HStack(alignment: .top, spacing: 16) {
-              Image(systemName: "book.closed").font(.title2).foregroundStyle(.tint).frame(
-                width: 48, height: 60
-              ).background(.tint.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-              VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.text("article_read_time", article.category, article.minutes)).font(
-                  .caption
-                ).foregroundStyle(
-                  .secondary)
-                Text(article.title).font(.headline)
-                Text(article.summary).font(.subheadline).foregroundStyle(.secondary)
-              }
-              Spacer()
-            }.padding(.vertical, 6)
-          }.buttonStyle(.plain)
-        }
-        if model.incidents.isEmpty && !model.loading {
-          ContentUnavailableView(
-            L10n.text("no_content"), systemImage: "wifi",
-            description: Text(L10n.text("refresh_later")))
-        }
-      }.padding(20).readableContent()
-    }.navigationTitle("FireLink").refreshable { await model.load() }
-      .navigationDestination(isPresented: $showNotifications) { NotificationHistoryView() }
-      .navigationDestination(isPresented: $showApplications) { ApplicationHistoryView() }
-      .overlay { if model.loading && model.incidents.isEmpty { ProgressView() } }
+        .padding(24)
+        .frame(maxWidth: 1248, alignment: .leading)
+        .frame(maxWidth: .infinity)
+      }
+      .refreshable { await model.load() }
+    }
+    .navigationTitle("FireLink")
+    .navigationDestination(isPresented: $showNotifications) { NotificationHistoryView() }
+    .navigationDestination(isPresented: $showApplications) { ApplicationHistoryView() }
+    .overlay { if model.loading && model.incidents.isEmpty { ProgressView() } }
   }
 }
+
+private struct HomeNotices: View {
+  @EnvironmentObject var model: AppModel
+  @Binding var showNotifications: Bool
+  @Binding var showApplications: Bool
+  @State private var opening = false
+
+  var body: some View {
+    let unread = Array(model.notifications.filter { $0.readAt == nil }.prefix(2))
+    if !unread.isEmpty {
+      VStack(spacing: 0) {
+        ForEach(unread) { notice in
+          if notice.id != unread.first?.id { Divider().padding(.horizontal, 14) }
+          Button {
+            opening = true
+            Task {
+              defer { opening = false }
+              do {
+                try await model.markNotificationRead(notice.id)
+                if notice.applicationId != nil {
+                  showApplications = true
+                } else {
+                  showNotifications = true
+                }
+              } catch { model.error = error.localizedDescription }
+            }
+          } label: {
+            HStack(alignment: .top, spacing: 12) {
+              Image(systemName: "bell.badge").foregroundStyle(.tint)
+              VStack(alignment: .leading, spacing: 4) {
+                Text(notice.title).fontWeight(.semibold)
+                Text(notice.body).foregroundStyle(.secondary)
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+              Image(systemName: "chevron.right").foregroundStyle(.secondary)
+            }
+            .font(.subheadline).padding(14).frame(minHeight: 44)
+          }
+          .buttonStyle(.plain).disabled(opening)
+          .accessibilityLabel(L10n.text("unread_notice", notice.title, notice.body))
+          .accessibilityIdentifier("unread-notice-" + notice.id)
+        }
+      }
+      .background(.tint.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+    }
+  }
+}
+
+private struct FeaturedOpportunity: View {
+  let incident: Incident
+  let isNearby: Bool
+  let navigation: AppNavigation
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(L10n.text(isNearby ? "nearby_opportunities" : "recruiting")).font(.title2.bold())
+      Button {
+        navigation.openIncident(incident.id)
+      } label: {
+        IncidentCard(incident: incident)
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("incident-" + incident.id)
+    }
+  }
+}
+
+private struct VolunteerGuides: View {
+  let articles: [Article]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(L10n.text("guides")).font(.title2.bold())
+      ForEach(articles) { article in
+        NavigationLink {
+          ScrollView { ContentBlocks(blocks: article.blocks).padding(24).readableContent() }
+            .navigationTitle(article.title).inlineNavigationTitle()
+        } label: {
+          HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "book.closed").font(.title2).foregroundStyle(.tint)
+              .frame(width: 40, height: 48)
+            VStack(alignment: .leading, spacing: 8) {
+              Text(article.title).font(.headline)
+              Text(article.summary).font(.subheadline).foregroundStyle(.secondary)
+              Text(L10n.text("article_read_time", article.category, article.minutes))
+                .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .padding(.vertical, 12)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        if article.id != articles.last?.id { Divider() }
+      }
+    }
+  }
+}
+
 struct MapPreview: View {
   let latitude: Double
   let longitude: Double
-  var height: CGFloat = 150
+  var height: CGFloat? = nil
   var body: some View {
     let point = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-    Map(
-      initialPosition: .region(
-        MKCoordinateRegion(
-          center: point, span: MKCoordinateSpan(latitudeDelta: 0.035, longitudeDelta: 0.035)))
-    ) { Marker(L10n.text("location"), coordinate: point).tint(.orange) }
-    .mapStyle(.standard(elevation: .flat)).frame(height: height).allowsHitTesting(false)
-    .accessibilityLabel(L10n.text("coordinates", latitude, longitude))
+    Color.clear
+      .aspectRatio(1.9, contentMode: .fit)
+      .frame(maxWidth: .infinity, maxHeight: height ?? 300)
+      .frame(height: height)
+      .overlay {
+        Map(
+          initialPosition: .region(
+            MKCoordinateRegion(
+              center: point,
+              span: MKCoordinateSpan(latitudeDelta: 0.035, longitudeDelta: 0.035))),
+          interactionModes: []
+        ) { Marker(L10n.text("location"), coordinate: point).tint(.orange) }
+        .mapStyle(.standard(elevation: .flat))
+        .allowsHitTesting(false)
+        .accessibilityLabel(L10n.text("coordinates", latitude, longitude))
+      }
+      .clipped()
   }
 }
 struct AnnotatedMapPreview: View {
@@ -147,25 +218,24 @@ struct IncidentCard: View {
     VStack(alignment: .leading, spacing: 0) {
       MapPreview(latitude: incident.latitude, longitude: incident.longitude)
       VStack(alignment: .leading, spacing: 12) {
-        HStack {
-          Text(L10n.text("volunteer_opportunities")).foregroundStyle(.tint)
-          Spacer()
-        }.font(.caption.bold())
-        Text(incident.title).font(.headline)
+        HStack(spacing: 12) {
+          Text(incident.title).font(.title3.bold())
+          Spacer(minLength: 0)
+          Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+        }
         Text(incident.region).font(.caption).foregroundStyle(.secondary)
         ForEach(incident.tasks.prefix(3)) { task in
           HStack {
             Circle().fill(.tint).frame(width: 5, height: 5)
             Text(task.title).font(.subheadline)
             Spacer()
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
           }
         }
         Text(L10n.text("updated_at", displayDate(incident.updatedAt))).font(.caption2)
           .foregroundStyle(.secondary)
       }.padding(16)
-    }.background(PlatformSupport.contentBackground, in: RoundedRectangle(cornerRadius: 20))
-      .clipShape(RoundedRectangle(cornerRadius: 20))
+    }.contentSurface(cornerRadius: 16)
+      .clipShape(RoundedRectangle(cornerRadius: 16))
   }
 }
 func displayDate(_ value: String) -> String {
@@ -181,145 +251,62 @@ func displayDate(_ value: String) -> String {
   formatter.timeStyle = .short
   return formatter.string(from: date)
 }
-struct IncidentsView: View {
-  @EnvironmentObject var model: AppModel
-  @State private var sort: IncidentSort = .updated
-  var body: some View {
-    ScrollView {
-      LazyVStack(alignment: .leading, spacing: 20) {
-        Menu {
-          Picker(L10n.text("sort_by"), selection: $sort) {
-            ForEach(IncidentSort.allCases) { option in Text(option.label).tag(option) }
-          }
-        } label: {
-          Label(sort.label, systemImage: "arrow.up.arrow.down")
-        }.accessibilityIdentifier("incident-sort")
-        ForEach(sort.apply(model.incidents)) { incident in
-          NavigationLink {
-            IncidentView(incident: incident)
-          } label: {
-            IncidentCard(incident: incident)
-          }.buttonStyle(.plain).accessibilityIdentifier("incident-" + incident.id)
-        }
-        if model.incidents.isEmpty {
-          ContentUnavailableView(
-            L10n.text("no_incidents"), systemImage: "checkmark.shield",
-            description: Text(L10n.text("no_incidents_hint")))
-        }
-      }.padding().readableContent()
-    }.background(PlatformSupport.groupedBackground).navigationTitle(L10n.text("incidents"))
-      .refreshable {
-        await model.load()
-      }
-  }
-}
 struct IncidentView: View {
   let incident: Incident
+  let navigation: BrowseNavigation
+  let selectsInPlace: Bool
+
   var body: some View {
-    List {
-      Section {
-        MapPreview(latitude: incident.latitude, longitude: incident.longitude).listRowInsets(
-          EdgeInsets())
-        Text(incident.region)
-      }
-      Section(L10n.text("tasks")) {
-        ForEach(incident.tasks) { task in
-          NavigationLink {
-            TaskDetailView(id: task.id)
-          } label: {
-            VStack(alignment: .leading, spacing: 8) {
-              Text(task.title).font(.headline)
-              Text(task.summary).font(.subheadline).foregroundStyle(.secondary)
-              Text(
-                task.status == "open" ? L10n.text("accepting_applications") : L10n.text("closed")
-              ).font(.caption).foregroundStyle(.tint)
-            }.padding(.vertical, 8)
-          }.accessibilityIdentifier("task-" + task.id)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        Text(incident.title).font(.title.bold())
+        VStack(alignment: .leading, spacing: 12) {
+          MapPreview(latitude: incident.latitude, longitude: incident.longitude)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+          Label(incident.region, systemImage: "mappin.and.ellipse")
+            .font(.subheadline).foregroundStyle(.secondary)
         }
-      }
-    }.navigationTitle(incident.title).inlineNavigationTitle()
-  }
-}
-struct TaskDetailView: View {
-  let id: String
-  @EnvironmentObject var model: AppModel
-  @State var task: RescueTask?
-  @State var applying = false
-  @State var showContacts = false
-  @State var loadError: String?
-  var body: some View {
-    Group {
-      if let task {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 22) {
-            HStack {
-              Image(systemName: task.organizer.verified ? "checkmark.seal.fill" : "building.2")
-                .foregroundStyle(.teal)
-              VStack(alignment: .leading, spacing: 4) {
-                Text(task.organizer.name).font(.headline)
-                Text(
-                  task.organizer.verified
-                    ? L10n.text("verified_organizer") : L10n.text("unverified")
-                ).font(.caption)
-                  .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+          Text(L10n.text("tasks")).font(.title2.bold())
+          ForEach(incident.tasks) { task in
+            let destination = BrowseDestination.task(id: task.id, incidentID: incident.id)
+            Group {
+              if selectsInPlace {
+                Button {
+                  navigation.selection = destination
+                } label: {
+                  IncidentTaskRow(task: task)
+                }
+              } else {
+                NavigationLink(value: destination) { IncidentTaskRow(task: task) }
               }
             }
-            Divider()
-            Text(task.title).font(.largeTitle.bold())
-            Text(task.summary).foregroundStyle(.secondary)
-            ContentBlocks(blocks: task.blocks)
-          }.padding(20).readableContent()
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("task-" + task.id)
+            if task.id != incident.tasks.last?.id { Divider() }
+          }
         }
-        .safeAreaInset(edge: .bottom) {
-          HStack {
-            if !task.organizer.contacts.isEmpty {
-              Button {
-                showContacts = true
-              } label: {
-                Label(L10n.text("contact_organizer"), systemImage: "bubble.left").font(.subheadline)
-              }
-            }
-            Spacer()
-            Button(
-              model.applications.contains(where: { $0.taskId == id })
-                ? L10n.text("applied_view_history") : L10n.text("apply")
-            ) {
-              model.authenticated { applying = true }
-            }.buttonStyle(.borderedProminent).disabled(task.status != "open")
-          }.padding().background(.bar)
-        }
-        .sheet(isPresented: $showContacts) {
-          NavigationStack { OrganizerContactsView(organizer: task.organizer) }.volunteerSheet()
-        }
-        .sheet(isPresented: $applying) {
-          NavigationStack {
-            if model.applications.contains(where: { $0.taskId == id }) {
-              ApplicationHistoryView()
-            } else {
-              ApplyView(task: task)
-            }
-          }.volunteerSheet()
-        }
-      } else if let loadError {
-        ContentUnavailableView {
-          Label(L10n.text("load_failed"), systemImage: "wifi.exclamationmark")
-        } description: {
-          Text(loadError)
-        } actions: {
-          Button(L10n.text("retry")) { Task { await load() } }
-        }
-      } else {
-        ProgressView()
       }
-    }.inlineNavigationTitle().task { await load() }
-  }
-  func load() async {
-    loadError = nil
-    do { task = try await model.request("/v1/tasks/\(id)") } catch {
-      loadError = error.localizedDescription
+      .padding(24)
+      .readableContent()
     }
+    .navigationTitle(incident.title).inlineNavigationTitle()
   }
 }
+
+private struct IncidentTaskRow: View {
+  let task: TaskSummary
+  var body: some View {
+    HStack(spacing: 16) {
+      TaskSummaryRow(task: task)
+      Spacer(minLength: 0)
+      Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+  }
+}
+
 struct ContentBlocks: View {
   let blocks: [ContentBlock]
   var body: some View {

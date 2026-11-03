@@ -70,6 +70,7 @@ struct NotificationHistoryView: View {
         .refreshable { await reload() }
       }
     }
+    .readableContent()
     .navigationTitle(L10n.text("notification_history")).inlineNavigationTitle()
     .navigationDestination(isPresented: $showApplications) { ApplicationHistoryView() }
     .task(id: model.profile?.id) { if model.profile != nil { await reload() } }

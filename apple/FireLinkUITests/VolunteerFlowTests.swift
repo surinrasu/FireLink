@@ -10,7 +10,13 @@ final class VolunteerFlowTests: XCTestCase {
     for tab in ["首页", "状况"] {
       app.tabBars.buttons[tab].tap()
       for attempt in 1...3 {
-        let scroll = app.scrollViews.firstMatch
+        // SwiftUI List exposes a collection/table rather than a ScrollView.
+        let scroll =
+          app.scrollViews.firstMatch.exists
+          ? app.scrollViews.firstMatch
+          : app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch : app.tables.firstMatch
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
         let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
         let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
         start.press(forDuration: 0.1, thenDragTo: end)
