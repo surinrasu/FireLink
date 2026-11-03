@@ -1,0 +1,59 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+[tools]
+xcodegen = "2.45.3"
+
+[tasks.generate]
+run = "xcodegen generate"
+[tasks.build]
+description = "构建 iPhone / iPad 模拟器客户端"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLink -sdk iphonesimulator -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build"
+[tasks."build:mac"]
+description = "构建原生 macOS 客户端"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkMac -destination 'platform=macOS' -configuration Debug -derivedDataPath build/macos CODE_SIGN_IDENTITY=- build"
+[tasks."build:vision"]
+description = "构建原生 visionOS 模拟器客户端"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -target FireLinkVision -sdk xrsimulator -configuration Debug SYMROOT=\"$PWD/build/visionos/Build/Products\" OBJROOT=\"$PWD/build/visionos/Build/Intermediates.noindex\" CODE_SIGNING_ALLOWED=NO build"
+[tasks."build:all"]
+description = "构建 iPhone、iPad、Mac 和 Apple Vision Pro 客户端"
+depends = ["build", "build:mac", "build:vision"]
+[tasks.check]
+description = "iPhone 与 Mac 共享测试，以及 Vision Pro 构建"
+depends = ["test", "test:mac", "build:vision"]
+[tasks.test]
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLink -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath build CODE_SIGNING_ALLOWED=NO test"
+[tasks."test:mac"]
+description = "在 macOS 运行共享业务与本地化测试"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkMac -destination 'platform=macOS' -derivedDataPath build/macos CODE_SIGN_IDENTITY=- test"
+[tasks."test:vision"]
+description = "在已安装的 Apple Vision Pro 模拟器运行共享测试"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkVision -destination 'platform=visionOS Simulator,name=Apple Vision Pro' -derivedDataPath build/visionos CODE_SIGNING_ALLOWED=NO test"
+[tasks.doctor]
+run = "xcodebuild -version"
+
+[tasks."test:ui"]
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkUI -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath build CODE_SIGNING_ALLOWED=NO -skip-testing:FireLinkUITests/CloudDemoTests test"
+
+[tasks."test:demo"]
+description = "验证云端演示登录和退出（会创建独立演示空间）"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkUI -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath build CODE_SIGNING_ALLOWED=NO -only-testing:FireLinkUITests/CloudDemoTests test"
+
+[tasks."test:ipad"]
+description = "验证 iPad 侧边栏、联系人和登录弹窗（需要本地后端）"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkUI -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M5)' -derivedDataPath build CODE_SIGNING_ALLOWED=NO -only-testing:FireLinkUITests/AppleNavigationTests test"
+
+[tasks."test:mac:ui"]
+description = "验证 Mac 侧边栏、剪贴板和登录弹窗（需要本地后端）"
+depends = ["generate"]
+run = "xcodebuild -project FireLink.xcodeproj -scheme FireLinkMacUI -destination 'platform=macOS' -derivedDataPath build/macos CODE_SIGN_IDENTITY=- test"
+
+[tasks.format]
+run = "xcrun swift-format format -i -r FireLink FireLinkTests FireLinkUITests AppleUITests"

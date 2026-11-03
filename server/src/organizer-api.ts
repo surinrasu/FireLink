@@ -431,9 +431,9 @@ organizerAPI.put("/tasks/:id", async (c) => {
     deny(409, "已有报名，资料授权要求已锁定。请复制任务设置新的授权要求。");
   if (
     old.publication_status === "published" &&
-    (!input.summary || !input.location || !input.startsAt || !input.deadline)
+    (!input.summary || !input.startsAt || !input.deadline)
   )
-    deny(400, "已发布任务须保留摘要、地点、服务时间和截止时间。");
+    deny(400, "已发布任务须保留摘要、服务时间和截止时间。");
   const changed =
     input.startsAt !== old.starts_at ||
     input.endsAt !== old.ends_at ||
@@ -529,13 +529,12 @@ organizerAPI.post("/tasks/:id/state", async (c) => {
       deny(400, "请先在组织设置中填写公开联系方式。");
     if (
       !row.summary ||
-      !row.location ||
       !row.starts_at ||
       !row.deadline ||
       String(row.deadline) <= timestamp() ||
       !asJSON<string[]>(row.required_fields).length
     )
-      deny(400, "请先完善摘要、地点、服务时间、未来的截止时间和报名资料要求。");
+      deny(400, "请先完善摘要、服务时间、未来的截止时间和报名资料要求。");
   }
   if (input.state === "archived" && Number(row.pending) > 0)
     deny(409, "请处理全部待审核报名后再归档。");

@@ -1,3 +1,6 @@
 [submodule ".agents/skills/impeccable"]
 	path = .agents/skills/impeccable
 	url = git@github.com:pbakaus/impeccable.git
+[submodule ".agents/skills/skills"]
+	path = .agents/skills/skills
+	url = git@github.com:android/skills.git

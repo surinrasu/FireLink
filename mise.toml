@@ -20,7 +20,17 @@ run = "mise -C server exec -- bun run --cwd ../organizer build"
 run = "mise -C android run build"
 
 [tasks."ios:build"]
-run = "mise -C ios run build"
+run = "mise -C apple run build"
+
+[tasks."apple:build"]
+description = "构建 iPhone、iPad、Mac 和 Apple Vision Pro 志愿者客户端"
+run = "mise -C apple run build:all"
+
+[tasks."macos:build"]
+run = "mise -C apple run build:mac"
+
+[tasks."visionos:build"]
+run = "mise -C apple run build:vision"
 
 [tasks.demo]
 description = "启动中文演示幻灯片、本地后端和专用 AVD"
@@ -29,8 +39,8 @@ run = "node start.ts"
 raw = true
 
 [tasks.check]
-description = "检查组织者工作台、后端、演示程序和移动端（完整检查需要 macOS、Xcode 和 Android SDK）"
-depends = ["check:whitespace", "check:organizer", "check:server", "check:presentation", "check:android", "check:ios"]
+description = "检查组织者工作台、后端、演示程序和各客户端（完整检查需要 macOS、Xcode 和 Android SDK）"
+depends = ["check:whitespace", "check:organizer", "check:server", "check:presentation", "check:android", "check:apple"]
 
 [tasks."check:organizer"]
 description = "组织者网页 TypeScript 检查和生产构建"
@@ -54,4 +64,16 @@ run = "mise -C android run test"
 
 [tasks."check:ios"]
 description = "iOS 模拟器构建和单元测试"
-run = ["mise -C ios run build", "mise -C ios run test"]
+run = ["mise -C apple run build", "mise -C apple run test"]
+
+[tasks."check:macos"]
+description = "原生 Mac 客户端构建和共享单元测试"
+run = "mise -C apple run test:mac"
+
+[tasks."check:apple"]
+description = "Apple 客户端构建与共享测试，统一生成 Xcode 工程"
+run = "mise -C apple run check"
+
+[tasks."check:visionos"]
+description = "原生 Vision Pro 客户端构建（不需要模拟器运行时）"
+run = "mise -C apple run build:vision"

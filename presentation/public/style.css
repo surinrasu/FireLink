@@ -79,10 +79,11 @@ button:disabled {
   align-self: flex-start;
   white-space: nowrap;
   text-decoration: none;
-  color: var(--primary);
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+  color: var(--on-surface);
+  font-size: 1.75rem;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
 }
 .stage {
   padding: 0;

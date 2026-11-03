@@ -616,12 +616,6 @@ fun IncidentCard(incident: Incident, onClick: () -> Unit) {
         MapPreview(incident.latitude, incident.longitude)
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row {
-                Icon(
-                    Icons.Outlined.LocalFireDepartment,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
                 Text(
                     strings.getString(R.string.volunteer_opportunities),
                     color = MaterialTheme.colorScheme.primary,

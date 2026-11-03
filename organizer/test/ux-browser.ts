@@ -32,6 +32,12 @@ async function review(page: Page) {
   await page.locator('.sidebar a[href="#/applications"]').click();
   await page.locator("#review-form").waitFor();
 }
+async function expandEditorSection(page: Page, id: string) {
+  const section = page.locator(`#${id}`);
+  await section.waitFor();
+  if (!(await section.evaluate((e) => (e as HTMLDetailsElement).open)))
+    await section.locator(":scope > summary").click();
+}
 async function editDraft(page: Page) {
   await page.locator('.sidebar a[href="#/tasks"]').click();
   await page.getByRole("link", { name: "继续编辑" }).first().click();
@@ -979,6 +985,8 @@ const cases: Record<
       .last()
       .click();
     await page.locator("#task-form").waitFor();
+    await expandEditorSection(page, "task-schedule");
+    await expandEditorSection(page, "task-details");
     await page.evaluate(() => document.fonts.ready);
     for (const viewport of [
       { width: 320, height: 740 },
@@ -1096,6 +1104,8 @@ const cases: Record<
       .last()
       .click();
     await page.locator("#task-form").waitFor();
+    await expandEditorSection(page, "task-schedule");
+    await expandEditorSection(page, "task-details");
     for (const size of ["normal", "large"]) {
       await page.getByRole("button", { name: "文字大小", exact: true }).click();
       await page
@@ -1193,14 +1203,16 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await expandEditorSection(page, "task-schedule");
+    await expandEditorSection(page, "task-details");
     await page.getByLabel("任务标题", { exact: true }).fill("地图标注验证");
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
     await page
-      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
+      .getByLabel("工作内容与能力要求摘要")
       .fill("多处位置、路线与活动范围");
-    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    await page.getByLabel("地点描述", { exact: true }).fill("社区服务中心");
     await page.getByRole("button", { name: "添加地图", exact: true }).click();
     const map = page.locator("#blocks firelink-map");
     await map.locator(".leaflet-container").waitFor();
@@ -1394,6 +1406,7 @@ const cases: Record<
     ]) {
       await page.clock.setFixedTime(new Date(now));
       await page.reload();
+      await expandEditorSection(page, "task-schedule");
       await start.waitFor();
       assert.equal(await start.inputValue(), startsAt);
       assert.equal(await deadline.inputValue(), closesAt);
@@ -1414,10 +1427,8 @@ const cases: Record<
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
-    await page
-      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求")
-      .fill("整理社区物资");
-    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    await page.getByLabel("工作内容与能力要求摘要").fill("整理社区物资");
+    await page.getByLabel("地点描述", { exact: true }).fill("社区服务中心");
     assert.equal(
       await page
         .getByRole("button", { name: "发布招募", exact: true })
@@ -1435,6 +1446,7 @@ const cases: Record<
     });
     await page.clock.setFixedTime(new Date("2031-01-01T17:42:00Z"));
     await card.getByRole("link", { name: "继续编辑", exact: true }).click();
+    await expandEditorSection(page, "task-schedule");
     await start.waitFor();
     assert.equal(
       await start.inputValue(),
@@ -1446,6 +1458,7 @@ const cases: Record<
     await page.getByRole("link", { name: "返回任务", exact: false }).click();
     await card.locator("h2 a").click();
     await page.getByRole("button", { name: "复制", exact: true }).click();
+    await expandEditorSection(page, "task-schedule");
     await start.waitFor();
     assert.equal(
       await start.inputValue(),
@@ -1476,19 +1489,21 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await expandEditorSection(page, "task-schedule");
+    await expandEditorSection(page, "task-details");
     const publish = page.locator("#publish-task");
     await publish.waitFor();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (7/11)");
+    assert.equal(await publish.innerText(), "发布招募 (7/10)");
     assert.equal(await page.locator(".publish-readiness").count(), 0);
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
-    assert.equal(await publish.innerText(), "发布招募 (8/11)");
+    assert.equal(await publish.innerText(), "发布招募 (8/10)");
     await page
       .getByLabel("所属事件", { exact: true })
       .selectOption({ index: 1 });
     await page
-      .getByLabel("一句话说明志愿者大概要做什么、有什么基本要求", {
+      .getByLabel("工作内容与能力要求摘要", {
         exact: true,
       })
       .fill("整理社区物资");
@@ -1496,9 +1511,12 @@ const cases: Record<
     await page.getByLabel("任务开始时间", { exact: true }).fill(`${day}T10:00`);
     await page.getByLabel("任务结束时间", { exact: true }).fill(`${day}T11:00`);
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T12:00`);
-    await page.getByLabel("服务地点", { exact: true }).fill("社区服务中心");
+    assert.equal(
+      await page.getByLabel("地点描述", { exact: true }).inputValue(),
+      "",
+    );
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
     assert.match(
       await page.locator("#deadline-publish-error").innerText(),
       /不能晚于任务结束时间/,
@@ -1509,16 +1527,16 @@ const cases: Record<
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
     await page.getByLabel("计划招募人数", { exact: true }).fill("0");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (11/12)");
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
     await page.getByLabel("计划招募人数", { exact: true }).fill("");
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "添加图片", exact: true }).click();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (11/12)");
+    assert.equal(await publish.innerText(), "发布招募 (10/11)");
     await page.getByRole("button", { name: "撤销", exact: true }).click();
     assert.equal(await publish.isEnabled(), true);
     // A completed draft becomes unavailable when its deadline passes, even
@@ -1528,7 +1546,7 @@ const cases: Record<
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
     await page.clock.runFor(1100);
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:30`);
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "发布招募", exact: true }).click();
@@ -1549,7 +1567,7 @@ const cases: Record<
       .first()
       .click();
     await publish.waitFor();
-    assert.equal(await publish.innerText(), "发布招募 (5/11)");
+    assert.equal(await publish.innerText(), "发布招募 (5/10)");
     assert.equal(await publish.isDisabled(), true);
     assert.match(
       (await publish.getAttribute("title")) || "",
@@ -1594,6 +1612,7 @@ const cases: Record<
   },
   "block-undo": async (page) => {
     await editDraft(page);
+    await expandEditorSection(page, "task-details");
     const undo = page.getByRole("button", { name: "撤销", exact: true });
     const redo = page.getByRole("button", { name: "重做", exact: true });
     assert.equal(await undo.isDisabled(), true);
@@ -1672,6 +1691,7 @@ const cases: Record<
     await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
     await page.reload();
     await page.locator("#task-form").waitFor();
+    await expandEditorSection(page, "task-details");
     assert.deepEqual(await contents(), before);
     assert.equal(await undo.isDisabled(), true);
     assert.equal(await redo.isDisabled(), true);

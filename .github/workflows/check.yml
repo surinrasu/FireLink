@@ -77,9 +77,9 @@ jobs:
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
           version: 2026.3.13
-          working_directory: ios
+          working_directory: apple
           install: false
       - name: Install toolchain
-        run: mise -C ios install
+        run: mise -C apple install
       - name: Check iOS
         run: mise run check:ios
