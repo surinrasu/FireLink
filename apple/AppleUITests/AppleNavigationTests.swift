@@ -43,6 +43,7 @@ final class AppleNavigationTests: XCTestCase {
       app = XCUIApplication(bundleIdentifier: "cn.firelink.volunteer")
       app.activate()
       XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+      resize(app.windows.firstMatch, width: 1100)
     #else
       app.launch()
     #endif
@@ -59,11 +60,34 @@ final class AppleNavigationTests: XCTestCase {
     XCTAssertTrue(contacts.waitForExistence(timeout: 10))
     activate(contacts)
     let copy = app.buttons["Copy WeChat ID"]
-    XCTAssertTrue(copy.waitForExistence(timeout: 5))
+    XCTAssertTrue(copy.waitForExistence(timeout: 5), app.debugDescription)
     activate(copy)
     XCTAssertTrue(app.buttons["Copied"].waitForExistence(timeout: 5))
     capture(app, name: "apple-contacts")
     activate(app.buttons["Done"])
+
+    #if os(macOS)
+      resize(app.windows.firstMatch, width: 760)
+      XCTAssertTrue(contacts.waitForExistence(timeout: 5), app.debugDescription)
+      capture(app, name: "apple-task-compact")
+      select("home", title: "Home", in: app)
+      select("incidents", title: "Incidents", in: app)
+      XCTAssertTrue(contacts.waitForExistence(timeout: 5), app.debugDescription)
+      activate(contacts)
+      XCTAssertTrue(copy.waitForExistence(timeout: 5), app.debugDescription)
+      resize(app.windows.firstMatch, width: 1100)
+      XCTAssertTrue(copy.waitForExistence(timeout: 5), app.debugDescription)
+      activate(app.buttons["Done"])
+      XCTAssertTrue(contacts.waitForExistence(timeout: 5), app.debugDescription)
+      capture(app, name: "apple-task-expanded")
+    #else
+      XCUIDevice.shared.orientation = .landscapeLeft
+      XCTAssertTrue(contacts.waitForExistence(timeout: 5), app.debugDescription)
+      XCUIDevice.shared.orientation = .portrait
+      select("home", title: "Home", in: app)
+      select("incidents", title: "Incidents", in: app)
+      XCTAssertTrue(contacts.waitForExistence(timeout: 5), app.debugDescription)
+    #endif
 
     select("account", title: "Account", in: app)
     let phone = app.textFields["sign-in-phone"]
@@ -77,17 +101,28 @@ final class AppleNavigationTests: XCTestCase {
   }
 
   private func select(_ section: String, title: String, in app: XCUIApplication) {
-    #if os(macOS)
-      activate(element("section-" + section, in: app))
-    #else
-      let sidebar = app.staticTexts["section-" + section]
-      if sidebar.exists && sidebar.isHittable {
-        activate(sidebar)
-      } else {
-        activate(app.tabBars.buttons[title])
-      }
-    #endif
+    // Adaptive tabs can be top tabs, a sidebar, or bottom tabs; don't assume TabBar ancestry.
+    let destination = element("section-" + section, in: app)
+    if destination.exists && destination.isHittable {
+      activate(destination)
+    } else if app.buttons[title].firstMatch.exists {
+      activate(app.buttons[title].firstMatch)
+    } else {
+      activate(app.staticTexts[title].firstMatch)
+    }
   }
+
+  #if os(macOS)
+    private func resize(_ window: XCUIElement, width: CGFloat) {
+      if abs(window.frame.width - width) <= 10 { return }
+      let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+        .withOffset(CGVector(dx: -2, dy: -2))
+      let target = corner.withOffset(CGVector(dx: width - window.frame.width, dy: 0))
+      corner.click(forDuration: 0.1, thenDragTo: target)
+      // Allow drag variance; these sizes remain well clear of the column transition.
+      XCTAssertEqual(window.frame.width, width, accuracy: 32)
+    }
+  #endif
 
   private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
     app.descendants(matching: .any).matching(identifier: identifier).firstMatch

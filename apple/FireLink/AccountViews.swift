@@ -192,7 +192,7 @@ struct AccountView: View {
           Label(L10n.text("settings"), systemImage: "gearshape")
         }
       }
-    }.navigationTitle(L10n.text("account")).refreshable {
+    }.readableContent().navigationTitle(L10n.text("account")).refreshable {
       if model.token != nil {
         do { try await model.refreshPrivate() } catch { model.error = error.localizedDescription }
       }
@@ -287,7 +287,7 @@ struct ProfileView: View {
       if saved {
         Label(L10n.text("saved"), systemImage: "checkmark.circle").foregroundStyle(.green)
       }
-    }.navigationTitle(L10n.text("profile")).toolbar {
+    }.readableContent().navigationTitle(L10n.text("profile")).toolbar {
       Button(busy ? L10n.text("saving") : L10n.text("save")) { Task { await save() } }.disabled(
         busy)
     }
@@ -403,7 +403,7 @@ struct SkillsView: View {
         }
         if credentials.isEmpty { Text(L10n.text("no_qualifications")).foregroundStyle(.secondary) }
       }
-    }.navigationTitle(L10n.text("qualifications")).task { await reload() }
+    }.readableContent().navigationTitle(L10n.text("qualifications")).task { await reload() }
       .fileImporter(isPresented: $importing, allowedContentTypes: [.pdf, .jpeg, .png]) { result in
         switch result {
         case .success(let url):
@@ -475,9 +475,10 @@ struct ApplicationHistoryView: View {
           }
         }
       }
-    }.navigationTitle(L10n.text("application_history")).task { await reload() }.refreshable {
-      await reload()
-    }
+    }.readableContent().navigationTitle(L10n.text("application_history")).task { await reload() }
+      .refreshable {
+        await reload()
+      }
   }
   func reload() async {
     do { try await model.refreshPrivate() } catch { model.error = error.localizedDescription }
@@ -510,6 +511,6 @@ struct SettingsView: View {
           Button(L10n.text("sign_out"), role: .destructive) { Task { await model.logout() } }
         }
       }
-    }.navigationTitle(L10n.text("settings"))
+    }.readableContent().navigationTitle(L10n.text("settings"))
   }
 }

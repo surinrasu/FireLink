@@ -192,3 +192,6 @@
 
 "refresh" = "重新整理";
 "sign_in_passkey" = "使用通行金鑰登入";
+
+"select_opportunity" = "選擇志願機會";
+"select_opportunity_hint" = "從列表中選擇事件或任務，查看詳細資訊。";

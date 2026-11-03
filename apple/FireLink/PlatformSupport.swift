@@ -10,6 +10,8 @@ enum PlatformSupport {
   static var groupedBackground: Color {
     #if os(macOS)
       Color(nsColor: .windowBackgroundColor)
+    #elseif os(visionOS)
+      Color.clear
     #else
       Color(uiColor: .systemGroupedBackground)
     #endif
@@ -26,6 +28,8 @@ enum PlatformSupport {
   static var secondaryBackground: Color {
     #if os(macOS)
       Color(nsColor: .underPageBackgroundColor)
+    #elseif os(visionOS)
+      Color.primary.opacity(0.06)
     #else
       Color(uiColor: .secondarySystemBackground)
     #endif
@@ -46,6 +50,15 @@ enum InputPurpose {
 }
 
 extension View {
+  @ViewBuilder func contentSurface(cornerRadius: CGFloat) -> some View {
+    #if os(visionOS)
+      background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+    #else
+      background(
+        PlatformSupport.contentBackground, in: RoundedRectangle(cornerRadius: cornerRadius))
+    #endif
+  }
+
   @ViewBuilder func inlineNavigationTitle() -> some View {
     #if os(macOS)
       self
@@ -85,7 +98,7 @@ extension View {
 
   /// Keep reading content comfortable when the surrounding window grows.
   func readableContent() -> some View {
-    frame(maxWidth: 820, alignment: .leading)
+    frame(maxWidth: 760, alignment: .leading)
       .frame(maxWidth: .infinity, alignment: .center)
   }
 }

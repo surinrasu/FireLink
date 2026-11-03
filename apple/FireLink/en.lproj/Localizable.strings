@@ -192,3 +192,6 @@
 
 "refresh" = "Refresh";
 "sign_in_passkey" = "Sign in with a passkey";
+
+"select_opportunity" = "Choose an opportunity";
+"select_opportunity_hint" = "Select an incident or task to see its details.";
