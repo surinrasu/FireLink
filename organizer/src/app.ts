@@ -1373,7 +1373,9 @@ async function renderPage(turn: number) {
       shell(
         heading(
           task ? "编辑任务" : "新建任务",
-          "",
+          !task || task.state === "draft"
+            ? "自动保存已启用"
+            : "已发布任务的更改需要手动保存",
           '<a class="button border" href="#/tasks">' +
             icon("arrow_back") +
             "返回任务</a>",
@@ -1383,6 +1385,7 @@ async function renderPage(turn: number) {
       editor = mountEditor(
         root.querySelector("#editor")!,
         workspace,
+        root.querySelector(".page-heading p")!,
         task,
         copy,
         route.searchParams.get("incident") || "",

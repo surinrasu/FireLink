@@ -1490,18 +1490,104 @@ textarea {
   background: var(--surface);
   border-radius: 18px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px 16px;
   z-index: 5;
   box-shadow: 0 3px 20px #00000008;
-}
-.editor-footer small {
-  font-size: 0.76rem;
 }
 .editor-footer .actions {
   display: flex;
   gap: 8px;
+  margin: 0;
+  flex-wrap: wrap;
+}
+.editor-pickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 8px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.editor-footer .editor-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  padding-inline: 16px;
+  gap: 8px;
+  text-align: center;
+}
+.editor-picker-button > i {
+  flex-shrink: 0;
+}
+.editor-picker-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-picker-search.field {
+  margin: 0;
+}
+.task-picker-status {
+  margin: 12px 0;
+}
+.task-picker-list {
+  list-style: none;
+  padding: 4px;
+  margin: 0 -4px;
+  max-height: min(400px, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--outline) var(--surface);
+}
+.task-picker-list > li {
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+}
+.task-picker-list > li + li {
+  border-top: 1px solid var(--outline-variant);
+}
+.task-picker-list .task-picker-option {
+  background: transparent;
+  color: var(--on-surface);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 64px;
+  padding: 12px;
+  margin: 0;
+  border-radius: 8px;
+  text-align: start;
+  white-space: normal;
+  line-height: 1.5;
+}
+.task-picker-option[aria-pressed="true"] {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+.task-picker-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-picker-detail {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--on-surface-variant);
+}
+.task-picker-option[aria-pressed="true"] .task-picker-detail {
+  color: inherit;
+}
+.task-picker-option > i {
+  flex-shrink: 0;
 }
 .table-scroll {
   overflow-x: auto;

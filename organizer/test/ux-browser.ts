@@ -3,6 +3,7 @@ import { access, mkdir } from "node:fs/promises";
 import { chromium, type Page, type BrowserContext } from "playwright";
 import type { MapAnnotation, Workspace } from "../../shared/organizer";
 import { isolateLocalDemo } from "./local-demo";
+import AxeBuilder from "@axe-core/playwright";
 
 const base = process.env.TEST_URL || "http://127.0.0.1:8787/mng-dash";
 let executablePath = process.env.BROWSER_EXECUTABLE;
@@ -47,6 +48,274 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "task-pickers": async (page) => {
+    let original: Workspace;
+    let emptyChoices = false;
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data: Workspace = await response.json();
+      original = structuredClone(data);
+      const member = data.members[0];
+      data.incidents.push(
+        ...Array.from({ length: 40 }, (_, index) => ({
+          ...data.incidents[0],
+          id: `extra-incident-${index}`,
+          title: `社区支援事件 ${index + 1}：这是一条用于验证长名称显示的事件`,
+        })),
+      );
+      data.members.push(
+        ...Array.from({ length: 40 }, (_, index) => ({
+          ...member,
+          id: `extra-member-${index}`,
+          name: `任务负责人 ${index + 1}`,
+          email: `manager${index + 1}@example.invalid`,
+          role: "manager" as const,
+        })),
+        { ...member, id: "inactive-member", name: "停用人员", active: false },
+        {
+          ...member,
+          id: "review-only-member",
+          name: "仅审核人员",
+          role: "reviewer",
+        },
+      );
+      if (emptyChoices) {
+        data.incidents = [];
+        data.members = [];
+      }
+      await route.fulfill({ response, json: data });
+    });
+    await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await page.locator("#task-form").waitFor();
+    const eventButton = page.locator("#incidentId-picker");
+    const ownerButton = page.locator("#ownerId-picker");
+    const dialog = page.getByRole("dialog");
+    const options = page.locator(".task-picker-list button");
+    assert.equal(
+      await page
+        .getByRole("button", { name: "待选择事件", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await page.locator(".page-heading #save-status").innerText(),
+      "自动保存已启用",
+    );
+    assert.equal(await page.locator(".editor-footer #save-status").count(), 0);
+    const checkPickerAlignment = async () => {
+      assert.equal(
+        await page.locator(".editor-picker-button").evaluateAll((buttons) =>
+          buttons.every((button) => {
+            const icon = button.querySelector("i")!.getBoundingClientRect();
+            const label = button.querySelector(".editor-picker-value")!;
+            const text = label.getBoundingClientRect();
+            const box = button.getBoundingClientRect();
+            return (
+              Math.abs(
+                (icon.left + text.right) / 2 - (box.left + box.right) / 2,
+              ) < 1 &&
+              Math.abs(
+                (icon.top + icon.bottom) / 2 - (text.top + text.bottom) / 2,
+              ) < 1 &&
+              getComputedStyle(label).whiteSpace === "nowrap" &&
+              box.height ===
+                document.querySelector("#preview-task")!.getBoundingClientRect()
+                  .height
+            );
+          }),
+        ),
+        true,
+        "Picker icons and single-line labels are centered like the preview button",
+      );
+    };
+    await checkPickerAlignment();
+    assert.equal(await page.locator(".editor-section select").count(), 0);
+    assert.equal(
+      await eventButton.locator("..").getAttribute("class"),
+      "editor-pickers",
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/task-pickers-desktop.png",
+    });
+    await eventButton.click();
+    const eventSearch = page.getByRole("searchbox", { name: "搜索事件" });
+    assert.equal(
+      await eventSearch.evaluate((el) => el === document.activeElement),
+      true,
+    );
+    assert.equal(await options.count(), original!.incidents.length + 40);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("End");
+    assert.ok(
+      await page
+        .locator(".task-picker-list")
+        .evaluate((el) => el.scrollTop > 0),
+    );
+    await eventSearch.fill(" 江苏省 ");
+    assert.equal(await options.count(), 1);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(
+      await page.locator("#incidentId").inputValue(),
+      "incident-nanjing",
+    );
+    assert.match(await eventButton.innerText(), /南京鼓楼区火情/);
+    assert.equal(
+      await page
+        .getByRole("button", { name: "南京鼓楼区火情", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await eventButton.evaluate((el) => el === document.activeElement),
+      true,
+    );
+    await eventButton.click();
+    assert.equal(await eventSearch.inputValue(), "");
+    assert.match(
+      await page
+        .locator('.task-picker-option[aria-pressed="true"]')
+        .innerText(),
+      /南京鼓楼区火情/,
+    );
+    await eventSearch.fill("不存在的事件关键词");
+    assert.equal(await options.count(), 0);
+    assert.match(await dialog.innerText(), /没有匹配的事件/);
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await page.locator("#incidentId").inputValue(),
+      "incident-nanjing",
+    );
+    await ownerButton.click();
+    const ownerSearch = page.getByRole("searchbox", { name: "搜索负责人" });
+    assert.equal(
+      await options.count(),
+      original!.members.filter((m) => m.active && m.role !== "reviewer")
+        .length + 40,
+    );
+    assert.equal(
+      await options.filter({ hasText: /停用人员|仅审核人员/ }).count(),
+      0,
+    );
+    await ownerSearch.fill(" MANAGER40@EXAMPLE.INVALID ");
+    assert.equal(await options.count(), 1);
+    await options.first().click();
+    assert.equal(
+      await page.locator("#ownerId").inputValue(),
+      "extra-member-39",
+    );
+    assert.match(await ownerButton.innerText(), /任务负责人 40/);
+    await ownerButton.click();
+    await ownerSearch.fill(original!.members[0].name);
+    await options.first().click();
+    await page
+      .getByLabel("任务标题", { exact: true })
+      .fill("底栏选择器保存验证");
+    await page
+      .getByLabel("工作内容与能力要求摘要")
+      .fill("选择事件和负责人后保存草稿");
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await page.getByRole("link", { name: "返回任务" }).click();
+    await page
+      .locator(".task-card")
+      .filter({ hasText: "底栏选择器保存验证" })
+      .getByRole("link", { name: "继续编辑" })
+      .click();
+    await eventButton.waitFor();
+    await page.reload();
+    await eventButton.waitFor();
+    assert.equal(
+      await page.locator("#incidentId").inputValue(),
+      "incident-nanjing",
+    );
+    assert.equal(
+      await page.locator("#ownerId").inputValue(),
+      original!.members[0].id,
+    );
+    assert.match(await eventButton.innerText(), /南京鼓楼区火情/);
+    await eventButton.click();
+    assert.deepEqual(
+      (
+        await new AxeBuilder({ page })
+          .include("#dialog")
+          .include(".editor-footer")
+          .analyze()
+      ).violations,
+      [],
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/task-picker-dialog-desktop.png",
+    });
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await checkPickerAlignment();
+      await eventButton.click();
+      const bounds = await dialog.boundingBox();
+      assert.ok(
+        bounds &&
+          bounds.x >= 0 &&
+          bounds.x + bounds.width <= width &&
+          bounds.y >= 0 &&
+          bounds.y + bounds.height <= 844,
+      );
+      assert.equal(
+        await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth),
+        true,
+      );
+      await page.screenshot({
+        path: `../.artifacts/organizer/ux/task-picker-dialog-${width}.png`,
+      });
+      assert.equal(
+        (await new AxeBuilder({ page }).include("#dialog").analyze()).violations
+          .length,
+        0,
+      );
+      await page.keyboard.press("Escape");
+      await page.screenshot({
+        path: `../.artifacts/organizer/ux/task-pickers-${width}.png`,
+      });
+    }
+    emptyChoices = true;
+    await page.goto(`${base}/#/tasks/new`);
+    await page
+      .getByRole("heading", { name: "新建任务", exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "待选择事件", exact: true })
+        .count(),
+      1,
+    );
+    assert.equal(
+      await page
+        .getByRole("button", { name: "待选择负责人", exact: true })
+        .count(),
+      1,
+    );
+    await eventButton.click();
+    assert.match(await dialog.innerText(), /暂无可选事件/);
+    await page.keyboard.press("Escape");
+    await ownerButton.click();
+    assert.match(await dialog.innerText(), /暂无可选负责人/);
+    await page.keyboard.press("Escape");
+    await page.getByLabel("任务标题", { exact: true }).fill("未选择事件");
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.getByRole("dialog", { name: "选择事件" }).waitFor();
+    assert.match(
+      await page.locator("#save-status").innerText(),
+      /请先选择事件/,
+    );
+    assert.equal(await page.locator("#publish-task").isDisabled(), true);
+  },
   "select-menus": async (page) => {
     const menu = page.locator(".select-popover:popover-open");
     const organization = page.getByRole("combobox", {
@@ -99,38 +368,6 @@ const cases: Record<
     await menu.getByRole("option", { name: "任务管理员", exact: true }).click();
     assert.equal(await role.inputValue(), "manager");
     await page.getByRole("button", { name: "取消", exact: true }).click();
-    await page.locator('.sidebar a[href="#/tasks/new"]').click();
-    await page.locator("#task-form").waitFor();
-    const editorIncident = page.getByLabel("所属事件", { exact: true });
-    await editorIncident.click();
-    await menu
-      .getByRole("option", { name: "南京鼓楼区火情", exact: true })
-      .click();
-    assert.equal(
-      await page
-        .locator("#task-form")
-        .evaluate((form) =>
-          new FormData(form as HTMLFormElement).get("incidentId"),
-        ),
-      "incident-nanjing",
-    );
-    await page.getByRole("button", { name: "主题", exact: true }).click();
-    await page.getByRole("radio", { name: "深色", exact: true }).check();
-    await page.keyboard.press("Escape");
-    await page.setViewportSize({ width: 320, height: 740 });
-    await editorIncident.click();
-    await menu.waitFor();
-    const bounds = await menu.boundingBox();
-    assert.ok(
-      bounds &&
-        bounds.x >= 0 &&
-        bounds.x + bounds.width <= 320 &&
-        bounds.y >= 0 &&
-        bounds.y + bounds.height <= 740,
-    );
-    await page.keyboard.press("Escape");
-    await page.getByLabel("任务负责人", { exact: true }).click();
-    await menu.waitFor();
   },
   "incident-tasks": async (page) => {
     const incidents = () => page.goto(`${base}/#/incidents`);
@@ -1009,7 +1246,13 @@ const cases: Record<
         `${viewport.width}px: editor fields and panels fit`,
       );
       await page.locator("#title").focus();
-      for (const id of ["title", "summary", "incidentId", "ownerId"]) {
+      for (const id of [
+        "title",
+        "summary",
+        "incidentId-picker",
+        "ownerId-picker",
+      ]) {
+        await page.locator(`#${id}`).focus();
         await page.waitForFunction((id) => {
           const field = document.getElementById(id)!;
           const box = field.getBoundingClientRect();
@@ -1023,15 +1266,17 @@ const cases: Record<
           return (
             document.activeElement === field &&
             box.top >= 0 &&
-            box.bottom <= Math.min(footer.top, innerHeight) &&
+            box.bottom <=
+              (field.closest(".editor-footer")
+                ? innerHeight
+                : Math.min(footer.top, innerHeight)) &&
             (hit === field || field.contains(hit))
           );
         }, id);
-        if (id !== "ownerId") await page.keyboard.press("Tab");
       }
     }
     await page.setViewportSize({ width: 320, height: 740 });
-    await page.locator("#ownerId").focus();
+    await page.locator("#ownerId-picker").focus();
     await page.screenshot({
       path: "../.artifacts/organizer/ux/mobile-editor-focus-viewport.png",
     });
@@ -1206,9 +1451,8 @@ const cases: Record<
     await expandEditorSection(page, "task-schedule");
     await expandEditorSection(page, "task-details");
     await page.getByLabel("任务标题", { exact: true }).fill("地图标注验证");
-    await page
-      .getByLabel("所属事件", { exact: true })
-      .selectOption({ index: 1 });
+    await page.locator("#incidentId-picker").click();
+    await page.locator(".task-picker-list button").first().click();
     await page
       .getByLabel("工作内容与能力要求摘要")
       .fill("多处位置、路线与活动范围");
@@ -1328,6 +1572,7 @@ const cases: Record<
       })
       .getByRole("link", { name: "继续编辑", exact: true })
       .click();
+    await expandEditorSection(page, "task-details");
     await map.waitFor();
     assert.deepEqual(await annotations(), expected);
     await page.setViewportSize({ width: 320, height: 844 });
@@ -1388,20 +1633,38 @@ const cases: Record<
       [
         "2030-12-31T15:14:25Z",
         "2030-12-31T23:30",
-        "2031-01-01T23:14",
-        "2031-01-02T23:14",
+        "2030-12-31T23:24",
+        "2031-01-01T12:00",
+      ],
+      [
+        "2030-12-31T15:15:00Z",
+        "2030-12-31T23:30",
+        "2030-12-31T23:25",
+        "2031-01-01T12:00",
+      ],
+      [
+        "2030-12-31T15:15:01Z",
+        "2030-12-31T23:45",
+        "2030-12-31T23:25",
+        "2031-01-01T12:00",
       ],
       [
         "2030-12-31T15:30:00Z",
-        "2031-01-01T00:00",
-        "2031-01-01T23:30",
-        "2031-01-02T23:30",
+        "2030-12-31T23:45",
+        "2030-12-31T23:40",
+        "2031-01-01T12:00",
+      ],
+      [
+        "2030-12-31T15:59:59Z",
+        "2031-01-01T00:15",
+        "2031-01-01T00:09",
+        "2031-01-01T12:00",
       ],
       [
         "2030-12-31T16:00:00Z",
-        "2031-01-01T00:30",
-        "2031-01-02T00:00",
-        "2031-01-03T00:00",
+        "2031-01-01T00:15",
+        "2031-01-01T00:10",
+        "2031-01-01T12:00",
       ],
     ]) {
       await page.clock.setFixedTime(new Date(now));
@@ -1411,8 +1674,30 @@ const cases: Record<
       assert.equal(await start.inputValue(), startsAt);
       assert.equal(await deadline.inputValue(), closesAt);
       assert.equal(await end.inputValue(), endsAt);
+      assert.ok(
+        Date.parse(`${startsAt}:00+08:00`) - Date.parse(now) >= 15 * 60000,
+      );
+      assert.ok(
+        Date.parse(`${endsAt}:00+08:00`) - Date.parse(now) >= 12 * 3600000,
+      );
       assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     }
+    assert.equal(await page.getByLabel("人数上限", { exact: true }).count(), 1);
+    assert.equal(await page.locator("#location-help").count(), 0);
+    assert.equal(
+      await page
+        .getByText("只选择判断志愿者是否适合本任务所需的资料。", {
+          exact: true,
+        })
+        .count(),
+      0,
+    );
+    await expandEditorSection(page, "task-details");
+    assert.equal(
+      await page.getByRole("heading", { name: /详细信息/ }).count(),
+      1,
+    );
+    assert.equal(await page.getByLabel("文本内容", { exact: true }).count(), 1);
     assert.match(
       await page.locator("#live-preview").innerText(),
       /任务开始（北京时间）/,
@@ -1424,9 +1709,8 @@ const cases: Record<
     await page
       .getByLabel("任务标题", { exact: true })
       .fill("任务时间默认值验证");
-    await page
-      .getByLabel("所属事件", { exact: true })
-      .selectOption({ index: 1 });
+    await page.locator("#incidentId-picker").click();
+    await page.locator(".task-picker-list button").first().click();
     await page.getByLabel("工作内容与能力要求摘要").fill("整理社区物资");
     await page.getByLabel("地点描述", { exact: true }).fill("社区服务中心");
     assert.equal(
@@ -1450,11 +1734,11 @@ const cases: Record<
     await start.waitFor();
     assert.equal(
       await start.inputValue(),
-      "2031-01-01T00:30",
+      "2031-01-01T00:15",
       "editing must preserve saved times",
     );
-    assert.equal(await deadline.inputValue(), "2031-01-02T00:00");
-    assert.equal(await end.inputValue(), "2031-01-03T00:00");
+    assert.equal(await deadline.inputValue(), "2031-01-01T00:10");
+    assert.equal(await end.inputValue(), "2031-01-01T12:00");
     await page.getByRole("link", { name: "返回任务", exact: false }).click();
     await card.locator("h2 a").click();
     await page.getByRole("button", { name: "复制", exact: true }).click();
@@ -1465,11 +1749,11 @@ const cases: Record<
       "2031-01-02T02:00",
       "copies use fresh defaults",
     );
-    assert.equal(await deadline.inputValue(), "2031-01-03T01:42");
-    assert.equal(await end.inputValue(), "2031-01-04T01:42");
+    assert.equal(await deadline.inputValue(), "2031-01-02T01:52");
+    assert.equal(await end.inputValue(), "2031-01-02T14:00");
     const timePanel = page
       .locator(".editor-section")
-      .filter({ hasText: "时间与地点" });
+      .filter({ hasText: "时间 地点及人数" });
     await timePanel.screenshot({
       path: "../.artifacts/organizer/ux/task-times-desktop.png",
     });
@@ -1494,14 +1778,19 @@ const cases: Record<
     const publish = page.locator("#publish-task");
     await publish.waitFor();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (7/10)");
+    assert.equal(await publish.innerText(), "发布招募 (7/9)");
     assert.equal(await page.locator(".publish-readiness").count(), 0);
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
-    assert.equal(await publish.innerText(), "发布招募 (8/10)");
+    assert.equal(await publish.innerText(), "发布招募 (8/9)");
     await page
-      .getByLabel("所属事件", { exact: true })
-      .selectOption({ index: 1 });
+      .getByLabel("工作内容与能力要求摘要", { exact: true })
+      .fill("整理社区物资");
+    assert.equal(await publish.innerText(), "发布招募 (9/9)");
+    assert.equal(await publish.isDisabled(), true);
+    assert.match((await publish.getAttribute("title")) || "", /请选择事件/);
+    await page.locator("#incidentId-picker").click();
+    await page.locator(".task-picker-list button").first().click();
     await page
       .getByLabel("工作内容与能力要求摘要", {
         exact: true,
@@ -1516,7 +1805,7 @@ const cases: Record<
       "",
     );
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (8/9)");
     assert.match(
       await page.locator("#deadline-publish-error").innerText(),
       /不能晚于任务结束时间/,
@@ -1527,16 +1816,16 @@ const cases: Record<
     assert.equal(await page.locator('[aria-invalid="true"]').count(), 0);
     await page.getByLabel("任务标题", { exact: true }).fill("");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (8/9)");
     await page.getByLabel("任务标题", { exact: true }).fill("准备检查回归");
-    await page.getByLabel("计划招募人数", { exact: true }).fill("0");
+    await page.getByLabel("人数上限", { exact: true }).fill("0");
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
-    await page.getByLabel("计划招募人数", { exact: true }).fill("");
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    await page.getByLabel("人数上限", { exact: true }).fill("");
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "添加图片", exact: true }).click();
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (10/11)");
+    assert.equal(await publish.innerText(), "发布招募 (9/10)");
     await page.getByRole("button", { name: "撤销", exact: true }).click();
     assert.equal(await publish.isEnabled(), true);
     // A completed draft becomes unavailable when its deadline passes, even
@@ -1546,7 +1835,7 @@ const cases: Record<
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:00`);
     await page.clock.runFor(1100);
     assert.equal(await publish.isDisabled(), true);
-    assert.equal(await publish.innerText(), "发布招募 (9/10)");
+    assert.equal(await publish.innerText(), "发布招募 (8/9)");
     await page.getByLabel("报名截止时间", { exact: true }).fill(`${day}T09:30`);
     assert.equal(await publish.isEnabled(), true);
     await page.getByRole("button", { name: "发布招募", exact: true }).click();
@@ -1567,7 +1856,7 @@ const cases: Record<
       .first()
       .click();
     await publish.waitFor();
-    assert.equal(await publish.innerText(), "发布招募 (5/10)");
+    assert.equal(await publish.innerText(), "发布招募 (5/9)");
     assert.equal(await publish.isDisabled(), true);
     assert.match(
       (await publish.getAttribute("title")) || "",
@@ -1577,6 +1866,29 @@ const cases: Record<
       (await publish.getAttribute("title")) || "",
       /至少一种公开联系方式/,
     );
+  },
+  "publish-missing-owner": async (page) => {
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data: Workspace = await response.json();
+      data.members = [];
+      await route.fulfill({ response, json: data });
+    });
+    await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    const publish = page.locator("#publish-task");
+    await page.getByLabel("任务标题", { exact: true }).fill("负责人必填检查");
+    await page
+      .getByLabel("工作内容与能力要求摘要", { exact: true })
+      .fill("检查发布条件");
+    assert.equal(await publish.innerText(), "发布招募 (9/9)");
+    assert.equal(await publish.isDisabled(), true);
+    assert.match((await publish.getAttribute("title")) || "", /请选择事件/);
+    assert.match((await publish.getAttribute("title")) || "", /请选择负责人/);
+    await page.locator("#incidentId-picker").click();
+    await page.locator(".task-picker-list button").first().click();
+    assert.equal(await publish.innerText(), "发布招募 (9/9)");
+    assert.equal(await publish.isDisabled(), true);
+    assert.equal(await publish.getAttribute("title"), "请选择负责人");
   },
   "organization-drafts": async (page) => {
     const settings = () =>
@@ -1649,7 +1961,7 @@ const cases: Record<
     );
 
     // A new change after undo starts a new branch and drops the redo history.
-    await page.getByRole("button", { name: "添加段落", exact: true }).click();
+    await page.getByRole("button", { name: "添加文本", exact: true }).click();
     assert.equal(await redo.isDisabled(), true);
     const added = page.locator('#blocks [name^="block-text-"]').last();
     await added.pressSequentially("新增的段落");
@@ -1670,7 +1982,7 @@ const cases: Record<
     await undo.click();
     assert.deepEqual(await contents(), before);
 
-    for (const name of ["小标题", "段落", "图片", "视频", "表格", "地图"]) {
+    for (const name of ["小标题", "文本", "图片", "视频", "表格", "地图"]) {
       await page
         .getByRole("button", { name: `添加${name}`, exact: true })
         .click();
