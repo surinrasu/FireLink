@@ -635,6 +635,7 @@ test("production refuses mock authentication even if mock flag is accidentally e
           r2Buckets: ["FILES"],
           bindings: {
             APP_ENV: "production",
+            ORGANIZER_DEMO: "true",
             MOCK_AUTH: "true",
             RP_ID: "",
             PASSKEY_ORIGINS: "",
@@ -646,6 +647,15 @@ test("production refuses mock authentication even if mock flag is accidentally e
     }),
   );
   try {
+    assert.equal(
+      (await workerFetch(prod, "/v1/auth/demo", { method: "POST", body: "{}" }))
+        .status,
+      404,
+    );
+    const config = (await (await workerFetch(prod, "/v1/config")).json()) as {
+      demo: boolean;
+    };
+    assert.equal(config.demo, false);
     assert.equal(
       (
         await workerFetch(prod, "/v1/auth/sms", {
@@ -826,4 +836,9 @@ test("stored result notifications follow the requesting language without rewriti
   assert.ok(stored);
   assert.equal(stored.title, "报名未通过");
   assert.equal(stored.body, "组织者已更新你的申请结果");
+});
+
+test("demo entry is unavailable when the feature is disabled", async () => {
+  assert.equal((await call("/v1/auth/demo", {})).status, 404);
+  assert.equal((await call<{ demo: boolean }>("/v1/config")).data.demo, false);
 });

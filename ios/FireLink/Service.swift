@@ -31,6 +31,7 @@ enum TokenStore {
   }
 }
 @MainActor final class AppModel: ObservableObject {
+  static let defaultServer = "https://firelink-demo.surindaku.workers.dev"
   @Published var profile: Profile?
   @Published var incidents: [Incident] = []
   @Published var articles: [Article] = []
@@ -40,6 +41,7 @@ enum TokenStore {
   @Published var error: String?
   @Published var loading = false
   @Published var showLogin = false
+  @Published var demoSessionID: String?
   var afterLogin: (() -> Void)?
   var token = TokenStore.read()
   private let session: URLSession
@@ -47,10 +49,18 @@ enum TokenStore {
 
   init(session: URLSession = .shared) {
     self.session = session
+    let saved = UserDefaults.standard.string(forKey: "serverURL")
+    if !ProcessInfo.processInfo.arguments.contains("--ui-test")
+      && (saved == nil || saved == "http://localhost:8787")
+    {
+      UserDefaults.standard.set(Self.defaultServer, forKey: "serverURL")
+      token = nil
+      TokenStore.save(nil)
+    }
   }
 
   var baseURL: String {
-    UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8787"
+    UserDefaults.standard.string(forKey: "serverURL") ?? Self.defaultServer
   }
   func request<T: Decodable>(_ path: String, method: String = "GET", body: [String: Any]? = nil)
     async throws -> T
@@ -78,6 +88,7 @@ enum TokenStore {
         profile = nil
         applications = []
         notifications = []
+        incidents = []
       }
       let info = try? JSONSerialization.jsonObject(with: data) as? [String: String]
       throw ServiceError(message: info?["error"] ?? L10n.text("request_failed"))
@@ -157,7 +168,27 @@ enum TokenStore {
       profile = nil
       applications = []
       notifications = []
+      incidents = []
+      await load()
     } catch { self.error = error.localizedDescription }
+  }
+  func enterDemo() async throws {
+    // Finish any public refresh before replacing it with the demo workspace.
+    if let loadTask { await loadTask.value }
+    let result: AuthResult = try await request("/v1/auth/demo", method: "POST", body: [:])
+    afterLogin = nil
+    guard let token = result.token, let profile = result.profile else {
+      throw ServiceError(message: L10n.text("invalid_login"))
+    }
+    self.token = token
+    TokenStore.save(token)
+    self.profile = profile
+    try await refreshPrivate()
+    incidents = try await request("/v1/incidents")
+    articles = try await request("/v1/articles")
+    error = nil
+    demoSessionID = profile.id
+    showLogin = false
   }
   func upload(data: Data, filename: String, mime: String, title: String) async throws {
     guard data.count <= 8 * 1024 * 1024 else {

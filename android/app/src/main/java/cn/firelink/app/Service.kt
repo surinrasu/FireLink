@@ -17,6 +17,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -147,15 +148,26 @@ class Api(
 }
 
 class AppModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        const val DEFAULT_SERVER = "https://firelink-demo.surindaku.workers.dev"
+    }
     private val strings
         get() = getApplication<Application>().resources
 
     private val prefs = application.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val tokenStore = TokenStore(application)
+    init {
+        // Existing installs used the emulator's host service as their default.
+        val saved = prefs.getString("serverURL", null)
+        if (!BuildConfig.DEMO_MODE && (saved == null || saved == "http://10.0.2.2:8787")) {
+            tokenStore.save(null)
+            prefs.edit().putString("serverURL", DEFAULT_SERVER).apply()
+        }
+    }
     val api =
         Api(
             if (BuildConfig.DEMO_MODE) DemoMode.SERVER
-            else prefs.getString("serverURL", "http://10.0.2.2:8787")!!,
+            else prefs.getString("serverURL", DEFAULT_SERVER)!!,
             if (BuildConfig.DEMO_MODE) DemoMode.TOKEN else tokenStore.read(),
             application.resources,
         )
@@ -184,13 +196,16 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var nearbyEnabled by mutableStateOf(prefs.getBoolean("nearby", true))
         private set
 
+    private var loadJob: Job? = null
+
     fun report(e: Throwable) {
         if (e is ServiceException && e.status == 401) clearSession()
         error = e.message ?: strings.getString(R.string.operation_failed)
     }
 
     fun load() {
-        viewModelScope.launch {
+        if (loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
             loading = true
             try {
                 config = api.get("/v1/config")
@@ -231,6 +246,15 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         refreshPrivate()
     }
 
+    suspend fun enterDemo() {
+        loadJob?.join()
+        val result: AuthResult = api.post("/v1/auth/demo")
+        accept(result)
+        incidents = api.get("/v1/incidents")
+        articles = api.get("/v1/articles")
+        error = null
+    }
+
     suspend fun saveProfile(p: Profile) {
         profile = api.json.decodeFromString(api.raw("/v1/me", "PATCH", api.json.encodeToString(p)))
     }
@@ -251,6 +275,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     suspend fun logout() {
         api.raw("/v1/me/logout", "POST", "{}")
         clearSession()
+        load()
     }
 
     private fun clearSession() {
@@ -259,6 +284,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         profile = null
         applications = emptyList()
         notifications = emptyList()
+        incidents = emptyList()
     }
 
     fun setServer(address: String) {

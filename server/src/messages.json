@@ -406,5 +406,11 @@
     "zh-Hans": "厢式货车数量须为 0–999 的整数",
     "zh-Hant": "廂式貨車數量須為 0–999 的整數",
     "zh-Hant-HK": "客貨車數量須為 0–999 的整數"
+  },
+  "demo_unavailable": {
+    "en": "Demo access is not available on this server.",
+    "zh-Hans": "当前服务未开放演示入口",
+    "zh-Hant": "目前服務未開放示範入口",
+    "zh-Hant-HK": "目前服務未開放示範入口"
   }
 }

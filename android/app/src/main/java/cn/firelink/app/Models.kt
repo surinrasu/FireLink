@@ -173,6 +173,7 @@ data class ServerConfig(
     val region: String,
     val consentVersion: Int,
     val mockIdentity: IdentityExample? = null,
+    val demo: Boolean = false,
 )
 
 @Serializable

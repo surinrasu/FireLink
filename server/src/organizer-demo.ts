@@ -1,5 +1,5 @@
 import fixture from "../../fixtures/demo.json";
-import { randomToken, timestamp } from "./domain";
+import { randomToken, timestamp, type Profile } from "./domain";
 import {
   deny,
   issueOrganizerSession,
@@ -12,13 +12,20 @@ export async function createDemo(c: OrgContext) {
   if (c.env.ORGANIZER_DEMO !== "true" || c.env.APP_ENV === "production")
     deny(404, "当前环境未开放演示。");
   await rateLimit(c, "demo", 12);
+  const { accountId, orgId } = await seedDemoWorkspace(c.env.DB);
+  await issueOrganizerSession(c, accountId);
+  return c.json({ organizationId: orgId }, 201);
+}
+
+export async function seedDemoWorkspace(db: D1Database) {
   const accountId = crypto.randomUUID(),
     orgId = crypto.randomUUID(),
     memberId = crypto.randomUUID();
   const now = timestamp();
   const at = (days: number, hours = 0) =>
     new Date(Date.now() + (days * 24 + hours) * 3600000).toISOString();
-  const db = c.env.DB;
+  const expiresAt = Date.now() + 86400000;
+  let volunteer: Profile | undefined;
   const statements: D1PreparedStatement[] = [
     db
       .prepare("INSERT INTO organizer_accounts VALUES (?,?,?,?,?,?)")
@@ -39,7 +46,7 @@ export async function createDemo(c: OrgContext) {
         "青禾志愿服务中心",
         JSON.stringify(fixture.organizations[0].contacts),
         "连接身边的善意，让每一份力气都有去处。我们关注社区支援、物资整理与运输协助。",
-        Date.now() + 86400000,
+        expiresAt,
       ),
     db
       .prepare("INSERT INTO organization_members VALUES (?,?,?,'admin',1,1)")
@@ -149,15 +156,27 @@ export async function createDemo(c: OrgContext) {
         : status === "rejected"
           ? "感谢你的关注，本次招募名额有限。"
           : null;
+    const user: Profile = {
+      id: userId,
+      username: name,
+      realName: name,
+      pronouns: "",
+      birthDate: "1998-06-18",
+      gender: "",
+      verified: true,
+      region: profile.region,
+      body: "",
+      equipment: [],
+      equipmentDetails: {},
+      equipmentDescription: profile.equipment,
+      vehicles: profile.vehicles ?? {},
+      contacts: { ...contacts, email: "" },
+    };
+    if (index === 0) volunteer = user;
     statements.push(
       db
         .prepare("INSERT INTO users VALUES (?,?,?,?)")
-        .bind(
-          userId,
-          `demo:${userId}`,
-          JSON.stringify({ id: userId, ...profile, contacts }),
-          now,
-        ),
+        .bind(userId, `demo:${userId}`, JSON.stringify(user), now),
     );
     statements.push(
       db
@@ -207,6 +226,6 @@ export async function createDemo(c: OrgContext) {
       ),
   );
   await db.batch(statements);
-  await issueOrganizerSession(c, accountId);
-  return c.json({ organizationId: orgId }, 201);
+  if (!volunteer) throw new Error("Missing demo volunteer");
+  return { accountId, orgId, volunteer, expiresAt };
 }

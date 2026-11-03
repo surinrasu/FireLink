@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
 @Composable
-fun LoginScreen(model: AppModel, done: () -> Unit) {
+fun LoginScreen(model: AppModel, demoDone: () -> Unit, done: () -> Unit) {
     val strings = localizedResources()
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
@@ -133,6 +133,20 @@ fun LoginScreen(model: AppModel, done: () -> Unit) {
                     Text(strings.getString(R.string.request_code))
                 }
                 PasskeyLoginOption(model, enabled = !busy, done = done) { failure = it }
+                if (model.config?.demo == true) {
+                    OutlinedButton(
+                        enabled = !busy,
+                        onClick = {
+                            perform {
+                                model.enterDemo()
+                                demoDone()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(strings.getString(R.string.enter_demo_client))
+                    }
+                }
             } else {
                 OutlinedTextField(
                     code,

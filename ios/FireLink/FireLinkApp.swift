@@ -4,7 +4,10 @@ import SwiftUI
   @StateObject private var model = AppModel()
   init() {
     #if DEBUG
-      if ProcessInfo.processInfo.arguments.contains("--ui-test") {
+      if ProcessInfo.processInfo.arguments.contains("--demo-ui-test") {
+        TokenStore.save(nil)
+        UserDefaults.standard.set(AppModel.defaultServer, forKey: "serverURL")
+      } else if ProcessInfo.processInfo.arguments.contains("--ui-test") {
         TokenStore.save(nil)
         UserDefaults.standard.set("http://localhost:8787", forKey: "serverURL")
       }
@@ -31,6 +34,8 @@ struct RootView: View {
       }
       .tag(2)
     }
+    .id(model.demoSessionID)
+    .onChange(of: model.demoSessionID) { _, _ in selected = 0 }
     .onChange(of: selected) { _, value in
       if value == 2 && model.profile == nil { model.showLogin = true }
     }
