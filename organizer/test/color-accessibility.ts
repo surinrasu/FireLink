@@ -295,6 +295,7 @@ try {
     await page.getByRole("button", { name: "取消", exact: true }).click();
     await goto("tasks/new", "新建任务");
     await scan(page, `${name}-editor`);
+    await page.locator("#task-schedule > summary").click();
     await page
       .getByLabel("报名截止", { exact: false })
       .fill("2020-01-01T12:00");

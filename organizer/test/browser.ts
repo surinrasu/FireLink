@@ -139,7 +139,8 @@ try {
   await page
     .getByLabel("任务标题", { exact: true })
     .fill("浏览器验证 · 社区物资整理");
-  await page.getByLabel("所属事件", { exact: true }).selectOption({ index: 1 });
+  await page.locator("#incidentId-picker").click();
+  await page.locator(".task-picker-list button").first().click();
   await page
     .getByLabel("工作内容与能力要求摘要")
     .fill("协助社区清点和分类物资，招募 3 位志愿者。");
@@ -153,11 +154,11 @@ try {
   await page
     .getByLabel("报名截止时间", { exact: true })
     .fill(`${deadline}T18:00`);
-  await page.getByLabel("计划招募人数", { exact: true }).fill("3");
+  await page.getByLabel("人数上限", { exact: true }).fill("3");
   await page.getByLabel("地点描述", { exact: true }).fill("西湖区社区服务中心");
   await page.locator("#task-details > summary").click();
   await page
-    .getByLabel("段落内容", { exact: true })
+    .getByLabel("文本内容", { exact: true })
     .fill("按类别清点物资，做好登记。具体安排由双方沟通确认。");
   await page.getByRole("button", { name: "保存草稿", exact: true }).click();
   await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();

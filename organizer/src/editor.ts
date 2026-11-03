@@ -9,6 +9,7 @@ import { api, uploadMedia } from "./api";
 import { mediaTypes } from "../../shared/media";
 import { mapPreview, updatePreview } from "./maps";
 import { completeMap, mapAnnotations } from "../../shared/maps";
+import { openTaskPicker, type TaskChoice } from "./task-picker";
 import {
   closeDialog,
   errorText,
@@ -19,7 +20,6 @@ import {
   input,
   openDialog,
   renderBlocks,
-  select,
   textarea,
   toast,
 } from "./ui";
@@ -37,7 +37,7 @@ const utcInput = (value: string) =>
   value ? new Date(`${value}:00+08:00`).toISOString() : "";
 const blockNames = {
   heading: "小标题",
-  paragraph: "段落",
+  paragraph: "文本",
   image: "图片",
   video: "视频",
   table: "表格",
@@ -47,19 +47,22 @@ const blockNames = {
 export function mountEditor(
   host: HTMLElement,
   workspace: Workspace,
+  status: HTMLElement,
   task?: OrganizerTask,
   copy?: OrganizerTask,
   incidentId = "",
 ): EditorHandle {
   const source = task || copy;
   const now = Date.now();
-  const halfHour = 30 * 60 * 1000;
+  const minute = 60 * 1000;
+  const quarterHour = 15 * minute;
+  const hour = 60 * minute;
   const times = task || {
     startsAt: new Date(
-      (Math.floor(now / halfHour) + 1) * halfHour,
+      Math.ceil((now + quarterHour) / quarterHour) * quarterHour,
     ).toISOString(),
-    deadline: new Date(now + 24 * 3600000).toISOString(),
-    endsAt: new Date(now + 48 * 3600000).toISOString(),
+    deadline: new Date(now + 10 * minute).toISOString(),
+    endsAt: new Date(Math.ceil((now + 12 * hour) / hour) * hour).toISOString(),
   };
   let id = task?.id;
   let version = task?.version ?? 1;
@@ -85,6 +88,11 @@ export function mountEditor(
     ],
   );
   const draft = !task || task.state === "draft";
+  status.id = "save-status";
+  status.setAttribute("role", "status");
+  status.textContent = draft
+    ? "自动保存已启用"
+    : "已发布任务的更改需要手动保存";
   const requirementsLocked =
     !!task && task.pending + task.accepted + task.rejected + task.withdrawn > 0;
   const fields = source?.requiredFields || ["realName", "region"];
@@ -111,18 +119,37 @@ export function mountEditor(
         `<div class="requirement-group" role="group" aria-labelledby="requirement-label-${index}"><span id="requirement-label-${index}" class="requirement-label">${label}</span><div class="requirement-options">${requirementOptions("requiredFields", keys, fields)}</div></div>`,
     )
     .join("");
+  const incidentChoices: TaskChoice[] = workspace.incidents.map((incident) => ({
+    id: incident.id,
+    title: incident.title,
+    detail: incident.region,
+  }));
+  const ownerChoices: TaskChoice[] = workspace.members
+    .filter((member) => member.active && member.role !== "reviewer")
+    .map((member) => ({
+      id: member.id,
+      title: member.name,
+      detail: member.email,
+    }));
+  const selectedIncident = incidentChoices.find(
+    (choice) => choice.id === (incidentId || source?.incidentId),
+  );
+  const selectedOwner =
+    ownerChoices.find(
+      (choice) => choice.id === (source?.ownerId || workspace.membership.id),
+    ) || ownerChoices[0];
+  const pickerButton = (
+    name: string,
+    label: string,
+    symbol: string,
+    choice?: TaskChoice,
+  ) =>
+    `<input type="hidden" id="${name}" name="${name}" value="${h(choice?.id || "")}"><button class="border editor-picker-button" type="button" id="${name}-picker" aria-haspopup="dialog">${icon(symbol)}<span id="${name}-selection" class="editor-picker-value">${h(choice?.title || `待选择${label}`)}</span></button>`;
   host.innerHTML = `<form id="task-form"><div class="editor-layout"><div>
     <section class="panel editor-section"><h2><span class="step-number">1</span>基本信息</h2>${input("title", "任务标题", copy ? `${copy.title}（副本）` : task?.title || "", 'required maxlength="100"')}<div class="task-summary"><label for="summary">工作内容与能力要求摘要</label><div class="field textarea border"><textarea id="summary" name="summary" maxlength="500" rows="3">${h(source?.summary || "")}</textarea></div></div>
-    <div class="form-grid">${select("incidentId", "所属事件", [["", "请选择事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], incidentId || source?.incidentId || "", "required")}${select(
-      "ownerId",
-      "任务负责人",
-      workspace.members
-        .filter((m) => m.active && m.role !== "reviewer")
-        .map((m) => [m.id, m.name]),
-      source?.ownerId || workspace.membership.id,
-    )}</div></section>
-    <details class="panel editor-section" id="task-schedule"><summary class="editor-section-toggle"><h2><span class="step-number">2</span>时间与地点</h2>${icon("expand_more")}</summary><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "任务开始时间", beijingInput(times.startsAt), "", "datetime-local")}${input("endsAt", "任务结束时间", beijingInput(times.endsAt), "", "datetime-local")}${input("deadline", "报名截止时间", beijingInput(times.deadline), "", "datetime-local")}${input("capacity", "计划招募人数", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "地点描述", source?.location || "", 'maxlength="300" aria-describedby="location-help"')}<p class="help" id="location-help">选填</p></details>
-    <details class="panel editor-section" id="task-details"><summary class="editor-section-toggle"><h2><span class="step-number">3</span>任务详细信息</h2>${icon("expand_more")}</summary><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
+    </section>
+    <details class="panel editor-section" id="task-schedule"><summary class="editor-section-toggle"><h2><span class="step-number">2</span>时间 地点及人数</h2>${icon("expand_more")}</summary><p class="muted" style="font-size:.8rem;margin-top:12px">北京时间（UTC+8）</p><div class="form-grid">${input("startsAt", "任务开始时间", beijingInput(times.startsAt), "", "datetime-local")}${input("endsAt", "任务结束时间", beijingInput(times.endsAt), "", "datetime-local")}${input("deadline", "报名截止时间", beijingInput(times.deadline), "", "datetime-local")}${input("capacity", "人数上限", source?.capacity?.toString() || "", 'min="1" max="10000" step="1"', "number")}</div>${input("location", "地点描述", source?.location || "", 'maxlength="300"')}</details>
+    <details class="panel editor-section" id="task-details"><summary class="editor-section-toggle"><h2><span class="step-number">3</span>详细信息</h2>${icon("expand_more")}</summary><div class="block-history" role="group" aria-label="内容编辑历史"><button class="border" type="button" id="undo-block" disabled>${icon("undo")}撤销</button><button class="border" type="button" id="redo-block" disabled>${icon("redo")}重做</button></div><div id="blocks"></div><div class="block-add-actions" role="group" aria-label="添加内容">${Object.entries(
       blockNames,
     )
       .map(
@@ -130,10 +157,44 @@ export function mountEditor(
           `<button class="border" type="button" data-add-block="${type}" aria-label="添加${label}">${icon("add")}${label}</button>`,
       )
       .join("")}</div></details>
-    <section class="panel editor-section"><h2><span class="step-number">4</span>志愿者上传资料</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend><p class="muted">只选择判断志愿者是否适合本任务所需的资料。</p>${requirements}<div id="contact-fields" class="requirement-group" role="group" aria-labelledby="contact-fields-label" tabindex="-1"><span id="contact-fields-label" class="requirement-label">联系方式</span><div class="requirement-options">${requirementOptions("contactFields", ["phone", "wechat", "email"], contacts)}</div></div></fieldset></section>
+    <section class="panel editor-section"><h2><span class="step-number">4</span>志愿者上传资料</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend>${requirements}<div id="contact-fields" class="requirement-group" role="group" aria-labelledby="contact-fields-label" tabindex="-1"><span id="contact-fields-label" class="requirement-label">联系方式</span><div class="requirement-options">${requirementOptions("contactFields", ["phone", "wechat", "email"], contacts)}</div></div></fieldset></section>
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
-    <footer class="editor-footer"><small id="save-status" role="status">${draft ? "草稿填写后自动保存" : "已发布任务的更改需要手动保存"}</small><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
+    <footer class="editor-footer"><div class="editor-pickers" role="group" aria-label="任务事件与负责人">${pickerButton("incidentId", "事件", "explore", selectedIncident)}${pickerButton("ownerId", "负责人", "person", selectedOwner)}</div><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
+  let pickerDialog: HTMLDialogElement | undefined;
+  const bindPicker = (
+    name: string,
+    label: string,
+    placeholder: string,
+    choices: TaskChoice[],
+  ) => {
+    const field = form.elements.namedItem(name) as HTMLInputElement;
+    const button = form.querySelector<HTMLButtonElement>(`#${name}-picker`)!;
+    button.addEventListener("click", () => {
+      pickerDialog = openTaskPicker(
+        label,
+        placeholder,
+        choices,
+        field.value,
+        (choice) => {
+          if (choice.id === field.value) return;
+          field.value = choice.id;
+          form.querySelector(`#${name}-selection`)!.textContent = choice.title;
+          button.removeAttribute("aria-invalid");
+          field.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+      );
+      pickerDialog.addEventListener(
+        "close",
+        () => {
+          pickerDialog = undefined;
+        },
+        { once: true },
+      );
+    });
+  };
+  bindPicker("incidentId", "事件", "搜索事件名称或地区", incidentChoices);
+  bindPicker("ownerId", "负责人", "搜索姓名或邮箱", ownerChoices);
   form.addEventListener(
     "invalid",
     (event) => {
@@ -180,7 +241,6 @@ export function mountEditor(
   form.addEventListener("focusin", revealFocus);
   window.addEventListener("resize", revealFocus);
   window.visualViewport?.addEventListener("resize", revealFocus);
-  const status = host.querySelector<HTMLElement>("#save-status")!;
   const blockHost = host.querySelector<HTMLElement>("#blocks")!;
   const undoButton = host.querySelector<HTMLButtonElement>("#undo-block")!;
   const redoButton = host.querySelector<HTMLButtonElement>("#redo-block")!;
@@ -246,13 +306,7 @@ export function mountEditor(
   redoButton.addEventListener("click", () => restoreBlocks(future, past));
   const publishButton = host.querySelector<HTMLButtonElement>("#publish-task");
   let deadlineTimer: ReturnType<typeof setTimeout>;
-  for (const name of [
-    "title",
-    "incidentId",
-    "summary",
-    "startsAt",
-    "deadline",
-  ]) {
+  for (const name of ["title", "summary", "startsAt", "deadline"]) {
     const field = form.elements.namedItem(name) as HTMLInputElement;
     const label = form.querySelector<HTMLLabelElement>(`label[for="${name}"]`)!;
     field.setAttribute("aria-label", label.textContent || "");
@@ -273,13 +327,14 @@ export function mountEditor(
     };
     const required = {
       title: "任务标题",
-      incidentId: "所属事件",
       summary: "工作内容与能力要求摘要",
       startsAt: "任务开始时间",
       deadline: "报名截止时间",
     };
     for (const [field, label] of Object.entries(required))
       check(field, !!value(field).trim(), `请填写${label}`);
+    check("incidentId", !!value("incidentId").trim(), "请选择事件");
+    check("ownerId", !!value("ownerId").trim(), "请选择负责人");
     for (const field of ["endsAt", "capacity"])
       if (value(field)) check(field, true, "");
     if (
@@ -341,7 +396,7 @@ export function mountEditor(
       invalidate(
         field.id,
         field.id === "capacity"
-          ? "计划招募人数须为 1 至 10000 的整数"
+          ? "人数上限须为 1 至 10000 的整数"
           : `请检查${field.getAttribute("aria-label") || form.querySelector(`label[for="${field.id}"]`)?.textContent || "此项内容"}`,
       );
     }
@@ -351,9 +406,12 @@ export function mountEditor(
     if (!publishButton) return;
     const checks = publicationChecks();
     const issues = checks.filter((item) => !item.complete);
+    const counted = checks.filter(
+      (item) => item.field !== "incidentId" && item.field !== "ownerId",
+    );
     publishButton.disabled = issues.length > 0;
     publishButton.textContent = issues.length
-      ? `发布招募 (${checks.length - issues.length}/${checks.length})`
+      ? `发布招募 (${counted.filter((item) => item.complete).length}/${counted.length})`
       : "发布招募";
     publishButton.title = issues.map((issue) => issue.message).join("\n");
     clearTimeout(deadlineTimer);
@@ -521,7 +579,7 @@ export function mountEditor(
     blockHost.innerHTML = blocks
       .map(
         (block, index) =>
-          `<div class="block-editor" style="border-top:1px solid var(--outline-variant);margin-top:20px;padding-top:16px"><div class="row"><strong class="max" style="font-size:.85rem">${index + 1}. ${blockNames[block.type]}</strong><button class="transparent circle" type="button" data-move-block="${index}" ${index === 0 ? "disabled" : ""} aria-label="上移第 ${index + 1} 段">${icon("arrow_upward")}</button><button class="transparent circle" type="button" data-remove-block="${index}" aria-label="删除第 ${index + 1} 段">${icon("delete_outline")}</button></div>${block.type === "paragraph" ? textarea(`block-text-${index}`, "段落内容", block.text || "", 'maxlength="10000"') : input(`block-text-${index}`, block.type === "heading" ? "小标题" : "说明文字", block.text || "", 'maxlength="10000"')}${uploadControl(block, index)}${block.type === "map" ? mapControl(block, index) : ""}${block.type === "table" ? textarea(`block-rows-${index}`, "表格内容", block.rows?.map((row) => row.join(" | ")).join("\n") || "", 'maxlength="10000"') + '<p class="help">每行一条记录，列之间用 | 分隔，第一行为表头。</p>' : ""}</div>`,
+          `<div class="block-editor" style="border-top:1px solid var(--outline-variant);margin-top:20px;padding-top:16px"><div class="row"><strong class="max" style="font-size:.85rem">${index + 1}. ${blockNames[block.type]}</strong><button class="transparent circle" type="button" data-move-block="${index}" ${index === 0 ? "disabled" : ""} aria-label="上移第 ${index + 1} 段">${icon("arrow_upward")}</button><button class="transparent circle" type="button" data-remove-block="${index}" aria-label="删除第 ${index + 1} 段">${icon("delete_outline")}</button></div>${block.type === "paragraph" ? textarea(`block-text-${index}`, "文本内容", block.text || "", 'maxlength="10000"') : input(`block-text-${index}`, block.type === "heading" ? "小标题" : "说明文字", block.text || "", 'maxlength="10000"')}${uploadControl(block, index)}${block.type === "map" ? mapControl(block, index) : ""}${block.type === "table" ? textarea(`block-rows-${index}`, "表格内容", block.rows?.map((row) => row.join(" | ")).join("\n") || "", 'maxlength="10000"') + '<p class="help">每行一条记录，列之间用 | 分隔，第一行为表头。</p>' : ""}</div>`,
       )
       .join("");
     blockHost
@@ -585,7 +643,7 @@ export function mountEditor(
       ["报名截止（北京时间）", value("deadline").replace("T", " ")],
       ["地点描述", value("location")],
       ["集合地点", source?.meetingPoint || ""],
-      ["招募人数", value("capacity")],
+      ["人数上限", value("capacity")],
     ].filter(([, text]) => text);
     const metadata: ContentBlock[] = rows.length
       ? [
@@ -630,7 +688,17 @@ export function mountEditor(
     if (!dirty && id) return;
     const input = data();
     if (!input.title || !input.incidentId) {
-      if (!automatic) form.reportValidity();
+      if (!automatic) {
+        if (!input.title) form.reportValidity();
+        else {
+          status.textContent = "请先选择事件";
+          const button =
+            form.querySelector<HTMLButtonElement>("#incidentId-picker")!;
+          button.setAttribute("aria-invalid", "true");
+          button.focus();
+          button.click();
+        }
+      }
       return;
     }
     if (!input.contactFields.length) {
@@ -787,6 +855,7 @@ export function mountEditor(
     },
     dispose: () => {
       disposed = true;
+      pickerDialog?.close();
       cancelAnimationFrame(focusFrame);
       footerResize.disconnect();
       window.removeEventListener("resize", revealFocus);
