@@ -83,7 +83,11 @@ export function sameHash(left: string, right: string) {
     b = new TextEncoder().encode(right);
   return a.byteLength === b.byteLength && crypto.subtle.timingSafeEqual(a, b);
 }
-export async function rateLimit(c: OrgContext, scope: string, limit = 20) {
+export async function rateLimit(
+  c: Pick<OrgContext, "env" | "req">,
+  scope: string,
+  limit = 20,
+) {
   const now = Date.now();
   const key = await hash(
     `${scope}:${c.req.header("CF-Connecting-IP") ?? "local"}`,

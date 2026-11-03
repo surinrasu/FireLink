@@ -92,6 +92,14 @@ struct LoginView: View {
           }
         }
       }
+      if registration == nil && challenge == nil && model.config?.demo == true {
+        Section {
+          Button(L10n.text("enter_demo_client")) {
+            passkeys.cancel()
+            perform { try await model.enterDemo() }
+          }.disabled(busy)
+        }
+      }
       if let failure { Section { Text(failure).foregroundStyle(.red) } }
       if busy { ProgressView() }
     }.task(id: "\(model.config?.passkeys == true)-\(challenge == nil)") {

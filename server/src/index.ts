@@ -22,6 +22,8 @@ import { organizerAPI } from "./organizer-api";
 import { organizerMedia } from "./organizer-media";
 import { cleanupOrganizerData } from "./organizer-maintenance";
 import { volunteerTaskBlocks } from "./task-presentation";
+import { seedDemoWorkspace } from "./organizer-demo";
+import { rateLimit } from "./organizer-auth";
 import {
   resolveLanguage,
   translate,
@@ -34,7 +36,12 @@ import {
 
 export type App = {
   Bindings: Env;
-  Variables: { user: Profile; sessionHash: string; language: Language };
+  Variables: {
+    user: Profile;
+    sessionHash: string;
+    language: Language;
+    demoOrganization: string | null;
+  };
 };
 const app = new Hono<App>();
 function fail(
@@ -121,6 +128,7 @@ app.use("/v1/*", async (c, next) => {
 app.get("/v1/config", (c) =>
   c.json({
     mockAuth: c.env.MOCK_AUTH === "true" && c.env.APP_ENV !== "production",
+    demo: c.env.ORGANIZER_DEMO === "true" && c.env.APP_ENV !== "production",
     passkeys: !!c.env.RP_ID && c.env.RP_ID !== "localhost",
     region: "CN",
     consentVersion: 1,
@@ -144,6 +152,25 @@ const mockOnly = (env: Env) => {
   if (env.APP_ENV === "production" || env.MOCK_AUTH !== "true")
     fail(503, "identity_unavailable");
 };
+app.post("/v1/auth/demo", async (c) => {
+  if (c.env.ORGANIZER_DEMO !== "true" || c.env.APP_ENV === "production")
+    fail(404, "demo_unavailable");
+  await rateLimit(c, "volunteer-demo", 12);
+  const { orgId, volunteer, expiresAt } = await seedDemoWorkspace(c.env.DB);
+  const token = randomToken();
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO demo_volunteers VALUES (?,?)").bind(
+      volunteer.id,
+      orgId,
+    ),
+    c.env.DB.prepare("INSERT INTO sessions VALUES (?,?,?)").bind(
+      await hash(token),
+      volunteer.id,
+      expiresAt,
+    ),
+  ]);
+  return c.json({ token, profile: volunteer }, 201);
+});
 app.post("/v1/auth/sms", async (c) => {
   mockOnly(c.env);
   const { phone } = z
@@ -236,7 +263,27 @@ app.post("/v1/auth/register", async (c) => {
   return c.json(await issueSession(c.env, p), 201);
 });
 
+// A demo token grants access only to its own workspace, including on public routes.
+const optionalAuthorization = async (
+  c: Context<App>,
+  next: () => Promise<void>,
+) => {
+  if (c.req.header("Authorization")) await authorize(c, next);
+  else await next();
+};
+app.use("/v1/incidents", optionalAuthorization);
+app.use("/v1/tasks/*", optionalAuthorization);
+function taskVisibility(c: Context<App>) {
+  const organization = c.get("demoOrganization");
+  return organization
+    ? {
+        sql: "o.id=? AND o.demo_expires_at>?",
+        values: [organization, Date.now()],
+      }
+    : { sql: "o.demo_expires_at IS NULL", values: [] };
+}
 app.get("/v1/incidents", async (c) => {
+  const visibility = taskVisibility(c);
   const incidents = (
     await c.env.DB.prepare(
       "SELECT id,title,region,latitude,longitude,status,updated_at AS updatedAt FROM incidents ORDER BY updated_at DESC,id",
@@ -244,8 +291,10 @@ app.get("/v1/incidents", async (c) => {
   ).results;
   const tasks = (
     await c.env.DB.prepare(
-      "SELECT t.id,t.incident_id AS incidentId,t.title,t.summary,CASE WHEN t.paused=1 OR (t.deadline!='' AND t.deadline<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 'closed' ELSE t.status END AS status,t.updated_at AS updatedAt FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.publication_status='published' AND o.demo_expires_at IS NULL ORDER BY t.updated_at DESC,t.id",
-    ).all()
+      `SELECT t.id,t.incident_id AS incidentId,t.title,t.summary,CASE WHEN t.paused=1 OR (t.deadline!='' AND t.deadline<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 'closed' ELSE t.status END AS status,t.updated_at AS updatedAt FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.publication_status='published' AND ${visibility.sql} ORDER BY t.updated_at DESC,t.id`,
+    )
+      .bind(...visibility.values)
+      .all()
   ).results;
   return c.json(
     incidents.map((i) => ({
@@ -255,10 +304,11 @@ app.get("/v1/incidents", async (c) => {
   );
 });
 app.get("/v1/tasks/:id", async (c) => {
+  const visibility = taskVisibility(c);
   const row = await c.env.DB.prepare(
-    "SELECT t.*,o.name AS organizer_name,o.verified,o.contact,o.contact_methods FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status!='draft' AND o.demo_expires_at IS NULL",
+    `SELECT t.*,o.name AS organizer_name,o.verified,o.contact,o.contact_methods FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status!='draft' AND ${visibility.sql}`,
   )
-    .bind(c.req.param("id"))
+    .bind(c.req.param("id"), ...visibility.values)
     .first();
   if (!row) fail(404, "task_not_found");
   return c.json({
@@ -305,13 +355,14 @@ export async function authorize(c: Context<App>, next: () => Promise<void>) {
   if (!token) fail(401, "sign_in_required");
   const key = await hash(token);
   const row = await c.env.DB.prepare(
-    "SELECT u.profile FROM sessions s JOIN users u ON u.id=s.user_id WHERE token_hash=? AND expires_at>?",
+    "SELECT u.profile,d.organization_id FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN demo_volunteers d ON d.user_id=u.id LEFT JOIN organizations o ON o.id=d.organization_id WHERE s.token_hash=? AND s.expires_at>? AND (d.user_id IS NULL OR o.demo_expires_at>?)",
   )
-    .bind(key, Date.now())
-    .first<{ profile: string }>();
+    .bind(key, Date.now(), Date.now())
+    .first<{ profile: string; organization_id: string | null }>();
   if (!row) fail(401, "session_expired");
   c.set("user", asJSON<Profile>(row.profile));
   c.set("sessionHash", key);
+  c.set("demoOrganization", row.organization_id);
   await next();
 }
 app.get("/v1/me", (c) => c.json(c.get("user")));
@@ -444,10 +495,11 @@ app.post("/v1/applications", async (c) => {
   const { taskId, ...choice } = applySchema
     .extend({ taskId: z.string() })
     .parse(await boundedJSON(c.req.raw));
+  const visibility = taskVisibility(c);
   const row = await c.env.DB.prepare(
-    "SELECT t.*,o.verified FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status='published' AND o.demo_expires_at IS NULL",
+    `SELECT t.*,o.verified FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.publication_status='published' AND ${visibility.sql}`,
   )
-    .bind(taskId)
+    .bind(taskId, ...visibility.values)
     .first();
   if (!row) fail(404, "task_not_found");
   if (
@@ -529,7 +581,7 @@ app.post("/v1/applications", async (c) => {
   const id = crypto.randomUUID(),
     now = timestamp();
   const result = await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO applications(id,user_id,task_id,status,profile_snapshot,contact_snapshot,consent_version,created_at,updated_at,response) SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.status='open' AND t.paused=0 AND t.publication_status='published' AND o.verified=1 AND o.demo_expires_at IS NULL AND (t.deadline='' OR t.deadline>strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    `INSERT OR IGNORE INTO applications(id,user_id,task_id,status,profile_snapshot,contact_snapshot,consent_version,created_at,updated_at,response) SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.status='open' AND t.paused=0 AND t.publication_status='published' AND o.verified=1 AND ${visibility.sql} AND (t.deadline='' OR t.deadline>strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
   )
     .bind(
       id,
@@ -540,6 +592,7 @@ app.post("/v1/applications", async (c) => {
       now,
       now,
       taskId,
+      ...visibility.values,
     )
     .run();
   if (!result.meta.changes) fail(409, "already_applied");

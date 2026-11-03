@@ -150,6 +150,7 @@ struct ServerConfig: Codable {
   let region: String
   let consentVersion: Int
   let mockIdentity: IdentityExample?
+  var demo: Bool? = nil
 }
 struct AuthResult: Codable {
   let token: String?

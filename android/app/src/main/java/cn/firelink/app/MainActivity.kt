@@ -269,7 +269,10 @@ fun FireLink(
                 }
             }
             composable("login") {
-                LoginScreen(model) {
+                LoginScreen(model, demoDone = {
+                    nav.popBackStack("home", false)
+                    go("home")
+                }) {
                     nav.popBackStack()
                     go(pending)
                 }

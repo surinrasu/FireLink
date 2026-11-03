@@ -188,3 +188,4 @@
 "vehicle_decrease" = "Decrease %1$@ count";
 "vehicle_increase" = "Increase %1$@ count";
 "equipment_text_hint" = "Describe any tools, equipment, or supplies you can provide.";
+"enter_demo_client" = "Enter demo client";

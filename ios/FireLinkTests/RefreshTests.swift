@@ -5,6 +5,40 @@ import XCTest
 
 final class RefreshTests: XCTestCase {
   @MainActor
+  func testDemoEntryUsesServerSessionAndReloadsWorkspace() async throws {
+    let previousToken = TokenStore.read()
+    defer { TokenStore.save(previousToken) }
+    var paths: [String] = []
+    let (model, session) = makeModel { request in
+      let path = try XCTUnwrap(request.url?.path)
+      paths.append(path)
+      if path == "/v1/auth/demo" {
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+        return "{\"token\":\"demo-session\",\"profile\":\(Self.responses["/v1/me"]!)}"
+      }
+      XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer demo-session")
+      return try XCTUnwrap(Self.responses[path])
+    }
+    defer { session.invalidateAndCancel() }
+    model.showLogin = true
+    model.afterLogin = { XCTFail("Demo entry must not resume a task from another workspace") }
+
+    try await model.enterDemo()
+
+    XCTAssertEqual(
+      paths,
+      [
+        "/v1/auth/demo", "/v1/me", "/v1/applications", "/v1/notifications", "/v1/incidents",
+        "/v1/articles",
+      ])
+    XCTAssertEqual(model.token, "demo-session")
+    XCTAssertEqual(model.demoSessionID, "volunteer-new")
+    XCTAssertEqual(model.incidents.first?.id, "incident-new")
+    XCTAssertFalse(model.showLogin)
+    XCTAssertNil(model.afterLogin)
+  }
+  @MainActor
   func testRefreshCompletesAfterViewCancellationAndSharesOverlappingRequests() async {
     var paths: [String] = []
     let (model, session) = makeModel { request in
