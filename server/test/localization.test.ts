@@ -55,6 +55,15 @@ test("errors and result notifications translate while authored content remains u
   );
   const authored = { title: "集合提醒", body: "请于明早集合" };
   assert.deepEqual(notificationText("en", authored, null, null), authored);
+  const expiry = {
+    title: "报名已过期",
+    body: "任务已结束，报名未获确认，已自动过期。",
+  };
+  for (const language of ["en", "zh-Hans", "zh-Hant", "zh-Hant-HK"] as const)
+    assert.deepEqual(notificationText(language, expiry, "expired", null), {
+      title: translate(language, "application_expired"),
+      body: translate(language, "application_expired_body"),
+    });
   assert.equal(
     notificationText(
       "zh-Hant",

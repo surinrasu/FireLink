@@ -21,6 +21,7 @@ import { passkeyRoutes } from "./passkeys";
 import { organizerAPI } from "./organizer-api";
 import { organizerMedia } from "./organizer-media";
 import { cleanupOrganizerData } from "./organizer-maintenance";
+import { expireApplications } from "./application-expiry";
 import { volunteerTaskBlocks } from "./task-presentation";
 import { seedDemoWorkspace } from "./organizer-demo";
 import { rateLimit } from "./organizer-auth";
@@ -89,6 +90,12 @@ app.use("*", async (c, next) => {
   c.header("X-Robots-Tag", "noindex, nofollow, noarchive");
 });
 app.onError((e, c) => {
+  const detail = `${e.message} ${e.cause instanceof Error ? e.cause.message : ""}`;
+  if (detail.includes("application_task_ended"))
+    return c.json(
+      { error: translate(c.get("language"), "application_task_ended") },
+      409,
+    );
   if (e instanceof ZodError)
     return c.json(
       {
@@ -291,7 +298,7 @@ app.get("/v1/incidents", async (c) => {
   ).results;
   const tasks = (
     await c.env.DB.prepare(
-      `SELECT t.id,t.incident_id AS incidentId,t.title,t.summary,CASE WHEN t.paused=1 OR (t.deadline!='' AND t.deadline<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 'closed' ELSE t.status END AS status,t.updated_at AS updatedAt FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.publication_status='published' AND ${visibility.sql} ORDER BY t.updated_at DESC,t.id`,
+      `SELECT t.id,t.incident_id AS incidentId,t.title,t.summary,CASE WHEN t.paused=1 OR (t.ends_at!='' AND t.ends_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) OR (t.deadline!='' AND t.deadline<=strftime('%Y-%m-%dT%H:%M:%fZ','now')) THEN 'closed' ELSE t.status END AS status,t.updated_at AS updatedAt FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.publication_status='published' AND ${visibility.sql} ORDER BY t.updated_at DESC,t.id`,
     )
       .bind(...visibility.values)
       .all()
@@ -319,6 +326,7 @@ app.get("/v1/tasks/:id", async (c) => {
     status:
       row.paused ||
       row.publication_status === "archived" ||
+      (row.ends_at && String(row.ends_at) <= timestamp()) ||
       (row.deadline && String(row.deadline) <= timestamp())
         ? "closed"
         : row.status,
@@ -363,6 +371,8 @@ export async function authorize(c: Context<App>, next: () => Promise<void>) {
   c.set("user", asJSON<Profile>(row.profile));
   c.set("sessionHash", key);
   c.set("demoOrganization", row.organization_id);
+  if (/^\/v1\/(applications|notifications)(\/|$)/.test(c.req.path))
+    await expireApplications(c.env.DB, { userId: c.get("user").id });
   await next();
 }
 app.get("/v1/me", (c) => c.json(c.get("user")));
@@ -506,6 +516,7 @@ app.post("/v1/applications", async (c) => {
     row.status !== "open" ||
     !row.verified ||
     row.paused ||
+    (row.ends_at && String(row.ends_at) <= timestamp()) ||
     (row.deadline && String(row.deadline) <= timestamp())
   )
     fail(409, "applications_closed");
@@ -581,7 +592,7 @@ app.post("/v1/applications", async (c) => {
   const id = crypto.randomUUID(),
     now = timestamp();
   const result = await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO applications(id,user_id,task_id,status,profile_snapshot,contact_snapshot,consent_version,created_at,updated_at,response) SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.status='open' AND t.paused=0 AND t.publication_status='published' AND o.verified=1 AND ${visibility.sql} AND (t.deadline='' OR t.deadline>strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
+    `INSERT OR IGNORE INTO applications(id,user_id,task_id,status,profile_snapshot,contact_snapshot,consent_version,created_at,updated_at,response) SELECT ?, ?, ?, 'pending', ?, ?, 1, ?, ?, NULL WHERE EXISTS (SELECT 1 FROM tasks t JOIN organizations o ON o.id=t.organizer_id WHERE t.id=? AND t.status='open' AND t.paused=0 AND t.publication_status='published' AND o.verified=1 AND ${visibility.sql} AND (t.ends_at='' OR t.ends_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) AND (t.deadline='' OR t.deadline>strftime('%Y-%m-%dT%H:%M:%fZ','now')))`,
   )
     .bind(
       id,
@@ -674,7 +685,9 @@ app.route("/api/organizer", organizerAPI);
 app.route("/api/organizer-media", organizerMedia);
 export default {
   fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, env: Env) {
-    await cleanupOrganizerData(env.DB, Date.now(), env.FILES);
+  async scheduled(controller: ScheduledController, env: Env) {
+    await expireApplications(env.DB);
+    if (controller.cron !== "*/5 * * * *")
+      await cleanupOrganizerData(env.DB, Date.now(), env.FILES);
   },
 } satisfies ExportedHandler<Env>;

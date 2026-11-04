@@ -18,6 +18,7 @@ export const stateLabels: Record<TaskState | ApplicationState, string> = {
   accepted: "已通过",
   rejected: "未通过",
   withdrawn: "已撤回",
+  expired: "已过期",
 };
 export const fieldLabels: Record<string, string> = {
   username: "昵称",
@@ -88,6 +89,18 @@ export function select(
   options = "",
 ) {
   return `<div class="field label border"><select id="${h(name)}" name="${h(name)}" ${options}>${choices.map(([key, text]) => `<option value="${h(key)}" ${key === value ? "selected" : ""}>${h(text)}</option>`).join("")}</select><label for="${h(name)}">${h(label)}</label></div>`;
+}
+export function searchField(
+  id: string,
+  label: string,
+  options: {
+    placeholder?: string;
+    value?: string;
+    name?: string;
+    className?: string;
+  } = {},
+) {
+  return `<div class="field border prefix search-field ${h(options.className || "")}">${icon("search")}<input id="${h(id)}" name="${h(options.name || id)}" type="search" value="${h(options.value || "")}" placeholder="${h(options.placeholder || label)}" aria-label="${h(label)}" autocomplete="off"></div>`;
 }
 export function empty(
   title: string,

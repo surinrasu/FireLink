@@ -233,6 +233,24 @@
     "zh-Hant": "報名未通過",
     "zh-Hant-HK": "報名未通過"
   },
+  "application_expired": {
+    "en": "Application expired",
+    "zh-Hans": "报名已过期",
+    "zh-Hant": "報名已過期",
+    "zh-Hant-HK": "報名已過期"
+  },
+  "application_expired_body": {
+    "en": "The task has ended. Your application was not confirmed and has expired automatically.",
+    "zh-Hans": "任务已结束，报名未获确认，已自动过期。",
+    "zh-Hant": "任務已結束，報名未獲確認，已自動過期。",
+    "zh-Hant-HK": "任務已結束，報名未獲確認，已自動過期。"
+  },
+  "application_task_ended": {
+    "en": "The task has ended and your application has expired. Refresh to see the latest status.",
+    "zh-Hans": "任务已结束，报名已过期，请刷新查看最新结果。",
+    "zh-Hant": "任務已結束，報名已過期，請重新整理查看最新結果。",
+    "zh-Hant-HK": "任務已結束，報名已過期，請重新整理查看最新結果。"
+  },
   "application_updated": {
     "en": "The organizer has updated your application result.",
     "zh-Hans": "组织者已更新你的申请结果",

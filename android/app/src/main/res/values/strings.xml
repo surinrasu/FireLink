@@ -69,6 +69,8 @@
     <string name="application_accepted">"Accepted"</string>
     <string name="application_rejected">"Not accepted"</string>
     <string name="application_withdrawn">"Withdrawn"</string>
+    <string name="application_expired">"Expired"</string>
+    <string name="application_expired_reason">"The task has ended. Your application was not confirmed and has expired automatically."</string>
     <string name="username">"Username"</string>
     <string name="pronouns">"Pronouns"</string>
     <string name="real_name">"Full name"</string>

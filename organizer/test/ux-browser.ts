@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { access, mkdir } from "node:fs/promises";
 import { chromium, type Page, type BrowserContext } from "playwright";
-import type { MapAnnotation, Workspace } from "../../shared/organizer";
+import type {
+  Session,
+  MapAnnotation,
+  TaskState,
+  Workspace,
+} from "../../shared/organizer";
 import { isolateLocalDemo } from "./local-demo";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -44,10 +49,277 @@ async function editDraft(page: Page) {
   await page.getByRole("link", { name: "继续编辑" }).first().click();
   await page.locator("#task-form").waitFor();
 }
+async function selectDashboardEvents(page: Page, names: string[]) {
+  const options = page.locator(".dashboard-event-option");
+  for (let index = 0; index < (await options.count()); index++) {
+    const option = options.nth(index);
+    const wanted = names.includes(await option.locator("span").innerText());
+    if (((await option.getAttribute("aria-pressed")) === "true") !== wanted)
+      await option.click();
+  }
+}
 const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "component-consistency": async (page) => {
+    const appearance = (selector: string, colors = false) =>
+      page
+        .locator(selector)
+        .first()
+        .evaluate((element, colors) => {
+          const style = getComputedStyle(element);
+          return {
+            font: style.fontSize,
+            weight: style.fontWeight,
+            lineHeight: style.lineHeight,
+            padding: style.padding,
+            radius: style.borderRadius,
+            gap: style.gap,
+            height: element.getBoundingClientRect().height,
+            ...(colors
+              ? {
+                  color: style.color,
+                  background: style.backgroundColor,
+                  border: style.borderColor,
+                }
+              : {}),
+          };
+        }, colors);
+    assert.deepEqual(
+      await appearance(".page-actions a.button:not(.border)"),
+      await appearance("#dashboard-map-toggle"),
+      "action links and buttons share the same dimensions and typography",
+    );
+    await page.locator(".dashboard-event-option").first().click();
+    await page.mouse.move(0, 0);
+    const eventSelected = await appearance(
+      '.dashboard-event-option[aria-pressed="true"]',
+      true,
+    );
+    const eventUnselected = await appearance(
+      '.dashboard-event-option[aria-pressed="false"]',
+      true,
+    );
+
+    const fieldAppearance = (selector: string) =>
+      page.locator(selector).evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          font: style.fontSize,
+          radius: style.borderRadius,
+          height: element.getBoundingClientRect().height,
+        };
+      });
+    const aligned = async (selector: string) => {
+      const fields = await page
+        .locator(selector)
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getBoundingClientRect().toJSON()),
+        );
+      assert.equal(fields.length, 2);
+      assert.ok(Math.abs(fields[0].top - fields[1].top) < 1);
+      assert.ok(Math.abs(fields[0].bottom - fields[1].bottom) < 1);
+    };
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page.locator("#task-search").waitFor();
+    await aligned("#task-search, #incident-filter");
+    const search = await fieldAppearance("#task-search");
+    await page.locator('.sidebar a[href="#/applications"]').click();
+    await page.locator("#application-search").waitFor();
+    await aligned("#application-task, #application-search");
+    assert.deepEqual(await fieldAppearance("#application-search"), search);
+    await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await page.locator(".requirement-option").first().waitFor();
+    assert.deepEqual(
+      await appearance(".requirement-option > input:checked + span", true),
+      eventSelected,
+      "event and requirement selections have the same selected appearance",
+    );
+    assert.deepEqual(
+      await appearance(
+        ".requirement-option > input:not(:checked) + span",
+        true,
+      ),
+      eventUnselected,
+      "event and requirement selections have the same unselected appearance",
+    );
+    await page.locator("#incidentId-picker").click();
+    await page.locator("#task-picker-search").waitFor();
+    assert.deepEqual(await fieldAppearance("#task-picker-search"), search);
+    await page.keyboard.press("Escape");
+  },
+  "enlarged-text-layout": async (page) => {
+    for (const [route, ready] of [
+      ["dashboard", "#dashboard-sort"],
+      ["tasks", "#task-search"],
+      ["applications", "#application-search"],
+    ]) {
+      await page.goto(`${base}#/${route}`);
+      await page.locator(ready).waitFor();
+      for (const fontSize of [16, 18, 32]) {
+        await page.evaluate((size) => {
+          document.documentElement.style.fontSize = `${size}px`;
+        }, fontSize);
+        for (const width of [320, 390, 768, 1440]) {
+          await page.setViewportSize({ width, height: 900 });
+          const failures = await page.evaluate(() => {
+            const failures: string[] = [];
+            for (const element of document.querySelectorAll<HTMLElement>(
+              ".dashboard-sort button, .dashboard-event-actions button, .mobile-nav a, .mobile-nav button, .toolbar input, .toolbar select",
+            )) {
+              const box = element.getBoundingClientRect();
+              if (!box.width || !box.height) continue;
+              const label =
+                element.getAttribute("aria-label") || element.textContent;
+              if (box.left < -1 || box.right > innerWidth + 1)
+                failures.push(`${label}: outside viewport`);
+              if (element.matches("input, select")) {
+                const field = element
+                  .closest(".field")!
+                  .getBoundingClientRect();
+                if (box.left < field.left - 1 || box.right > field.right + 1)
+                  failures.push(`${label}: outside field`);
+                continue;
+              }
+              const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT,
+              );
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (
+                  !node.textContent?.trim() ||
+                  node.parentElement?.closest("i")
+                )
+                  continue;
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                for (const text of range.getClientRects()) {
+                  if (
+                    text.left < box.left - 1 ||
+                    text.right > box.right + 1 ||
+                    text.top < box.top - 1 ||
+                    text.bottom > box.bottom + 1
+                  )
+                    failures.push(`${label}: clipped or overlapping label`);
+                }
+              }
+            }
+            const nav = document
+              .querySelector(".mobile-nav")!
+              .getBoundingClientRect();
+            const padding = parseFloat(
+              getComputedStyle(document.querySelector("main")!).paddingBottom,
+            );
+            if (nav.height && padding < nav.height + 8)
+              failures.push("navigation covers the end of the content");
+            return failures;
+          });
+          assert.deepEqual(
+            failures,
+            [],
+            `${route}: ${width}px / ${fontSize}px text`,
+          );
+          if (
+            (fontSize === 32 && width <= 390) ||
+            (fontSize === 16 && width === 1440)
+          ) {
+            await page.locator(ready).scrollIntoViewIfNeeded();
+            await page.screenshot({
+              path: `../.artifacts/organizer/ux/text-layout-${route}-${width}-${fontSize}.png`,
+            });
+          }
+        }
+      }
+      await page.setViewportSize({ width: 320, height: 900 });
+      if (route === "dashboard") {
+        const radios = page.locator("#dashboard-sort button");
+        await radios.first().click();
+        await page.keyboard.press("ArrowDown");
+        assert.equal(await radios.nth(1).getAttribute("aria-checked"), "true");
+        assert.equal(
+          await radios.nth(1).evaluate((el) => el === document.activeElement),
+          true,
+        );
+      } else {
+        await page.locator(ready).fill("安置");
+        await page.locator(ready).press("Enter");
+        await page.waitForURL(/q=/);
+        assert.equal(await page.locator(ready).inputValue(), "安置");
+      }
+    }
+    await page.locator('.mobile-nav button[data-action="more"]').click();
+    await page.getByRole("dialog").waitFor();
+    await page.keyboard.press("Escape");
+  },
+  "expired-applications": async (page) => {
+    const endpoint = (path: string) =>
+      new URL(`/api/organizer${path}`, base).href;
+    const session: Session = await (
+      await page.request.get(endpoint("/auth/session"))
+    ).json();
+    const headers = {
+      "X-Organization-Id": session.memberships[0].organizationId,
+      "X-FireLink-Request": "organizer",
+    };
+    const workspace: Workspace = await (
+      await page.request.get(endpoint("/workspace"), { headers })
+    ).json();
+    const task = workspace.tasks.find((item) => item.pending > 0)!;
+    const remaining =
+      workspace.tasks.reduce((sum, item) => sum + item.pending, 0) -
+      task.pending;
+    const update = await page.request.put(endpoint(`/tasks/${task.id}`), {
+      headers,
+      data: {
+        ...task,
+        startsAt: "2000-01-01T00:00:00.000Z",
+        endsAt: "2000-01-02T00:00:00.000Z",
+        deadline: "2000-01-01T00:00:00.000Z",
+      },
+    });
+    assert.equal(update.status(), 200, await update.text());
+    await page.locator('.sidebar a[href="#/applications"]').click();
+    await page
+      .locator(".filter-chips a")
+      .filter({ hasText: `已过期 ${task.pending}` })
+      .click();
+    await page
+      .getByText("任务已结束，报名未获确认，已自动过期。", { exact: true })
+      .waitFor();
+    assert.equal(await page.locator(".application-row").count(), task.pending);
+    assert.equal(
+      await page
+        .locator('.sidebar a[href="#/applications"] .count')
+        .innerText(),
+      String(remaining),
+    );
+    assert.equal(await page.locator("#review-form").count(), 0);
+    assert.equal(await page.locator(".contact-row").count(), 0);
+    assert.match(
+      await page.locator("#review-detail .review-heading .status").innerText(),
+      /已过期/,
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/expired-desktop.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await page.locator(".application-row").first().click();
+    await page
+      .getByText("任务已结束，报名未获确认，已自动过期。", { exact: true })
+      .waitFor();
+    assert.equal(await page.locator("#review-form").count(), 0);
+    assert.equal(await page.locator(".contact-row").count(), 0);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+  },
   "task-pickers": async (page) => {
     let original: Workspace;
     let emptyChoices = false;
@@ -334,9 +606,7 @@ const cases: Record<
       true,
     );
     await page.locator('.sidebar a[href="#/tasks"]').click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     const incident = page.getByLabel("所属事件", { exact: true });
     await incident.click();
     await menu
@@ -355,7 +625,7 @@ const cases: Record<
     await page.keyboard.press("Escape");
     assert.equal(await incident.inputValue(), "incident-hangzhou");
     await incident.click();
-    await page.getByRole("heading", { name: "任务管理", exact: true }).click();
+    await page.getByRole("heading", { name: "任务", exact: true }).click();
     await menu.waitFor({ state: "hidden" });
     await page.locator('.sidebar a[href="#/settings"]').click();
     await page.getByRole("button", { name: "邀请成员", exact: true }).click();
@@ -375,7 +645,7 @@ const cases: Record<
     const visibleTasks = page.locator(".task-card:visible");
     await incidents();
     await page
-      .getByRole("heading", { name: "活跃事件", exact: true })
+      .getByRole("heading", { name: "事件", exact: true, level: 1 })
       .waitFor();
     assert.deepEqual(
       await cards.locator(".incident-header h2").allTextContents(),
@@ -399,9 +669,7 @@ const cases: Record<
       fullPage: true,
     });
     await cards.first().getByRole("link", { name: "显示全部" }).click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(
       await page.getByLabel("所属事件", { exact: true }).inputValue(),
       "incident-hangzhou",
@@ -413,9 +681,7 @@ const cases: Record<
       ),
     );
     await page.reload();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(await visibleTasks.count(), 4);
     await page.getByRole("link", { name: "草稿 1", exact: true }).click();
     await page
@@ -443,9 +709,7 @@ const cases: Record<
     );
     await incidents();
     await cards.nth(1).getByRole("link", { name: "显示全部" }).click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(await visibleTasks.count(), 2);
     assert.ok(
       (await visibleTasks.locator(".task-event").allTextContents()).every(
@@ -463,9 +727,7 @@ const cases: Record<
       .getByLabel("所属事件", { exact: true })
       .selectOption("incident-hangzhou");
     await page.reload();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(await visibleTasks.count(), 4);
     await incidents();
     await cards.first().waitFor();
@@ -487,13 +749,11 @@ const cases: Record<
       ),
     );
     await cards.first().getByRole("link", { name: "显示全部" }).click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(await visibleTasks.count(), 4);
     await page.goBack();
     await page
-      .getByRole("heading", { name: "活跃事件", exact: true })
+      .getByRole("heading", { name: "事件", exact: true, level: 1 })
       .waitFor();
   },
   "account-preferences": async (page) => {
@@ -810,9 +1070,7 @@ const cases: Record<
     await page.getByRole("radio", { name: "浅色", exact: true }).check();
     await page.keyboard.press("Escape");
     await page.locator('.sidebar a[href="#/tasks"]').click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     await page.locator('.sidebar a[href="#/settings"]').click();
     await page
       .getByRole("heading", { name: "组织设置", exact: true })
@@ -822,6 +1080,571 @@ const cases: Record<
     assert.equal(
       await page.getByRole("radio", { name: "浅色", exact: true }).isChecked(),
       true,
+    );
+  },
+  "dashboard-events": async (page) => {
+    let removeSelected = false;
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data: Workspace = await response.json();
+      const sample = data.tasks.find((task) => task.state === "open")!;
+      const [first, second] = data.incidents;
+      data.incidents.push(
+        {
+          ...first,
+          id: "pending-event",
+          title: "报名截止但仍待审核的事件",
+          status: "closed",
+        },
+        { ...first, id: "draft-event", title: "尚未开始招募的事件" },
+        { ...first, id: "unrelated-event", title: "没有可见任务的事件" },
+      );
+      data.tasks = [
+        {
+          ...sample,
+          id: "event-task-a",
+          title: "杭州待审任务",
+          incidentId: first.id,
+          incidentTitle: first.title,
+          pending: 8,
+          updatedAt: "2026-01-03",
+          deadline: "2099-01-03",
+        },
+        {
+          ...sample,
+          id: "event-task-b",
+          title: "南京招募任务",
+          incidentId: second.id,
+          incidentTitle: second.title,
+          pending: 0,
+          updatedAt: "2026-01-02",
+          deadline: "2099-01-01",
+        },
+        {
+          ...sample,
+          id: "event-task-c",
+          title: "截止后待审任务",
+          incidentId: "pending-event",
+          incidentTitle: "报名截止但仍待审核的事件",
+          state: "closed",
+          pending: 1,
+          updatedAt: "2026-01-01",
+          deadline: "",
+        },
+        {
+          ...sample,
+          id: "event-task-d",
+          title: "草稿任务",
+          incidentId: "draft-event",
+          incidentTitle: "尚未开始招募的事件",
+          state: "draft",
+          pending: 0,
+        },
+      ];
+      if (removeSelected)
+        data.tasks = data.tasks.filter((task) => task.incidentId !== first.id);
+      await route.fulfill({ response, json: data });
+    });
+    await page.reload();
+    const toggle = page.locator("#dashboard-map-toggle");
+    await toggle.waitFor();
+    assert.equal(await toggle.getAttribute("aria-expanded"), "true");
+    const chip = (name: string) =>
+      page
+        .locator(".dashboard-event-list")
+        .getByRole("button", { name, exact: true });
+    const titles = async () => {
+      while (await page.locator("#dashboard-more").isVisible())
+        await page.locator("#dashboard-more").click();
+      return page.locator("#dashboard-tasks .task-info > a").allTextContents();
+    };
+    assert.equal(await chip("没有可见任务的事件").count(), 0);
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      4,
+    );
+    assert.equal(
+      await page.locator("#dashboard-events-title").innerText(),
+      "活跃事件",
+    );
+    const allEvents = page
+      .locator(".dashboard-events")
+      .getByRole("link", { name: "全部事件", exact: true });
+    await allEvents.click();
+    await page
+      .getByRole("heading", { name: "事件", exact: true, level: 1 })
+      .waitFor();
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await toggle.waitFor();
+    assert.deepEqual(await titles(), [
+      "杭州待审任务",
+      "南京招募任务",
+      "截止后待审任务",
+    ]);
+    await chip("南京鼓楼区火情").click();
+    assert.equal(
+      await chip("南京鼓楼区火情").getAttribute("aria-pressed"),
+      "false",
+    );
+    assert.deepEqual(await titles(), ["杭州待审任务", "截止后待审任务"]);
+    await selectDashboardEvents(page, ["南京鼓楼区火情"]);
+    assert.deepEqual(
+      await titles(),
+      ["南京招募任务"],
+      "other events' pending applications must not hide this open task",
+    );
+    assert.equal(
+      await page.locator("#dashboard-tasks .task-incident").count(),
+      0,
+    );
+    await chip("杭州西湖区火情").click();
+    assert.deepEqual(await titles(), ["杭州待审任务", "南京招募任务"]);
+    assert.equal(
+      await page.locator("#dashboard-tasks .task-incident").count(),
+      2,
+    );
+    await page
+      .getByRole("radio", { name: "按距截止时间", exact: true })
+      .click();
+    assert.deepEqual(await titles(), ["南京招募任务", "杭州待审任务"]);
+    const contained = await page
+      .locator(".incident-map-marker.is-selected")
+      .evaluateAll((markers) => {
+        const map = document
+          .querySelector(".incident-map-canvas")!
+          .getBoundingClientRect();
+        return markers.every((marker) => {
+          const box = marker.getBoundingClientRect();
+          return (
+            box.left >= map.left &&
+            box.right <= map.right &&
+            box.top >= map.top &&
+            box.bottom <= map.bottom
+          );
+        });
+      });
+    assert.equal(contained, true, "fit the complete selection inside the map");
+    await toggle.click();
+    await page.getByRole("link", { name: "南京招募任务", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "南京招募任务", exact: true })
+      .waitFor();
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await toggle.waitFor();
+    assert.equal(
+      await chip("杭州西湖区火情").getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.equal(
+      await chip("南京鼓楼区火情").getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.equal(
+      await page
+        .getByRole("radio", { name: "按距截止时间", exact: true })
+        .isChecked(),
+      true,
+    );
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false");
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      4,
+    );
+    await selectDashboardEvents(page, []);
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      0,
+    );
+    await page
+      .getByRole("heading", { name: "请选择事件", exact: true })
+      .waitFor();
+    assert.equal(await page.locator("#dashboard-tasks .task-row").count(), 0);
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await page
+      .getByRole("heading", { name: "请选择事件", exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      0,
+    );
+    await selectDashboardEvents(page, ["尚未开始招募的事件"]);
+    await page
+      .getByRole("heading", { name: "所选事件暂无需要关注的任务", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "查看全部事件的任务", exact: true })
+      .click();
+    assert.deepEqual(await titles(), [
+      "南京招募任务",
+      "杭州待审任务",
+      "截止后待审任务",
+    ]);
+    await selectDashboardEvents(page, ["杭州西湖区火情"]);
+    removeSelected = true;
+    await page.locator('.sidebar a[href="#/tasks"]').click();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
+    await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+    await toggle.waitFor();
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      3,
+      "discard choices no longer accessible",
+    );
+    assert.deepEqual(await titles(), ["南京招募任务", "截止后待审任务"]);
+  },
+  "dashboard-event-defaults": async (page) => {
+    const scenarios: { states: TaskState[]; selected: boolean }[] = [
+      { states: ["draft"], selected: true },
+      { states: ["open"], selected: true },
+      { states: ["paused"], selected: true },
+      { states: ["closed"], selected: false },
+      { states: ["archived"], selected: false },
+      { states: ["closed", "draft"], selected: false },
+      { states: ["closed", "open"], selected: true },
+      { states: ["archived", "paused"], selected: true },
+    ];
+    let allEnded = false;
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data: Workspace = await response.json();
+      const sample = data.tasks[0];
+      data.incidents = scenarios.map((scenario, index) => ({
+        ...data.incidents[0],
+        id: `default-event-${index}`,
+        title: scenario.states.join(" + "),
+      }));
+      data.tasks = scenarios.flatMap((scenario, index) =>
+        scenario.states.map((state, taskIndex) => ({
+          ...sample,
+          id: `default-task-${index}-${taskIndex}`,
+          incidentId: data.incidents[index].id,
+          incidentTitle: data.incidents[index].title,
+          state: allEnded ? "closed" : state,
+          pending: 0,
+        })),
+      );
+      await route.fulfill({ response, json: data });
+    });
+    await page.reload();
+    const panel = page.locator(".dashboard-events");
+    await panel.waitFor();
+    const selection = () =>
+      page
+        .locator(".dashboard-event-option")
+        .evaluateAll((options) =>
+          options.map(
+            (option) => option.getAttribute("aria-pressed") === "true",
+          ),
+        );
+    assert.deepEqual(
+      await selection(),
+      scenarios.map((scenario) => scenario.selected),
+    );
+    assert.equal((await selection()).filter(Boolean).length, 5);
+    assert.equal(
+      await page.locator(".incident-map-marker.is-selected").count(),
+      5,
+    );
+    const revisit = async () => {
+      await page.locator('.sidebar a[href="#/tasks"]').click();
+      await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
+      await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
+      await panel.waitFor();
+    };
+    allEnded = true;
+    await revisit();
+    assert.deepEqual(
+      await selection(),
+      scenarios.map(() => false),
+    );
+    assert.equal(
+      (await selection()).filter(Boolean).length,
+      0,
+      "no default matches must not select all",
+    );
+    assert.equal(
+      await page.locator(".incident-map-marker.is-selected").count(),
+      0,
+    );
+    await page
+      .locator('.dashboard-event-option[value="default-event-3"]')
+      .click();
+    await revisit();
+    assert.equal((await selection()).filter(Boolean).length, 1);
+    assert.deepEqual(
+      await selection(),
+      scenarios.map((_, index) => index === 3),
+      "manual choices survive navigation",
+    );
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    await revisit();
+    assert.deepEqual(
+      await selection(),
+      scenarios.map(() => true),
+    );
+    assert.equal((await selection()).filter(Boolean).length, 8);
+  },
+  "dashboard-map-responsive": async (page) => {
+    const toggle = page.locator("#dashboard-map-toggle");
+    const canvas = page.locator(".incident-map-canvas");
+    const expanded = (value: boolean) =>
+      page.waitForFunction(
+        (expected) =>
+          document
+            .querySelector("#dashboard-map-toggle")
+            ?.getAttribute("aria-expanded") === String(expected),
+        value,
+      );
+    await expanded(true);
+    assert.equal(
+      await canvas
+        .locator(".leaflet-tile")
+        .first()
+        .evaluate((element) => getComputedStyle(element).borderRadius),
+      "0px",
+    );
+    assert.equal(
+      await canvas
+        .locator(".leaflet-control-attribution")
+        .evaluate((element) => {
+          const attribution = element.getBoundingClientRect();
+          const frame = element
+            .closest(".incident-map-canvas")!
+            .getBoundingClientRect();
+          return (
+            attribution.top >= frame.top && attribution.bottom <= frame.bottom
+          );
+        }),
+      true,
+      "map attribution stays inside the visible map",
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/events-desktop.png",
+    });
+    await page.setViewportSize({ width: 900, height: 1000 });
+    await expanded(false);
+    await page.setViewportSize({ width: 1440, height: 600 });
+    await expanded(false);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await expanded(true);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expanded(false);
+    assert.equal(
+      await canvas.count(),
+      0,
+      "the collapsed map is initialized only on demand",
+    );
+    await page
+      .locator(".dashboard-event-list")
+      .getByRole("button", { name: "南京鼓楼区火情", exact: true })
+      .click();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/events-mobile.png",
+    });
+    await toggle.click();
+    await expanded(true);
+    await page.locator(".incident-map-marker.is-selected").waitFor();
+    const centered = () =>
+      page.waitForFunction(() => {
+        const map = document
+          .querySelector(".incident-map-canvas")!
+          .getBoundingClientRect();
+        const pin = document
+          .querySelector(".incident-map-marker.is-selected")!
+          .getBoundingClientRect();
+        return (
+          Math.abs(pin.x + pin.width / 2 - map.x - map.width / 2) < 3 &&
+          Math.abs(pin.y + pin.height / 2 - map.y - map.height / 2) < 3
+        );
+      });
+    await centered();
+    const marker = page.locator(".incident-map-marker.is-selected");
+    const before = await marker.boundingBox();
+    await canvas.focus();
+    await page.keyboard.press("ArrowRight");
+    await page.waitForFunction(
+      (x) =>
+        document
+          .querySelector(".incident-map-marker.is-selected")!
+          .getBoundingClientRect().x <
+        x - 10,
+      before!.x,
+    );
+    await page.waitForFunction(
+      () => !document.querySelector(".incident-map-canvas .leaflet-pan-anim"),
+    );
+    const moved = await marker.boundingBox();
+    await page
+      .getByRole("radio", { name: "按待审核人数", exact: true })
+      .click();
+    const afterSort = await marker.boundingBox();
+    assert.ok(
+      Math.abs(moved!.x - afterSort!.x) < 1,
+      "sorting must not move the map camera",
+    );
+    await page
+      .getByRole("button", { name: "回到所选事件", exact: true })
+      .click();
+    await centered();
+    // Keyboard activation of a map marker shares the event filter selection.
+    await marker.focus();
+    await page.keyboard.press("Space");
+    assert.equal(
+      await page
+        .locator(".dashboard-event-list")
+        .getByRole("button", { name: "杭州西湖区火情", exact: true })
+        .getAttribute("aria-pressed"),
+      "false",
+    );
+    assert.equal(
+      await page.locator('.incident-map-marker[aria-pressed="true"]').count(),
+      0,
+    );
+    await page
+      .getByRole("heading", { name: "请选择事件", exact: true })
+      .waitFor();
+    await toggle.click();
+    await page
+      .locator(".dashboard-event-list")
+      .getByRole("button", { name: "南京鼓楼区火情", exact: true })
+      .click();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await expanded(false);
+    await toggle.click();
+    await centered();
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    const axe = await new AxeBuilder({ page })
+      .include(".dashboard-events")
+      .analyze();
+    assert.deepEqual(axe.violations, []);
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/events-small-expanded.png",
+      fullPage: true,
+    });
+    await page.waitForFunction(() => {
+      const frame = document
+        .querySelector(".incident-map-canvas")!
+        .getBoundingClientRect();
+      return [...document.querySelectorAll(".incident-map-marker")].every(
+        (marker) => {
+          const box = marker.getBoundingClientRect();
+          return (
+            box.left >= frame.left &&
+            box.right <= frame.right &&
+            box.top >= frame.top &&
+            box.bottom <= frame.bottom
+          );
+        },
+      );
+    });
+  },
+  "dashboard-events-many": async (page, context) => {
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      const data: Workspace = await response.json();
+      const sample = data.tasks.find((task) => task.state === "open")!;
+      data.incidents = Array.from({ length: 18 }, (_, i) => ({
+        ...data.incidents[0],
+        id: `incident-${i}`,
+        title: `社区支援事件 ${i + 1}：长名称显示和事件筛选`,
+        latitude: i === 17 ? NaN : 30 + i / 10,
+      }));
+      data.tasks = data.incidents.map((incident, i) => ({
+        ...sample,
+        id: `task-${i}`,
+        incidentId: incident.id,
+        incidentTitle: incident.title,
+      }));
+      await route.fulfill({ response, json: data });
+    });
+    await context.route("https://tile.openstreetmap.org/**", (route) =>
+      route.abort(),
+    );
+    await page.reload();
+    await page.locator("#dashboard-event-search").waitFor();
+    const rows = page.locator(".dashboard-event-option:visible");
+    assert.equal(await rows.count(), 5);
+    await page
+      .getByRole("button", { name: "更多事件（13）", exact: true })
+      .click();
+    assert.equal(await rows.count(), 18);
+    await selectDashboardEvents(page, [
+      "社区支援事件 18：长名称显示和事件筛选",
+    ]);
+    await page.getByRole("button", { name: "收起事件", exact: true }).click();
+    await page
+      .getByRole("searchbox", { name: "搜索事件", exact: true })
+      .fill("事件 18：");
+    assert.equal(await rows.count(), 1);
+    assert.equal(await rows.getAttribute("aria-pressed"), "true");
+    await page
+      .getByRole("searchbox", { name: "搜索事件", exact: true })
+      .fill("");
+    assert.equal(
+      await rows.count(),
+      6,
+      "selected events stay visible beyond the collapsed preview",
+    );
+    assert.match(
+      await page.locator(".incident-map-status").innerText(),
+      /1 个事件暂无有效位置/,
+    );
+    assert.equal(
+      await page
+        .getByRole("button", { name: "回到所选事件", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(await page.locator("#dashboard-tasks .task-row").count(), 1);
+    await page
+      .getByRole("searchbox", { name: "搜索事件", exact: true })
+      .fill("无匹配");
+    await page
+      .getByText("没有匹配的事件，请换个关键词。", { exact: true })
+      .waitFor();
+    await page.getByRole("button", { name: "清除筛选", exact: true }).click();
+    assert.equal(
+      await page
+        .locator('.dashboard-event-option[aria-pressed="true"]')
+        .count(),
+      18,
+    );
+    await page
+      .getByRole("searchbox", { name: "搜索事件", exact: true })
+      .fill("");
+    await page
+      .locator(".incident-map-status")
+      .filter({ hasText: "底图暂不可用" })
+      .waitFor();
+    await rows.first().click();
+    assert.equal(
+      await page.locator("#dashboard-task-results").innerText(),
+      "所选事件有 17 个需要关注的任务",
+      "tile failures do not block filtering",
     );
   },
   "dashboard-fill": async (page) => {
@@ -859,7 +1682,7 @@ const cases: Record<
     await filled();
     const initial = await rows.count();
     assert.ok(
-      initial > 1 && initial < total,
+      initial > 0 && initial < total,
       "fill the viewport without a fixed five-row cap or rendering everything",
     );
     await page.screenshot({
@@ -951,9 +1774,7 @@ const cases: Record<
     assert.equal(await rows.count(), 0);
     assert.equal(await page.locator("#dashboard-more").isVisible(), false);
     await page.getByRole("link", { name: "全部任务", exact: false }).click();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     await page.setViewportSize({ width: 1440, height: 1000 });
   },
   "date-years": async (page) => {
@@ -1078,9 +1899,7 @@ const cases: Record<
     await page.emulateMedia({ forcedColors: "none" });
     await page.setViewportSize({ width: 1440, height: 1000 });
     release();
-    await page
-      .getByRole("heading", { name: "任务管理", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     await page.locator(".route-status").waitFor({ state: "hidden" });
     assert.equal(await page.locator("#app").getAttribute("aria-busy"), null);
     await page.unroute("**/api/organizer/workspace");
@@ -1093,7 +1912,7 @@ const cases: Record<
     assert.equal(await page.locator(".route-status").isVisible(), false);
     await page.unroute("**/api/organizer/workspace");
     await page.getByRole("button", { name: "重试", exact: true }).click();
-    await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   },
   "clear-filters": async (page) => {
     await page.locator('.sidebar a[href="#/tasks"]').click();
@@ -1178,6 +1997,8 @@ const cases: Record<
       .getByRole("radio", { name: "按距截止时间", exact: true })
       .click();
     const rows = page.locator("#dashboard-tasks .task-row");
+    while (await page.locator("#dashboard-more").isVisible())
+      await page.locator("#dashboard-more").click();
     assert.deepEqual(await rows.locator(".task-info > a").allTextContents(), [
       "截止检查 3",
       "截止检查 2",
@@ -1896,7 +2717,7 @@ const cases: Record<
     await settings();
     await page.getByLabel("组织介绍", { exact: true }).fill("暂存组织介绍");
     await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
-    await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
     await settings();
     await page
       .locator("#organization-draft-status")
@@ -2096,9 +2917,7 @@ try {
       await page
         .getByRole("button", { name: "进入演示工作台", exact: true })
         .click();
-      await page
-        .getByRole("heading", { name: "工作台", exact: true })
-        .waitFor();
+      await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
       await run(page, context);
       assert.deepEqual(errors, []);
       await page.screenshot({

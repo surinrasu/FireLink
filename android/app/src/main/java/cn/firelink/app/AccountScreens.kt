@@ -644,7 +644,9 @@ fun HistoryScreen(model: AppModel, go: (String) -> Unit) {
                         item.statusLabel?.let(strings::getString) ?: item.status,
                     )
                     Text(item.organizerName, style = MaterialTheme.typography.bodySmall)
-                    item.response?.let { Text(it) }
+                    if (item.status == "expired")
+                        Text(strings.getString(R.string.application_expired_reason))
+                    else item.response?.let { Text(it) }
                     Text(
                         if (item.contactsReleased)
                             strings.getString(

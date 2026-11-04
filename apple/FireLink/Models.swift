@@ -133,6 +133,7 @@ struct Application: Codable, Identifiable {
       "pending": L10n.text("application_pending"), "accepted": L10n.text("application_accepted"),
       "rejected": L10n.text("application_rejected"),
       "withdrawn": L10n.text("application_withdrawn"),
+      "expired": L10n.text("application_expired"),
     ][status] ?? status
   }
 }

@@ -56,6 +56,7 @@ class ContractTest {
                 R.string.application_accepted,
                 R.string.application_rejected,
                 R.string.application_withdrawn,
+                R.string.application_expired,
             ),
             records.map { it.statusLabel },
         )

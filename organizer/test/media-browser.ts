@@ -44,7 +44,7 @@ try {
   await page
     .getByRole("button", { name: "进入演示工作台", exact: true })
     .click();
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.goto(`${url}/#/tasks/new`);
   await page.getByLabel("任务标题", { exact: true }).fill("地图与附件验证");
   await page.locator("#incidentId-picker").click();

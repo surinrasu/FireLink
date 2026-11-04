@@ -40,7 +40,7 @@ final class ModelTests: XCTestCase {
       records.map(\.statusLabel),
       [
         "application_pending", "application_accepted", "application_rejected",
-        "application_withdrawn",
+        "application_withdrawn", "application_expired",
       ].map { L10n.text($0) })
     XCTAssertEqual(records.filter(\.contactsReleased).map(\.status), ["accepted"])
     XCTAssertEqual(records.first?.contactFields, ["phone"])

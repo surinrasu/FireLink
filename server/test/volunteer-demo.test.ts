@@ -110,6 +110,90 @@ async function tasks(token?: string) {
   assert.equal(result.status, 200);
   return result.data.flatMap((incident) => incident.tasks);
 }
+test("volunteers see expired results and one localized notice without contact release", async () => {
+  const user = await demo();
+  type Application = {
+    id: string;
+    taskId: string;
+    status: string;
+    contactsReleased: boolean;
+  };
+  const before = (
+    await call<Application[]>("/v1/applications", undefined, user.token)
+  ).data;
+  const pending = before.find((item) => item.status === "pending")!;
+  const otherPendingCount = async () =>
+    (await db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM applications WHERE task_id=? AND user_id!=? AND status='pending'",
+      )
+      .bind(pending.taskId, user.profile.id)
+      .first<{ n: number }>())!.n;
+  const othersBefore = await otherPendingCount();
+  assert.ok(othersBefore > 0);
+  await db
+    .prepare("UPDATE tasks SET ends_at='2000-01-01T00:00:00.000Z' WHERE id=?")
+    .bind(pending.taskId)
+    .run();
+  type Notice = {
+    id: string;
+    applicationId: string;
+    title: string;
+    body: string;
+  };
+  const notices = await call<Notice[]>(
+    "/v1/notifications",
+    undefined,
+    user.token,
+    "GET",
+    "en",
+  );
+  const expired = notices.data.filter(
+    (notice) => notice.applicationId === pending.id,
+  );
+  assert.equal(expired.length, 1);
+  assert.equal(expired[0].title, "Application expired");
+  assert.equal(
+    expired[0].body,
+    "The task has ended. Your application was not confirmed and has expired automatically.",
+  );
+  const after = (
+    await call<Application[]>("/v1/applications", undefined, user.token)
+  ).data;
+  const result = after.find((item) => item.id === pending.id)!;
+  assert.equal(result.status, "expired");
+  assert.equal(result.contactsReleased, false);
+  assert.equal(
+    (await call(`/v1/applications/${pending.id}/withdraw`, {}, user.token))
+      .status,
+    409,
+  );
+  const repeated = (
+    await call<Notice[]>(
+      "/v1/notifications",
+      undefined,
+      user.token,
+      "GET",
+      "zh-HK",
+    )
+  ).data;
+  assert.equal(
+    repeated.filter((notice) => notice.applicationId === pending.id).length,
+    1,
+  );
+  assert.equal(
+    repeated.find((notice) => notice.id === expired[0].id)!.title,
+    "報名已過期",
+  );
+  assert.equal(
+    (await call<Task>(`/v1/tasks/${pending.taskId}`, undefined, user.token))
+      .data.status,
+    "closed",
+  );
+  // A volunteer request only updates that volunteer's applications.
+  assert.equal(await otherPendingCount(), othersBefore);
+});
+
 test("cloud demo works with mock auth disabled and isolates volunteer workspaces", async () => {
   const config = await call<{ demo: boolean; mockAuth: boolean }>("/v1/config");
   assert.equal(config.data.demo, true);

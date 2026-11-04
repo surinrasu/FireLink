@@ -3,7 +3,8 @@ export type ApplicationStatus =
   | "pending"
   | "accepted"
   | "rejected"
-  | "withdrawn";
+  | "withdrawn"
+  | "expired";
 
 export interface Scene {
   id: string;

@@ -1,4 +1,4 @@
-import { closeDialog, h, icon, openDialog } from "./ui";
+import { closeDialog, h, icon, openDialog, searchField } from "./ui";
 
 export interface TaskChoice {
   id: string;
@@ -15,7 +15,7 @@ export function openTaskPicker(
 ) {
   const dialog = openDialog(
     `选择${label}`,
-    `<div class="task-picker"><div class="field border prefix task-picker-search">${icon("search")}<input type="search" aria-label="搜索${label}" placeholder="${h(placeholder)}" autocomplete="off"></div><p class="help task-picker-status" role="status" aria-live="polite"></p><ul class="task-picker-list" aria-label="${label}列表"></ul></div>`,
+    `<div class="task-picker">${searchField("task-picker-search", `搜索${label}`, { placeholder, className: "task-picker-search" })}<p class="help task-picker-status" role="status" aria-live="polite"></p><ul class="task-picker-list" aria-label="${label}列表"></ul></div>`,
   );
   dialog.querySelector(".dialog-header")!.setAttribute("role", "presentation");
   const search = dialog.querySelector<HTMLInputElement>("input")!;
