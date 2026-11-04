@@ -13,7 +13,7 @@ window.FIRELINK_DECK = {
       lead:B('民间志愿者火灾支援服务系统','A volunteer coordination service for fire support'),
       subtitle:B('FireLink　课程结题汇报','FireLink　Final design review'),
       image:'organizer-tasks.webp',
-      notes:'大家好，我们是邓雪意和朱禹杭。我们的选题是设计一套民间志愿者进行火灾支援的服务系统，项目叫 FireLink。它要解决的核心问题是：一个人愿意帮忙之后，怎样知道哪里需要自己、怎样报名，以及组织者怎样确认这个人是否适合。本次汇报以组织者工作台为主，同时展示志愿者端如何与它连接。所有界面中的事件与人员均为演示或演练数据。'
+      notes:'大家好，我们是邓雪意和朱禹杭。FireLink 面向火灾外围支援中的志愿者招募。有人愿意帮忙，却未必知道有哪些任务、自己是否适合；组织者也需要判断报名者是否符合要求。我们尝试用一套清楚的流程连接双方。今天重点展示组织者工作台和志愿者端。界面里的事件和人员均为演练数据。'
     },
     {
       id:'thesis', section:0, layout:'statement', time:40,
@@ -25,7 +25,7 @@ window.FIRELINK_DECK = {
         [B('联系有边界','Connect with consent'),B('审核通过后，获授权的成员按志愿者同意的范围联系。','After acceptance, authorized members can access only the contact methods the volunteer shared.')]
       ],
       source:B('产品定位　团队确认的服务边界','Product position　Team-confirmed service boundary'),
-      notes:'我们把服务重点放在建立联系之前的三个环节。第一，需求需要变成能判断、能执行的任务；第二，组织者不能只看到有人报名，还需要知道这个人的能力与时间是否符合任务；第三，联系方式不能在报名时就完全暴露。审核通过以后，很多组织已经有微信群、电话或其他成熟沟通方式，FireLink 将信息交接给这些渠道。这个交接就是本次设计的终点，而不是功能缺失。'
+      notes:'我们围绕三个问题设计：需求是否写得清楚，报名资料能否支持判断，联系方式何时开放。组织者发布具体任务，志愿者按任务授权资料，组织者逐份审核。通过后，具备权限的成员才能按授权范围获取联系方式。随后的联络和安排继续使用组织已有渠道。'
     },
     {
       id:'brief', section:0, layout:'table', time:40,
@@ -40,7 +40,7 @@ window.FIRELINK_DECK = {
         [B('英文与 UX Manual','English and UX Manual'),B('客户端支持常见中英文变体；将可用性原则落实到具体交互。','Clients support common Chinese and English locale variants; usability principles translated into concrete interactions.')]
       ],
       source:B('课程简报 p.16–19、30、33–34、44、47','Course brief pp.16–19, 30, 33–34, 44, 47'),
-      notes:'原始题目明确允许软件和系统方案，要求从用户需求、环境条件和作业流程出发。因此我们不只展示一组页面，而是先回答它如何形成服务。课程要求也强调用户旅程、页面流程、易操作和可靠性，这些会分别落实在后面的服务蓝图、双端流程与具体机制中。客户端支持常见中英文变体。我们将这些要求落实到具体页面和交互机制中，后面逐一展开。'
+      notes:'课程要求我们考虑用户需求、使用情境、用户旅程、页面流程、易用性和可靠性。我们把这些要求整理成五个设计重点，并落实到服务与界面中。关于 UX Manual，我们依据已获得的课程简报开展设计，没有将未获得的完整手册说成已经逐项验收。'
     },
     {
       id:'problem', section:0, layout:'columns', time:45,
@@ -52,7 +52,7 @@ window.FIRELINK_DECK = {
         [B('结果是否可追踪','Is the outcome clear?'),B('报名不等于确认参与。审核结果、撤回与未获确认的申请都需要明确状态。','Applying is not confirmation. Decisions, withdrawals and unconfirmed applications need explicit states.')]
       ],
       source:B('设计假设　课程简报与双角色任务分析','Design hypotheses　Course brief and role-based task analysis'),
-      notes:'从课程场景和双角色的任务分析中，我们提炼出三道信息门槛。第一道门槛是任务不够具体，热心的人不一定知道自己适不适合。第二道门槛是信息零散，组织者需要反复追问。第三道门槛是状态不明确，报名人不知道是否被确认。这三点分别对应结构化任务、按任务授权和可追踪结果，也成为后续评价方案是否有效的依据。'
+      notes:'根据课程场景和双角色任务分析，我们提出三项设计假设：需求描述不具体，可能让志愿者难以判断是否适合；任务需要的资料不同，可能增加组织者反复询问；申请状态不明确，则可能使人不知道下一步。这些问题尚未经正式访谈验证，后续需要实际测试。'
     },
     {
       id:'scope', section:0, layout:'scope', time:40,
@@ -64,7 +64,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('以“审核通过、授权联系”作为清楚的交接点，让双方进入组织熟悉的工作方式。','Acceptance and consented contact create a clear handoff into the organization’s familiar working practices.'),
       source:B('团队确认的范围　面向外围支援任务的设计定位','Team-confirmed scope　Focus on civilian support tasks'),
-      notes:'这是本项目一个主动的取舍。很多组织已经有成熟的沟通渠道，现场条件又高度复杂，把所有现场问题都搬进一个新平台，会增加采用成本，也超出本题要解决的重点。我们选择把需求、申请、审核和授权联系做好，在双方形成可信连接时完成交接。系统中的通过，只表示组织者接受了这份支援申请，不能被理解为专业资质认证或火场准入。'
+      notes:'FireLink 聚焦任务发布、报名授权、人工审核与联系方式交接。组织者可能已有电话或微信等协调方式，我们不试图用课程原型替代现场指挥。审核通过仅表示组织者接受报名，之后由获授权的成员联系志愿者；它不等于专业资格认证，也不代表允许进入火场。'
     },
     {
       id:'actors', section:1, layout:'table', time:40,
@@ -77,7 +77,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('组织承担判断与联络责任；平台提供统一的信息结构与操作记录。','Organizations remain responsible for decisions and coordination; the platform structures information and records actions.'),
       source:B('课程简报 p.16–19；shared/organizer.ts；organizer/src/app.ts','Course brief pp.16–19; shared/organizer.ts; organizer/src/app.ts'),
-      notes:'我们把参与者、组织者和需求方的责任分别梳理。志愿者需要判断适配性并决定分享范围；组织者负责把需求翻译成任务、审核申请并接手后续联系；需求方或社区则通过组织者表达需要。系统为这些不同责任提供信息结构，但不替代组织的判断。具体实现中又把组织管理、任务管理和审核角色分开，让分工和联系方式访问权限对应起来。'
+      notes:'这一流程涉及三方。志愿者判断任务是否适合自己，并选择分享资料；组织者把需求写成任务，负责审核和联系；受影响社区通过组织者提供需求背景。当前原型主要服务于志愿者和组织者两端，平台整理信息与记录，最终人员判断仍由组织负责。'
     },
     {
       id:'journey', section:1, layout:'journey', time:60,
@@ -90,7 +90,7 @@ window.FIRELINK_DECK = {
         [B('设计回应','Response'),B('事件聚合任务','Tasks grouped by incident'),B('结构化任务信息','Structured task details'),B('逐项授权与必填提示','Granular consent'),B('申请状态与撤回','Visible state and withdrawal'),B('结果通知与联系方式交接','Outcome and contact handoff')]
       ],
       source:B('目标用户旅程　林缘火情外围支援演练','Target user journey　Simulated wildfire-edge support'),
-      notes:'我们用外围支援演练作为贯穿场景。志愿者先在地区与事件中找到机会，再查看具体任务。如果符合时间和能力条件，才选择资料并授权报名。等待阶段可以查看状态或撤回，结果阶段知道自己是否被确认。这个旅程的重点是每一步都能回答一个具体疑问，而不是增加更多页面。例如授权页回答分享什么，申请页回答是否有结果，结果页回答如何进入后续联络。'
+      notes:'我们以合成的林缘火情外围支援任务串起旅程。志愿者先找到事件，再阅读时间、地点与能力要求，按任务授权资料并报名。等待时可以查看状态或撤回；有审核结果后，知道是否需要进入后续联系。每一步都应回答一个具体问题。'
     },
     {
       id:'blueprint', section:1, layout:'blueprint', time:65,
@@ -103,7 +103,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('关键服务证据：任务说明 → 授权记录 → 审核结果 → 联系方式交接。','Service evidence: task description → consent record → review outcome → contact handoff.'),
       source:B('server/src/organizer-api.ts；server/src/domain.ts；server/test/organizer.test.ts','server/src/organizer-api.ts; server/src/domain.ts; server/test/organizer.test.ts'),
-      notes:'蓝图把同一件事分成志愿者看到的界面、组织者完成的工作和后台保障。以审核为例，志愿者看到待审核状态，组织者看到授权资料，后台还必须校验角色、任务人数和最新申请状态。只有三层一致，界面上的承诺才成立。最终形成的不是一个聊天群链接，而是一条有任务依据、有授权记录、有审核结果的信息链，然后再将双方交接到既有渠道。'
+      notes:'服务蓝图分成志愿者界面、组织者操作和后台规则三层。以审核为例，志愿者看到待审核，组织者核对授权资料，后台还必须检查权限、容量和最新状态。只有几层相互对应，界面上的结果才可靠。系统因此保存任务、授权和审核记录，再交接联系方式。'
     },
     {
       id:'page-flow', section:1, layout:'flow', time:55,
@@ -115,7 +115,7 @@ window.FIRELINK_DECK = {
       branches:[B('资料不完整：返回补充后提交','Incomplete information: complete before submitting'),B('待审核：可撤回；未通过：保留结果','Pending: may withdraw; declined: retain the outcome'),B('任务结束仍待审核：自动过期并通知','Still pending when the task ends: expire and notify')],
       callout:B('联系方式交接后，双方进入组织现有沟通渠道。','After the contact handoff, both parties continue in the organization’s existing channels.'),
       source:B('页面流程：organizer/src/app.ts；presentation/proposal/scenes.ts；移动端页面','Page flow: organizer/src/app.ts; presentation/proposal/scenes.ts; native client views'),
-      notes:'这张页面流程图对应老师要求的页面关系。上方是组织者：从事件与开始页进入任务创建，完成编辑后发布，然后在审核页处理申请。下方是志愿者：发现、看详情、授权报名、查看申请、接收结果。两端通过同一份申请的数据相连。主路径之外也有资料不完整、撤回、未通过和过期分支。最后的联系进入原有渠道，整个路径因此有明确完成点。'
+      notes:'上方是组织者发布、审核的路径，下方是志愿者浏览、授权、报名和查看结果的路径。两端通过同一份申请连接。资料不全、撤回、未通过以及任务结束后仍待审核等情况，都需要独立的结果和提示。联系仅发生在审核通过且授权允许之后。'
     },
     {
       id:'information-architecture', section:2, layout:'table', time:35,
@@ -129,7 +129,7 @@ window.FIRELINK_DECK = {
         [B('已发送通知／组织设置','Notices / organization'),B('做过什么决定，谁有什么权限？','What was communicated? Who has access?'),B('回看通知、分工、联系方式与成员管理','Inspect notices, roles, contacts and members')]
       ],
       source:B('organizer/src/app.ts　当前工作台导航','organizer/src/app.ts　Current workspace navigation'),
-      notes:'信息架构按组织者工作顺序展开。开始页解决优先级，任务页管理招募本身，报名审核聚焦逐份判断，事件提供跨任务背景，通知和组织设置负责追溯与分工。这种安排让不同频率、不同对象的操作有各自的位置。我们没有把所有信息压在一个巨大的仪表盘里，而是让入口对应清晰的问题，再通过任务与申请之间的链接形成连续操作。'
+      notes:'工作台按照组织者的操作分成入口：开始页确定优先级，任务页管理招募，报名审核页处理申请，事件页记录背景，通知与组织设置便于追溯和分工。下面我们结合实际界面，说明如何完成这些操作。'
     },
     {
       id:'dashboard', section:2, layout:'screen', time:45,
@@ -141,7 +141,7 @@ window.FIRELINK_DECK = {
         [B('直接进入处理','Act from the overview'),B('草稿继续编辑，待审核任务进入具体申请。','Resume a draft or open the applications for a task.')]
       ],
       source:B('当前工作台实拍　本地隔离演练数据','Current application capture　Isolated synthetic drill data'),
-      notes:'开始页首先帮助组织者确定下一步。上方先选事件，减少无关任务的干扰；下方按最近更新、待审核人数和截止时间排序，适应不同工作压力。需要补充信息时进入草稿，有待审申请时直接进入审核。右侧动态帮助理解刚刚发生了什么。设计的价值在于缩短从发现问题到进入处理的路径。'
+      notes:'开始页可以先按事件筛选，再按最近更新、待审核人数或截止时间查看任务。草稿直接继续编辑，待审核任务直接进入审核。这样减少寻找下一步操作的时间。这里展示的是本地隔离演练截图，不是真实救援数据。'
     },
     {
       id:'incidents', section:2, layout:'screen', time:40,
@@ -153,7 +153,7 @@ window.FIRELINK_DECK = {
         [B('分层管理','Separate responsibilities'),B('事件说明背景；人数、要求、时间与负责人属于任务。','Capacity, requirements, schedules and owners belong to tasks.')]
       ],
       source:B('当前工作台实拍　合成演练数据　地图 © OpenStreetMap contributors','Current application capture　Synthetic drill data　Map © OpenStreetMap contributors'),
-      notes:'我们把事件和任务拆成两个层级，因为它们回答不同的问题。事件回答发生了什么、在哪里，任务回答需要谁来做什么。例如同一场林缘火情可以有物资整理、运输与登记三个任务。它们共享背景，但能力、时间、人数和负责人不同。这样既避免把每项工作重复描述成一个新事件，也避免用一条笼统的招募承载所有需求。地图帮助组织者理解位置，关联任务则把地点背景连接到具体工作。'
+      notes:'事件描述发生了什么、在哪里；任务则规定需要谁做什么、何时做和招募多少人。例如一个外围支援事件下，可以分别安排物资整理、运输与登记。它们共享背景，但负责人、时间与能力要求不同，因此需要分开管理。'
     },
     {
       id:'authoring', section:2, layout:'screen', time:50,
@@ -166,7 +166,7 @@ window.FIRELINK_DECK = {
         [B('保存与授权保持一致','Reliable saving'),B('草稿自动保存；已有报名后锁定资料要求，保留申请时的依据。','Drafts autosave. Requirements lock once applications exist.')]
       ],
       source:B('当前工作台实拍；organizer/src/editor.ts','Current application capture; organizer/src/editor.ts'),
-      notes:'任务编辑将工作、安排、详细说明和资料要求分成四组，右侧可以预览任务说明。通用档案能够复用，针对当前任务还可以增加文字填写项。比如这次物资整理，我们增加“可参与时段”和“相关支援经验”，让组织者获得具体的判断依据。这些答案随本次报名保存，进入审核页后可以逐项核对。草稿自动保存，已发布内容手动保存，多人编辑时会提示版本冲突。已有报名后，包括自定义项目在内的资料要求一起锁定，保留申请时的条件。'
+      notes:'任务编辑按基本信息、时间地点、任务说明和资料要求分组，右侧能够预览。通用档案之外，还可增加“可参与时段”“相关支援经验”等本次任务的问题。回答会进入审核页；已有报名后，资料要求会锁定，防止后续调整影响先前的申请。'
     },
     {
       id:'task-content', section:2, layout:'screen', time:40,
@@ -178,7 +178,7 @@ window.FIRELINK_DECK = {
         [B('边界可确认','Know the boundaries'),B('演练任务明确外围支援范围，等待组织者确认后行动。','The drill describes support boundaries and asks volunteers to wait for confirmation.')]
       ],
       source:B('真实任务页面 + 经授权整理的本地演练文案','Implemented task page + authorized synthetic drill content'),
-      notes:'这页用演练数据说明好的任务信息应该帮助报名者作判断。工作内容不能只写“需要志愿者”，而要说明实际要做什么。时间要分清任务开始、结束和报名截止，地点要有具体接洽方式。外围支援的行动边界也写进说明。界面支持文字、图片、视频、表格与地图等内容块，但本次演示选择简洁文字，重点是让这些信息足以支持参与判断。'
+      notes:'任务说明要帮助人在报名前判断是否适合。示例写明物资清点、分类和打包，区分任务开始、结束与报名截止，说明集合地点及外围支援边界。界面允许多种内容块，而这次示例优先用清楚的文字说明工作与条件。'
     },
     {
       id:'review', section:2, layout:'screen', time:55,
@@ -191,7 +191,7 @@ window.FIRELINK_DECK = {
         [B('回应与内部备注分开','Separate audiences'),B('给志愿者的回应可发送，内部备注仅用于组织协作。','The response goes to the volunteer; internal notes stay with the organization.')]
       ],
       source:B('当前工作台实拍；organizer/src/app.ts　reviewDetail','Current application capture; organizer/src/app.ts　review detail'),
-      notes:'审核页把列表和详情放在一起，左侧保留队列，右侧集中显示本次申请资料。这里能对应看到任务创建时设置的两个问题：可参与时段和相关支援经验。审核员把答案与任务安排对照，再结合授权档案作判断；这些答案是本次提交的记录。通过操作有明确确认，并产生结果通知。给志愿者的回应与内部备注分开：前者说明结果，后者帮助组织内部协作。'
+      notes:'审核页左侧保留申请队列，右侧显示本次资料。第十三页设置的可参与时段和支援经验会在这里出现。审核员将答案与任务要求对照，再作人工判断。对志愿者的回复与内部备注分开，避免混淆内外沟通。'
     },
     {
       id:'consent', section:2, layout:'table', time:60,
@@ -206,7 +206,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('已有报名后，通用资料、联系方式与自定义资料要求一并锁定。','Once applications exist, profile, contact and custom-question requirements lock together.'),
       source:B('server/test/organizer.test.ts：联系方式披露、任务权限、授权锁定测试','server/test/organizer.test.ts: disclosure, scoped permissions and consent-lock tests'),
-      notes:'隐私不只是一段隐私政策，而是服务流程中的时机设计。待审核阶段需要判断是否匹配，审核员可以查看授权档案和任务问答，联系方式保持隐藏。通过以后，读取联系方式还要同时符合任务访问权限、联系方式权限和志愿者本次授权范围。系统保存本次申请的资料和答案，已有申请后，通用资料、联系方式和自定义项目的要求一起锁定。这个机制让志愿者知道自己交出去什么，也让组织者清楚什么时候能够开始联系。'
+      notes:'待审核时，组织者可在任务权限范围内读取必要的申请资料，但联系方式不开放。审核通过后，仍需符合成员的任务权限、联系方式访问权限，以及志愿者本次授权范围。已有报名后资料要求锁定，让审核有稳定的依据。'
     },
     {
       id:'states', section:2, layout:'states', time:55,
@@ -219,7 +219,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('容量限制、重复操作与并发审核在服务端校验，避免界面显示与实际结果脱节。','Server-side capacity and concurrency checks keep the displayed decision consistent with the stored outcome.'),
       source:B('server/src/application-expiry.ts；server/test/organizer.test.ts','server/src/application-expiry.ts; server/test/organizer.test.ts'),
-      notes:'截止和结束看起来相似，但会导致不同服务结果。报名截止只是停止接收新申请，组织者仍可能需要处理已提交的申请；任务结束以后，仍待审核的申请应自动过期，避免志愿者一直等待。通过、拒绝和撤回也不能被过期逻辑改写。后台同时检查人数和最新状态，例如志愿者刚撤回，审核员不能用旧页面再把它通过。这里的设计同时需要界面语义和服务端规则。'
+      notes:'报名截止意味着停止接受新申请，已有申请仍可审核。任务结束时，仍待审核的申请自动过期并发送通知；已有明确决定的申请不因此改变。服务端还检查人数与最新状态，例如已经撤回的报名不能被旧审核页面重新通过。'
     },
     {
       id:'volunteer', section:2, layout:'phones', time:40,
@@ -230,7 +230,7 @@ window.FIRELINK_DECK = {
         {image:'accepted-light.webp',title:B('接收明确结果','Receive a clear outcome'),text:B('审核通过后进入既有联络方式。','Move to existing contact channels after acceptance.')}
       ],
       source:B('Android 客户端　任务详情、授权报名与审核结果','Android client　Task details, application consent and review outcome'),
-      notes:'组织者工作台不是独立存在的，它提供的信息最终会被志愿者读到。这三张已有客户端截图展示了对应的三个节点：看清任务、选择授权、接收结果。我们保留原生移动端的阅读和操作习惯，让个人档案可以复用，而具体分享范围仍然在每次报名时决定。客户端还保留申请记录和通知入口，让志愿者能够重新查看自己的报名与结果。'
+      notes:'志愿者端展示三个节点：阅读任务、选择授权、查看结果。个人资料可以复用，但每次报名仍需确认分享范围。申请记录与通知可以回看。这里的移动端截图与组织者演练截图使用不同的数据，展示的是同一套流程。'
     },
     {
       id:'handoff', section:2, layout:'screen', time:40,
@@ -242,7 +242,7 @@ window.FIRELINK_DECK = {
         [B('衔接已有实践','Fit existing practice'),B('通过后安排与变化，由组织在已有渠道进一步确认。','The organization confirms subsequent arrangements and changes through existing channels.')]
       ],
       source:B('当前通知页实拍；团队确认的交接定位','Current notices capture; team-confirmed handoff model'),
-      notes:'这一页展示服务终点。系统把审核结果记录下来，志愿者可以收到结果，组织者可以回看通知；符合权限的成员再按授权联系方式接洽。通过后的排班或安排变化，由组织使用已有渠道确认，这是产品定位的一部分。现有实现对待审核申请发送任务更新通知，而已经通过的参与者进入组织既有沟通流程。因此，我们的下一步迭代也应当改善交接是否清楚，而不是重新建设一整套现场通信工具。'
+      notes:'系统保存审核结果，志愿者可以查看通知，组织者可以回看已发送消息。通过后，获授权成员使用本次允许的联系方式联络志愿者。后续排班或安排变动由组织通过既有渠道确认；当前系统的任务更新通知主要面向待审核申请。'
     },
     {
       id:'visual-system', section:3, layout:'design', time:45,
@@ -254,7 +254,7 @@ window.FIRELINK_DECK = {
         [B('同一套操作习惯','One interaction vocabulary'),B('复用按钮、输入、筛选、弹窗与错误反馈；支持深浅色与字号调整。','Reuse controls and feedback; support light, dark and larger text.')]
       ],
       source:B('organizer/src/theme.ts；organizer/public/components.css；COMPONENTS.md','organizer/src/theme.ts; organizer/public/components.css; COMPONENTS.md'),
-      notes:'视觉系统主要延续组织者工作台的低饱和蓝色、浅色表面和清楚的轮廓。颜色有明确职责，例如主操作与选中态使用统一语义，状态同时配文字而不是只依赖颜色。按钮、输入、筛选、弹窗和错误反馈使用相同组件，减少用户重新学习的成本。深色与大字号模式也属于同一系统。本份汇报沿用这些颜色与字体层级，让设计成果和汇报本身保持一致。'
+      notes:'视觉语言延续工作台的蓝色主调与统一控件。主要操作和选中状态有一致的表达，状态也通过文字和轮廓区分。界面考虑深浅主题与较大字号，让用户在不同页面之间沿用熟悉的操作方式。'
     },
     {
       id:'iterations', section:3, layout:'table', time:40,
@@ -266,7 +266,7 @@ window.FIRELINK_DECK = {
         [B('主题、状态和组件不一致','Inconsistent themes, states and components'),B('语义主题、共享组件与固定状态色','Semantic theme, shared components, stable status colors'),B('对比度与组件状态专项检查','Targeted contrast and component-state checks')]
       ],
       source:B('设计评审记录与当前组件实现','Design review records and current component implementation'),
-      notes:'设计过程不只是画出第一版。仓库里已经有对桌面、窄屏、深浅色和大字号的评审记录，其中指出过控件挤压、审核动作可读性和信息密度等问题。当前实现通过共享组件、响应式重排与更连续的审核方式回应这些问题。这些评审记录帮助我们把注意力放到真实内容、键盘路径和字号变化，再通过组件与布局调整持续改进。'
+      notes:'迭代依据已有设计评审和工程检查，重点处理窄屏、大字号和审核页面的信息密度。响应式重排、共享组件及连续审核界面是针对这些问题的调整。现有证据属于设计和工程检查，还不能当作真实用户实验结果。'
     },
     {
       id:'implementation', section:3, layout:'architecture', time:40,
@@ -278,7 +278,7 @@ window.FIRELINK_DECK = {
       ],
       callout:B('同一套规则贯穿发布、授权、审核与结果，让双端信息保持一致。','One set of rules connects publishing, consent, review and outcomes across both interfaces.'),
       source:B('仓库目录 organizer / android / apple / server / shared / contracts','Repository: organizer / android / apple / server / shared / contracts'),
-      notes:'目前的成果包含双端界面及可运行的业务实现。组织者端是网页，志愿者端有 Android 和 Apple 客户端，背后共享 API、内容结构和业务约束。技术在这里的意义是保证不同界面表达同一件事。例如人数限制不能只在一个按钮上生效，授权条件不能只隐藏在前端。这样，组织者在工作台发布和处理的信息，能够按同一套规则到达志愿者端。'
+      notes:'项目包含组织者 Web 工作台，以及 Android 和 Apple 客户端，三端共享接口、任务结构与申请状态规则。容量、撤回和联系方式授权等关键判断由服务端执行，避免只靠界面的显示状态来决定实际结果。'
     },
     {
       id:'verification', section:3, layout:'evidence', time:50,
@@ -290,7 +290,7 @@ window.FIRELINK_DECK = {
         [B('验证可持续复用','Reusable verification'),B('保留测试入口与场景，每次迭代都能检查关键业务行为。','Retained scenarios and test entrypoints make core behaviors checkable with each iteration.')]
       ],
       source:B('2026-11-04 本地运行：server/test/{organizer,api}.test.ts；organizer/test/theme.test.ts','Local run 2026-11-04: server/test/{organizer,api}.test.ts; organizer/test/theme.test.ts'),
-      notes:'本次为汇报运行的49项相关后端测试，以及4项配色方案测试，全部通过。客户端提供深色模式支持与自动配色方案生成。后端覆盖权限隔离、联系方式开放、人数限制、撤回与过期，也加入了自定义资料的保存、名称校验、报名必填和答案快照检查。新版自定义资料界面还通过了桌面、手机布局与无障碍自动检查。这些工程检查把关键规则固定成可反复验证的场景。接下来可以与组织者进一步验证任务理解、审核判断、授权理解和交接清晰度。'
+      notes:'本次复跑了四十九项相关后端测试和四项配色方案测试，结果均通过。测试覆盖权限、容量、撤回、过期、授权联系及自定义资料保存。新版资料界面也在指定桌面、手机与无障碍自动检查场景下得到验证。这些是工程测试结果，不能替代真实用户或灾害现场验证。'
     },
     {
       id:'next', section:4, layout:'columns', time:45,
@@ -302,7 +302,7 @@ window.FIRELINK_DECK = {
         [B('探索机构合作','Explore organizational adoption'),B('与志愿组织、社区及培训伙伴试点；评估维护、审核与支持成本。','Pilot with volunteer organizations, communities and training partners; assess maintenance and support costs.')]
       ],
       source:B('服务试点与机构采用方案','Service pilot and organizational adoption proposal'),
-      notes:'后续深化继续围绕同一个定位。先邀请少量组织和志愿者共同走通流程，观察哪些任务说明读不懂、哪些资料不够判断、授权和交接有没有误解。再把常见外围支援需求沉淀成模板，降低使用成本。机构合作是可能的推广方式，我们计划通过试点进一步理解任务维护、审核分工和支持成本。德尔格的安全理念和培训生态可以作为合作讨论方向，具体合作尚未建立。'
+      notes:'下一步首先邀请少量组织者和志愿者完成同一组演练任务，观察任务理解、资料填写、审核判断与联系方式交接的问题。随后根据记录改进任务模板。机构合作和成本同样需要在试点中检验，目前没有既成合作、收入或效率提升数据。'
     },
     {
       id:'closing', section:4, layout:'closing', time:30,
@@ -313,7 +313,7 @@ window.FIRELINK_DECK = {
         [B('对组织者','For organizers'),B('用同一套流程表达需求、确认人员并交接联系。','Use one flow to express needs, confirm people and hand off contact.')]
       ],
       source:B('FireLink　邓雪意 24168119　朱禹杭 24168202','FireLink　邓雪意 24168119　朱禹杭 24168202'),
-      notes:'最后回到开头的问题：怎样让愿意帮忙的人真正找到合适的地方？FireLink 的回答是把需求说明白，让审核有依据，再以明确的授权建立联系。它帮助志愿者理解参与，也帮助组织者确认人选，并在合适的时机把工作交还给组织熟悉的渠道。我们希望交付一段清楚、可信、容易接入现有实践的服务。'
+      notes:'最后回到开头：怎样让愿意帮忙的人找到合适任务？FireLink 把需求写清楚，让志愿者授权报名，由组织者审核并建立联系。我们已完成双端原型及关键规则的工程验证；实际使用效果仍需通过用户演练检验。谢谢大家。'
     },
     {
       id:'firelink', section:4, layout:'brand-end', time:5,
