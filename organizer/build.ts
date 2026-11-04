@@ -1,6 +1,7 @@
 import { cp, mkdir, readdir, rm, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_HUE, themeColors, themeCss } from "./src/theme";
+import { buildPresentations } from "../presentation/site";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const output = `${root}build/mng-dash`;
 await rm(`${root}build`, { recursive: true, force: true });
@@ -49,3 +50,4 @@ if (!result.success) {
   process.exit(1);
 }
 console.log("Organizer built → organizer/build");
+await buildPresentations(`${root}build`);

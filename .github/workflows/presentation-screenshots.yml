@@ -39,7 +39,7 @@ jobs:
           mise -C android install
           # Presentation imports backend domain schemas and their dependencies.
           mise -C server run install
-          mise -C server exec -- npm --prefix ../presentation ci
+          mise -C server exec -- bun install --cwd ../presentation/proposal --frozen-lockfile
       - name: Enable Android hardware acceleration
         # https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/
         run: |
@@ -60,18 +60,18 @@ jobs:
             echo "::error::At least 12 GiB of free disk space is required for the Android build and emulator."
             exit 1
           fi
-          mise -C server exec -- npm --prefix ../presentation run screenshots:update
+          mise run presentation:screenshots
       - name: Show emulator diagnostics on failure
         if: failure()
         run: |
           df -h "$GITHUB_WORKSPACE"
-          tail -n 100 presentation/.artifacts/emulator.log || true
+          tail -n 100 presentation/proposal/.artifacts/emulator.log || true
       - name: Commit updated screenshots
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
-          git add -- presentation/public/screenshots
+          git add -- presentation/proposal/public/screenshots
           if git diff --cached --quiet; then
             echo "Screenshots are already up to date."
             exit 0

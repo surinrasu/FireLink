@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="FireLink 课程结题汇报。民间志愿者火灾支援服务系统，双语离线幻灯片。">
+  <meta name="theme-color" content="#f3f3fa">
+  <title>FireLink　课程结题汇报</title>
+  <link rel="icon" href="assets/firelink.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="content.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#stage">跳到幻灯片</a>
+  <main id="stage" tabindex="-1" aria-label="幻灯片"></main>
+  <nav id="controls" aria-label="演示控制"></nav>
+  <button id="restore-controls" class="control outlined" type="button" data-action="toolbar" aria-controls="controls" aria-keyshortcuts="f" hidden></button>
+  <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+  <dialog id="overview" aria-labelledby="overview-title"></dialog>
+  <dialog id="notes" aria-labelledby="notes-title"></dialog>
+  <dialog id="lightbox" aria-labelledby="lightbox-title"></dialog>
+  <dialog id="help" aria-labelledby="help-title"></dialog>
+  <div id="print-deck" aria-hidden="true"></div>
+  <noscript>本幻灯片需要启用 JavaScript，或打开交付文件夹内的 PDF 版本。</noscript>
+</body>
+</html>

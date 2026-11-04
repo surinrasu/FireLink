@@ -35,7 +35,7 @@ jobs:
           mise -C server install
           mise -C server run install
           mise -C server exec -- bun install --cwd ../organizer --frozen-lockfile
-          mise -C server exec -- npm --prefix ../presentation ci
+          mise -C server exec -- bun install --cwd ../presentation/proposal --frozen-lockfile
       - name: Check organizer web
         run: mise run check:organizer
       - name: Check backend

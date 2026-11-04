@@ -1,0 +1,27 @@
+{
+  "name": "firelink-presentation",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.3",
+  "scripts": {
+    "start": "bun start.ts",
+    "serve": "bun server.ts",
+    "test": "bun test ./test",
+    "verify": "bun verify.ts",
+    "verify:browser": "bun browser-check.ts",
+    "screenshots": "bun screenshots.ts",
+    "screenshots:update": "bun start.ts --screenshots",
+    "doctor": "bun start.ts --check",
+    "check": "bun run --bun tsc --noEmit && bun run --bun tsc --noEmit -p tsconfig.browser.json"
+  },
+  "dependencies": {
+    "beercss": "5.0.3",
+    "esbuild": "0.28.2"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "@types/bun": "1.4.3",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2"
+  }
+}

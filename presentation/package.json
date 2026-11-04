@@ -1,28 +1,20 @@
 {
-  "name": "firelink-presentation",
+  "name": "firelink-presentations",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.3",
   "scripts": {
-    "start": "node start.ts",
-    "serve": "node server.ts",
-    "test": "node --test test/*.test.ts",
-    "verify": "node verify.ts",
-    "verify:browser": "node browser-check.ts",
-    "screenshots": "node screenshots.ts",
-    "screenshots:update": "node start.ts --screenshots",
-    "doctor": "node start.ts --check",
-    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.browser.json"
-  },
-  "dependencies": {
-    "beercss": "5.0.3",
-    "esbuild": "0.28.2"
-  },
-  "engines": {
-    "node": ">=22.18.0"
-  },
-  "devDependencies": {
-    "playwright": "1.64.1",
-    "@types/node": "24.19.2",
-    "typescript": "7.0.2"
+    "proposal": "bun run --cwd proposal start",
+    "final": "bun final/serve.mjs",
+    "final:build": "bun final/build.mjs && bun final/speaker-script.mjs",
+    "start": "bun run proposal",
+    "serve": "bun run --cwd proposal serve",
+    "test": "bun run --cwd proposal test",
+    "verify": "bun run --cwd proposal verify",
+    "verify:browser": "bun run --cwd proposal verify:browser",
+    "screenshots": "bun run --cwd proposal screenshots",
+    "screenshots:update": "bun run --cwd proposal screenshots:update",
+    "doctor": "bun run --cwd proposal doctor",
+    "check": "bun run --cwd proposal check"
   }
 }

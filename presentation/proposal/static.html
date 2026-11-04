@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="FireLink 开题汇报：发现任务、授权报名、连接善意。"
+    />
+    <title>FireLink 开题汇报</title>
+    <link rel="icon" href="firelink.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="vendor/beer.min.css" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="static.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body class="light">
+    <div class="presentation">
+      <main class="stage" aria-label="开题汇报">
+        <section class="story" aria-live="polite" aria-atomic="true">
+          <a class="brand" href="#welcome" aria-label="FireLink 演示首页"
+            >FireLink</a
+          >
+          <h1 id="headline">让每一份善意，<br /><em>都有去处。</em></h1>
+          <p id="description" class="description">
+            FireLink，让志愿者与需要帮助的地方相遇。
+          </p>
+          <ul id="points" class="points"></ul>
+        </section>
+        <section class="demo-stage" aria-label="Android 客户端界面截图">
+          <div class="phone-wrap">
+            <div class="phone">
+              <picture id="screen-preview">
+                <source
+                  id="preview-dark"
+                  media="(prefers-color-scheme: dark)"
+                  srcset="screenshots/welcome-dark.png"
+                />
+                <img
+                  id="preview-light"
+                  src="screenshots/welcome-light.png"
+                  alt="FireLink 首页"
+                  draggable="false"
+                />
+              </picture>
+            </div>
+          </div>
+          <p id="connection" class="connection" aria-live="polite"></p>
+        </section>
+      </main>
+      <footer class="deck-footer">
+        <div class="paging">
+          <button id="previous" class="circle border" aria-label="上一页">
+            <i aria-hidden="true">arrow_back</i>
+          </button>
+          <button id="next" class="round">
+            <span>下一页</span><i aria-hidden="true">arrow_forward</i>
+          </button>
+        </div>
+      </footer>
+    </div>
+    <noscript>请启用 JavaScript 以切换汇报页面。</noscript>
+  </body>
+</html>

@@ -19,7 +19,7 @@ import { createDemoServer } from "./server.ts";
 import { createBridge } from "./adb.ts";
 import { acquireLauncherLock } from "./launcher-lock.ts";
 const directory = fileURLToPath(new URL(".", import.meta.url));
-const android = path.resolve(directory, "../android");
+const android = path.resolve(directory, "../../android");
 const artifacts = path.join(directory, ".artifacts");
 const avdRoot = path.join(artifacts, "avd");
 const suffix = process.platform === "win32" ? ".exe" : "";
@@ -148,7 +148,7 @@ try {
       path.join(directory, "node_modules/beercss/dist/cdn/beer.min.css"),
     )
   )
-    throw new Error("请先在 presentation 目录执行 npm ci。");
+    throw new Error("请先在仓库根目录执行 mise run presentation:install。");
   await mkdir(artifacts, { recursive: true });
   releaseLock = acquireLauncherLock(path.join(artifacts, "launcher.lock"));
   if (packages.length) {
@@ -230,7 +230,7 @@ try {
   for (let count = 0; Date.now() < deadline; count++) {
     if (emulatorError || emulator.exitCode !== null)
       throw new Error(
-        `AVD 启动失败，请查看 presentation/.artifacts/emulator.log。${emulatorError?.message || ""}`,
+        `AVD 启动失败，请查看 presentation/proposal/.artifacts/emulator.log。${emulatorError?.message || ""}`,
       );
     booted = await run(
       adb,

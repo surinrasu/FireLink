@@ -1,0 +1,57 @@
+[
+  {
+    "file": "organizer-dashboard.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-tasks.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-events.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-editor.webp",
+    "origin": "Current organizer UI at 4afb122; isolated local demo, 2026-11-04; custom questions created in editor; matching synthetic application snapshot seeded locally.",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-task.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-review.webp",
+    "origin": "Current organizer UI at 4afb122; isolated local demo, 2026-11-04; custom questions created in editor; matching synthetic application snapshot seeded locally.",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-notifications.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "organizer-dark.webp",
+    "origin": "FireLink isolated local organizer demo, 2026-11-04; synthetic data; authorized scenario adjustments",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "task-light.webp",
+    "origin": "Existing repository Android screenshot: presentation/proposal/public/screenshots/task-light.png",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "consent-light.webp",
+    "origin": "Existing repository Android screenshot: presentation/proposal/public/screenshots/consent-light.png",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  },
+  {
+    "file": "accepted-light.webp",
+    "origin": "Existing repository Android screenshot: presentation/proposal/public/screenshots/accepted-light.png",
+    "processing": "Lossless WebP conversion; organizer text separators changed to spacing for the presentation"
+  }
+]
