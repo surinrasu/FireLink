@@ -29,7 +29,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'brief', section:0, layout:'table', time:40,
-      title:B('课程要求被转化为五个设计问题','Five design questions from the brief'),
+      title:B('从课程要求出发，明确五个设计重点','Five design priorities from the course brief'),
       lead:B('以山火支援为起点，聚焦受影响社区与民间志愿者的连接。','Starting with wildfire support, we focus on connecting affected communities and civilian volunteers.'),
       headers:[B('原始要求','Brief requirement'),B('FireLink 的回应','Our design response')],
       rows:[
@@ -44,8 +44,8 @@ window.FIRELINK_DECK = {
     },
     {
       id:'problem', section:0, layout:'columns', time:45,
-      title:B('热心参与，需要跨过三道信息门槛','Willingness alone leaves three information gaps'),
-      lead:B('围绕参与者与组织者的交接，梳理需求、报名与结果三类信息。','Analyze the handoff between volunteers and organizers through needs, applications and outcomes.'),
+      title:B('从报名到确认，存在三处信息缺口','Three information gaps from sign-up to confirmation'),
+      lead:B('以下问题来自课程场景与角色任务分析，尚待真实用户验证。','These hypotheses come from the course scenario and role-based analysis; they require user validation.'),
       items:[
         [B('需求是否具体','Is the request specific?'),B('“需要支援”不足以判断是否适合。参与者还需要知道做什么、何时去、在哪里、需要什么能力。','“Help needed” does not tell a person whether they fit. Work, time, place and capabilities must be clear.')],
         [B('报名是否可判断','Can an application be assessed?'),B('不同任务需要不同资料。重复询问与零散信息让组织者难以持续比较与确认。','Different tasks need different evidence. Repeated questions and fragmented information hinder review.')],
@@ -56,8 +56,8 @@ window.FIRELINK_DECK = {
     },
     {
       id:'scope', section:0, layout:'scope', time:40,
-      title:B('服务在可信交接处完成','The service completes at a trusted handoff'),
-      lead:B('接入组织原有工作方式，让新工具承担最需要标准化的一段。','Fit existing organizational practices by structuring the part that needs a shared process.'),
+      title:B('服务止于审核结果与授权联系','Our scope ends at review and consented contact'),
+      lead:B('发布、报名、审核和授权联系由 FireLink 处理；后续协调继续使用组织已有渠道。','FireLink handles publication, applications, review and consented contact; existing channels handle subsequent coordination.'),
       items:[
         [B('FireLink 内完成','Within FireLink'),B('发布具体支援任务\n按任务提交授权资料\n人工审核与人数控制\n通知结果、开放获授权的联系方式','Publish specific support tasks\nSubmit task-specific consent\nReview people and manage capacity\nNotify outcomes and release permitted contacts')],
         [B('交接至组织已有渠道','Handoff to existing channels'),B('电话、微信及其他既有联络方式\n由组织进一步确认人员与安排\n沿用其现有的现场协调方案','Phone, WeChat and other established channels\nThe organization confirms people and arrangements\nExisting field coordination practices continue')]
@@ -81,7 +81,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'journey', section:1, layout:'journey', time:60,
-      title:B('把每一个等待，接到明确的下一步','Every waiting point has a clear next step'),
+      title:B('让志愿者随时知道申请进展','Make the application journey easy to follow'),
       lead:B('贯穿场景：林缘火情外围支援演练，招募物资整理、运输与信息登记志愿者。','Walkthrough: a simulated wildfire-edge support effort recruiting for supplies, transport and registration.'),
       headers:[B('阶段','Stage'),B('发现需求','Discover'),B('判断任务','Assess'),B('提交申请','Apply'),B('等待审核','Wait'),B('接收结果','Receive')],
       rows:[
@@ -94,7 +94,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'blueprint', section:1, layout:'blueprint', time:65,
-      title:B('服务蓝图让前台承诺有后台支撑','A service blueprint connects promise and delivery'),
+      title:B('把服务步骤与后台规则对应起来','Connect the service journey to backend rules'),
       headers:[B('服务层','Service layer'),B('发布需求','Publish'),B('报名授权','Apply'),B('审核确认','Review'),B('结果交接','Handoff')],
       rows:[
         [B('志愿者可见','Volunteer-facing'),B('事件与任务详情','Incident and task details'),B('档案、必填项、授权范围','Profile, required fields, consent'),B('待审核／可撤回','Pending / withdrawal'),B('结果、回应与联系入口','Outcome, response, contact route')],
@@ -119,7 +119,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'information-architecture', section:2, layout:'table', time:35,
-      title:B('工作台按照组织者的工作来组织','The workspace follows the organizer’s work'),
+      title:B('按处理流程组织工作台入口','Organize the workspace around tasks'),
       headers:[B('入口','Destination'),B('回答的问题','Question it answers'),B('关键动作','Key actions')],
       rows:[
         [B('开始','Home'),B('现在优先处理什么？','What needs attention now?'),B('筛选事件、排序待处理任务','Filter incidents and prioritize tasks')],
@@ -145,7 +145,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'incidents', section:2, layout:'screen', time:40,
-      title:B('事件提供背景，任务承载行动','Incidents give context; tasks define action'),
+      title:B('一个事件下，可以发布多项任务','Multiple tasks can belong to one incident'),
       image:'organizer-events.webp',
       items:[
         [B('共享背景','Shared context'),B('一次事件可以关联多个具体支援任务。','One incident can contain multiple specific support tasks.')],
@@ -170,7 +170,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'task-content', section:2, layout:'screen', time:40,
-      title:B('任务内容支持参与前的判断','Task details support an informed decision'),
+      title:B('报名之前，先看清工作与条件','Understand the work before applying'),
       image:'organizer-task.webp',
       items:[
         [B('工作可理解','Understand the work'),B('在指定支援点清点、分类与打包物资。','Count, sort and pack supplies at an agreed support point.')],
@@ -182,7 +182,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'review', section:2, layout:'screen', time:55,
-      title:B('让审核围绕任务与授权资料展开','Review the person against the task'),
+      title:B('审核时对照任务要求与申请资料','Review applications against task requirements'),
       image:'organizer-review.webp',
       imagePosition:'left 40%',
       items:[
@@ -223,7 +223,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'volunteer', section:2, layout:'phones', time:40,
-      title:B('志愿者端让每一步都可理解','Make each step understandable for volunteers'),
+      title:B('志愿者端呈现任务、授权与结果','Show tasks, consent and outcomes to volunteers'),
       phones:[
         {image:'task-light.webp',title:B('先读清任务','Understand the task'),text:B('查看组织者、要求与详细内容。','Read the organizer, requirements and details.')},
         {image:'consent-light.webp',title:B('再决定授权','Choose what to share'),text:B('区分必需资料与可选资料。','Distinguish required and optional information.')},
@@ -258,7 +258,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'iterations', section:3, layout:'table', time:40,
-      title:B('迭代把注意力转向实际操作','Iteration focused on actual use'),
+      title:B('针对实际操作问题持续改进界面','Improve the interface through targeted reviews'),
       headers:[B('已有材料中的问题','Issue in review records'),B('当前设计回应','Current response'),B('判断价值的方式','How to judge value')],
       rows:[
         [B('信息分散，下一步不够突出','Scattered information and unclear next action'),B('开始页聚焦任务，审核保持列表与详情连续','Task-focused home and continuous queue/detail review'),B('能否直接找到最需要处理的申请','Can the reviewer find the next relevant application?')],
@@ -270,7 +270,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'implementation', section:3, layout:'architecture', time:40,
-      title:B('双端原型共享同一套业务规则','Both interfaces share the same service rules'),
+      title:B('三个界面共享一套业务规则','Three interfaces, one set of business rules'),
       layers:[
         {title:B('交互层','Interfaces'),text:B('组织者 Web 工作台　Android 客户端　Apple 客户端','Organizer web workspace　Android client　Apple clients')},
         {title:B('服务与契约','Service & contracts'),text:B('共享 API、任务内容、授权字段与申请状态','Shared APIs, task content, consent fields and application states')},
@@ -282,7 +282,7 @@ window.FIRELINK_DECK = {
     },
     {
       id:'verification', section:3, layout:'evidence', time:50,
-      title:B('核心规则形成了可复跑的验证','Core service rules have repeatable tests'),
+      title:B('用自动化测试检查关键规则','Automated checks for critical rules'),
       metrics:[{n:'49',label:B('后端相关测试通过','Relevant backend tests passed')},{n:'4',label:B('配色方案测试通过','Color scheme tests passed')}],
       items:[
         [B('本次实际复跑','Re-run for this review'),B('覆盖权限、授权、人数与状态规则，新增自定义资料与答案快照检查；提供深色模式支持与自动配色方案生成。','Covers access, consent, capacity and state rules, including custom fields and answer snapshots; provides dark mode support and automatic color scheme generation.')],
@@ -294,8 +294,8 @@ window.FIRELINK_DECK = {
     },
     {
       id:'next', section:4, layout:'columns', time:45,
-      title:B('后续深化，继续围绕招募与匹配','Deepen recruitment and matching'),
-      lead:B('以少量组织试点，验证是否真正减少了确认成本。','Start with a small organizational pilot to learn whether the service reduces coordination effort.'),
+      title:B('下一步：验证流程并改进任务表达','Next: validate the flow and task descriptions'),
+      lead:B('先观察组织者和志愿者能否顺利完成一项外围支援任务。','First observe whether organizers and volunteers can complete a simulated civilian support task.'),
       items:[
         [B('先验证服务','Validate the service'),B('邀请组织者与志愿者完成同一条流程，观察任务理解、错审、授权误解与交接失败点。','Ask organizers and volunteers to complete the connected flow; observe misunderstandings, wrong decisions and unclear handoffs.')],
         [B('再优化任务表达','Improve task authoring'),B('针对常见外围支援任务沉淀模板与字段解释，降低发布与审核成本。','Develop templates and field guidance for common support tasks to reduce authoring and review effort.')],
