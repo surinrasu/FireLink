@@ -7,7 +7,7 @@ import { createState, api } from "../state.ts";
 import { SCENES, TOKEN, NOW } from "../scenes.ts";
 import { imageArchitecture, sdkCandidates, provisionAvd } from "../platform.ts";
 import { createDemoServer } from "../server.ts";
-import { spawnSync } from "node:child_process";
+import { Transpiler } from "bun";
 import type { Bridge, SceneReadiness } from "../adb.ts";
 const auth = `Bearer ${TOKEN}`;
 test("all scenes restore a fresh, deterministic state including read flags and approval", () => {
@@ -179,15 +179,7 @@ test("HTTP controller serializes transitions, rejects stale input, blocks foreig
     assert.equal(script.status, 200);
     assert.match(script.headers.get("Content-Type") || "", /text\/javascript/);
     const source = await script.text();
-    const parsed = spawnSync(
-      process.execPath,
-      ["--input-type=module", "--check"],
-      {
-        input: source,
-        encoding: "utf8",
-      },
-    );
-    assert.equal(parsed.status, 0, parsed.stderr);
+    assert.doesNotThrow(() => new Transpiler({ loader: "js" }).scan(source));
     assert.ok(source.includes("/api/demo/scenes"));
     assert.doesNotMatch(source, /(?:from|import)\s*["'][^"']+\.ts["']/);
     const head = await fetch(base + "/app.js", { method: "HEAD" });

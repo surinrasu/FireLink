@@ -32,10 +32,31 @@ run = "mise -C apple run build:mac"
 [tasks."visionos:build"]
 run = "mise -C apple run build:vision"
 
-[tasks.demo]
-description = "启动中文演示幻灯片、本地后端和专用 AVD"
-dir = "presentation"
-run = "node start.ts"
+[tasks."presentation:install"]
+description = "使用 Bun 安装开题汇报及其后端依赖"
+run = ["mise -C server run install", "mise -C server exec -- bun install --cwd ../presentation/proposal --frozen-lockfile"]
+
+[tasks."presentation:proposal"]
+description = "启动开题汇报、本地演示后端和专用 AVD"
+run = "mise -C server exec -- bun run --cwd ../presentation proposal"
+raw = true
+
+[tasks."presentation:final"]
+description = "启动结题汇报静态预览"
+run = "mise -C server exec -- bun run --cwd ../presentation final"
+raw = true
+
+[tasks."presentation:build"]
+description = "重建结题汇报与演讲稿 HTML"
+run = "mise -C server exec -- bun run --cwd ../presentation final:build"
+
+[tasks."presentation:deploy"]
+description = "随现有站点发布 /pre/proposal 与 /pre/final"
+run = "mise -C server run deploy"
+
+[tasks."presentation:screenshots"]
+description = "启动开题客户端并更新全部演示截图"
+run = "mise -C server exec -- bun run --cwd ../presentation screenshots:update"
 raw = true
 
 [tasks.check]
@@ -55,8 +76,8 @@ description = "后端生成类型、TypeScript、格式和 API 测试"
 run = ["mise -C server run check", "mise -C server run test"]
 
 [tasks."check:presentation"]
-description = "演示程序类型检查和测试，复用后端固定的 Node.js 版本"
-run = ["mise -C server exec -- npm --prefix ../presentation run check", "mise -C server exec -- npm --prefix ../presentation test"]
+description = "使用项目固定的 Bun 版本运行演示程序类型检查和测试"
+run = ["mise -C server exec -- bun run --cwd ../presentation check", "mise -C server exec -- bun run --cwd ../presentation test"]
 
 [tasks."check:android"]
 description = "Android 单元测试和 lint"

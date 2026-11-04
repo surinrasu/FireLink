@@ -30,7 +30,7 @@ export function createBridge({
   hierarchy(): Promise<string>;
 } {
   if (!serial || !/^emulator-\d+$/.test(serial))
-    throw new Error("请通过 npm start 启动专用 AVD，或设置 DEMO_SERIAL。");
+    throw new Error("请通过 bun run start 启动专用 AVD，或设置 DEMO_SERIAL。");
   const run = async (...args: string[]) =>
     (
       await exec(adb, ["-s", serial, ...args], {
@@ -48,7 +48,7 @@ export function createBridge({
       // The dedicated package has no user data. Clear forms, scroll, auth, and saved preferences.
       const clear = (await run("shell", "pm", "clear", PACKAGE)).toString();
       if (!clear.includes("Success"))
-        throw new Error("演示 APK 未安装，请重新运行 npm start。");
+        throw new Error("演示 APK 未安装，请重新运行 bun run start。");
       reset();
       await run(
         "shell",

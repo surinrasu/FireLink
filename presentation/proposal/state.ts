@@ -1,8 +1,8 @@
-import fixture from "../fixtures/demo.json" with { type: "json" };
+import fixture from "../../fixtures/demo.json" with { type: "json" };
 import type { ApplicationStatus } from "./types.ts";
 import { NOW, TOKEN, SCENES } from "./scenes.ts";
-import { profileSchema, type Profile } from "../server/src/domain.ts";
-import messages from "../server/src/messages.json" with { type: "json" };
+import { profileSchema, type Profile } from "../../server/src/domain.ts";
+import messages from "../../server/src/messages.json" with { type: "json" };
 const profile: Profile = {
   id: "volunteer-demo",
   username: "林小满",

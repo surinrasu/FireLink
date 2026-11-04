@@ -1,0 +1,7 @@
+.phone img {
+  cursor: default;
+  touch-action: auto;
+}
+button:disabled {
+  cursor: default;
+}
