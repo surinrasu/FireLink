@@ -218,7 +218,7 @@ try {
     await page
       .getByRole("button", { name: "进入演示工作台", exact: true })
       .click();
-    await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
     await scan(page, `${name}-dashboard`);
     await page.screenshot({
       path: `${output}/${name}-h266-dashboard.png`,
@@ -226,9 +226,11 @@ try {
     });
     const goto = async (route: string, heading: string) => {
       await page.goto(`${base}/#/${route}`);
-      await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+      await page
+        .getByRole("heading", { name: heading, exact: true, level: 1 })
+        .waitFor();
     };
-    await goto("tasks", "任务管理");
+    await goto("tasks", "任务");
     await scan(page, `${name}-tasks`);
     await selectedIndicator(
       page.locator('.sidebar .side-link[aria-current="page"]'),
@@ -284,7 +286,7 @@ try {
     await goto("applications?status=accepted", "已通过报名");
     await page.locator(".contact-row").first().waitFor();
     await scan(page, `${name}-accepted`);
-    await goto("incidents", "活跃事件");
+    await goto("incidents", "事件");
     await scan(page, `${name}-incidents`);
     await goto("notices", "已发送通知");
     await scan(page, `${name}-notices`);
@@ -367,7 +369,7 @@ try {
       // Check the same interface under system contrast settings and on a narrow
       // screen; these do not require a separate application-specific color mode.
       await page.reload();
-      await goto("tasks", "任务管理");
+      await goto("tasks", "任务");
       await page.setViewportSize({ width: 1440, height: 1000 });
       await page.emulateMedia({ forcedColors: "active" });
       await scan(page, `${name}-forced-colors`);
@@ -422,7 +424,7 @@ try {
       await page.getByRole("radio", { name: "标准字号", exact: true }).check();
       await page.keyboard.press("Escape");
       for (const hue of [25, 90, 155, 320, 266]) {
-        await goto("tasks", "任务管理");
+        await goto("tasks", "任务");
         await page.getByRole("button", { name: "主题", exact: true }).click();
         await page.locator(`.hue-preset[data-hue="${hue}"]`).click();
         assert.equal(
@@ -468,7 +470,7 @@ try {
           form.prepend(error);
         });
         await scan(page, `${name}-h${hue}-errors`);
-        await goto("tasks", "任务管理");
+        await goto("tasks", "任务");
         for (const type of [
           "achromatopsia",
           "deuteranopia",

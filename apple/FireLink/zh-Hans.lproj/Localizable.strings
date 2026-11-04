@@ -82,6 +82,8 @@
 "application_accepted" = "已通过";
 "application_rejected" = "未通过";
 "application_withdrawn" = "已撤回";
+"application_expired" = "已过期";
+"application_expired_reason" = "任务已结束，报名未获确认，已自动过期。";
 "username" = "用户名";
 "pronouns" = "称呼代词";
 "real_name" = "姓名";

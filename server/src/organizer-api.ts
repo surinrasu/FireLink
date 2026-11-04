@@ -15,6 +15,7 @@ import {
   type OrganizerEnv,
 } from "./organizer-auth";
 import { createDemo } from "./organizer-demo";
+import { expireApplications } from "./application-expiry";
 import { uploadMedia, validateMedia } from "./organizer-media";
 import {
   completeMap,
@@ -49,6 +50,11 @@ organizerAPI.onError((error, c) => {
       : "";
   if (message.includes("organizer_capacity_full"))
     return c.json({ error: "名额已满，请先调整招募人数。" }, 409);
+  if (message.includes("application_task_ended"))
+    return c.json(
+      { error: "任务已结束，报名已过期，请刷新查看最新结果。" },
+      409,
+    );
   if (message.includes("organizer_last_admin"))
     return c.json({ error: "组织至少需要保留一位管理员。" }, 409);
   if (message.includes("CHECK constraint failed: hits"))
@@ -103,6 +109,7 @@ organizerAPI.use("*", async (c, next) => {
     "taskIds",
     assigned.results.map((r) => r.task_id),
   );
+  await expireApplications(c.env.DB, { organizationId: orgId });
   await next();
 });
 
@@ -131,7 +138,8 @@ const taskSelect = `SELECT t.*,i.title AS incident_title,a.name AS owner_name,
  (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='pending') AS pending,
  (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='accepted') AS accepted,
  (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='rejected') AS rejected,
- (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='withdrawn') AS withdrawn
+ (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='withdrawn') AS withdrawn,
+ (SELECT COUNT(*) FROM applications WHERE task_id=t.id AND status='expired') AS expired
  FROM tasks t JOIN incidents i ON i.id=t.incident_id
  LEFT JOIN organization_members m ON m.id=t.owner_id LEFT JOIN organizer_accounts a ON a.id=m.account_id`;
 export function taskState(row: Row): TaskState {
@@ -140,6 +148,7 @@ export function taskState(row: Row): TaskState {
     row.publication_status === "archived"
   )
     return row.publication_status;
+  if (row.ends_at && String(row.ends_at) <= timestamp()) return "closed";
   if (row.paused) return "paused";
   if (
     row.status !== "open" ||
@@ -173,6 +182,7 @@ function taskDTO(row: Row): OrganizerTask {
     accepted: Number(row.accepted),
     rejected: Number(row.rejected),
     withdrawn: Number(row.withdrawn),
+    expired: Number(row.expired),
   };
 }
 async function findTask(c: OrgContext, id: string) {
@@ -419,7 +429,8 @@ organizerAPI.put("/tasks/:id", async (c) => {
     Number(old.pending) +
       Number(old.accepted) +
       Number(old.rejected) +
-      Number(old.withdrawn) >
+      Number(old.withdrawn) +
+      Number(old.expired) >
     0;
   const sameFields = (a: string[], b: string[]) =>
     JSON.stringify([...new Set(a)].sort()) ===
@@ -588,7 +599,16 @@ organizerAPI.get("/applications", async (c) => {
     Math.min(100000, Number.parseInt(c.req.query("page") || "1", 10) || 1),
   );
   const status = c.req.query("status") || "all";
-  if (!["all", "pending", "accepted", "rejected", "withdrawn"].includes(status))
+  if (
+    ![
+      "all",
+      "pending",
+      "accepted",
+      "rejected",
+      "withdrawn",
+      "expired",
+    ].includes(status)
+  )
     deny(400, "报名状态无效。");
   const query = (c.req.query("q") || "").trim().slice(0, 100);
   const where = `t.organizer_id=? AND ${scope.sql} ${taskId ? "AND t.id=?" : ""} ${query ? "AND (instr(lower(COALESCE(json_extract(a.profile_snapshot,'$.realName'),'')),lower(?))>0 OR instr(lower(COALESCE(json_extract(a.profile_snapshot,'$.username'),'')),lower(?))>0 OR instr(lower(COALESCE(json_extract(a.profile_snapshot,'$.region'),'')),lower(?))>0)" : ""}`;
@@ -610,7 +630,13 @@ organizerAPI.get("/applications", async (c) => {
       .bind(...values)
       .all<{ status: OrganizerApplication["status"]; n: number }>(),
   ]);
-  const counts = { pending: 0, accepted: 0, rejected: 0, withdrawn: 0 };
+  const counts = {
+    pending: 0,
+    accepted: 0,
+    rejected: 0,
+    withdrawn: 0,
+    expired: 0,
+  };
   for (const group of groups.results) counts[group.status] = group.n;
   const total =
     status === "all"
@@ -696,7 +722,7 @@ organizerAPI.post("/applications/:id/decision", async (c) => {
     ),
   ]);
   if (!results[0].meta.changes)
-    deny(409, "这份报名已被处理或撤回，请刷新查看最新结果。");
+    deny(409, "这份报名已被处理、撤回或已过期，请刷新查看最新结果。");
   return c.json({ ok: true });
 });
 organizerAPI.get("/notices", async (c) => {

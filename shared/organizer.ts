@@ -5,7 +5,8 @@ export type ApplicationState =
   | "pending"
   | "accepted"
   | "rejected"
-  | "withdrawn";
+  | "withdrawn"
+  | "expired";
 export interface ContactMethod {
   type: "phone" | "wechat" | "email";
   label: string;
@@ -73,6 +74,7 @@ export interface OrganizerTask {
   accepted: number;
   rejected: number;
   withdrawn: number;
+  expired: number;
 }
 export interface OrganizerApplication {
   id: string;

@@ -13,6 +13,7 @@ import type {
   Workspace,
 } from "../../shared/organizer";
 import { cleanupOrganizerData } from "../src/organizer-maintenance.ts";
+import { expireApplications } from "../src/application-expiry.ts";
 import type { UploadedMedia } from "../../shared/media";
 
 let mf: Miniflare, db: D1Database, base: string;
@@ -408,6 +409,230 @@ test("concurrent acceptance respects capacity and creates exactly one result not
     "accepted",
   );
 });
+test("expiry uses task end, respects tenant scope, preserves decisions and notifies once", async () => {
+  const identity = await demo(),
+    other = await demo();
+  const before = (await request<ApplicationPage>("/applications", identity))
+    .data;
+  const data = await workspace(identity);
+  const task = data.tasks.find(
+    (item) => item.pending > 0 && item.accepted > 0,
+  )!;
+  const candidates = before.items.filter(
+    (item) => item.taskId === task.id && item.status === "pending",
+  );
+  const cutoff = "2099-01-02T00:00:00.000Z";
+  const beforeCutoff = "2099-01-01T23:59:59.999Z";
+  await db
+    .prepare(
+      "UPDATE tasks SET ends_at='',deadline='2000-01-01T00:00:00.000Z' WHERE organizer_id=?",
+    )
+    .bind(identity.org)
+    .run();
+  await db
+    .prepare("UPDATE tasks SET ends_at=? WHERE id=? OR organizer_id=?")
+    .bind(cutoff, task.id, other.org)
+    .run();
+  await expireApplications(db, { organizationId: identity.org }, beforeCutoff);
+  assert.equal(
+    (await request<ApplicationPage>("/applications", identity)).data.counts
+      .expired,
+    0,
+  );
+  await Promise.all([
+    expireApplications(db, { organizationId: identity.org }, cutoff),
+    expireApplications(db, { organizationId: identity.org }, cutoff),
+  ]);
+  await expireApplications(db, { organizationId: identity.org }, cutoff);
+  const after = (await request<ApplicationPage>("/applications", identity))
+    .data;
+  assert.equal(after.counts.expired, candidates.length);
+  assert.equal(after.counts.pending, before.counts.pending - candidates.length);
+  for (const original of before.items) {
+    const expected = candidates.some(
+      (candidate) => candidate.id === original.id,
+    )
+      ? "expired"
+      : original.status;
+    assert.equal(
+      after.items.find((item) => item.id === original.id)!.status,
+      expected,
+    );
+  }
+  for (const candidate of candidates) {
+    const detail = await request<OrganizerApplication>(
+      `/applications/${candidate.id}`,
+      identity,
+    );
+    assert.equal(detail.data.status, "expired");
+    assert.equal(detail.data.contacts, null);
+    assert.equal(detail.data.reviewerName, null);
+    assert.equal(detail.data.updatedAt, cutoff);
+    const notices = await db
+      .prepare("SELECT title,body FROM notifications WHERE application_id=?")
+      .bind(candidate.id)
+      .all<{ title: string; body: string }>();
+    assert.deepEqual(notices.results, [
+      { title: "报名已过期", body: "任务已结束，报名未获确认，已自动过期。" },
+    ]);
+    await assert.rejects(
+      () =>
+        db
+          .prepare("UPDATE applications SET status='accepted' WHERE id=?")
+          .bind(candidate.id)
+          .run(),
+      /invalid application transition/,
+    );
+  }
+  const filtered = await request<ApplicationPage>(
+    "/applications?status=expired",
+    identity,
+  );
+  assert.equal(filtered.status, 200);
+  assert.equal(filtered.data.total, candidates.length);
+  const updatedTask = (await workspace(identity)).tasks.find(
+    (item) => item.id === task.id,
+  )!;
+  assert.equal(updatedTask.pending, 0);
+  assert.equal(updatedTask.expired, candidates.length);
+  assert.equal(updatedTask.accepted, task.accepted);
+  const audit = await db
+    .prepare(
+      "SELECT actor,action FROM organizer_activity WHERE task_id=? AND action='报名已过期'",
+    )
+    .bind(task.id)
+    .all();
+  assert.equal(audit.results.length, candidates.length);
+  assert.ok(audit.results.every((item) => item.actor === "系统"));
+  assert.equal(
+    (await request<ApplicationPage>("/applications", other)).data.counts
+      .pending,
+    5,
+  );
+});
+
+test("task end wins over stale review, while a signup deadline still allows review", async () => {
+  const identity = await demo();
+  const items = (
+    await request<ApplicationPage>("/applications?status=pending", identity)
+  ).data.items;
+  const expired = items[0];
+  const reviewable = items.find((item) => item.taskId !== expired.taskId)!;
+  await db
+    .prepare("UPDATE tasks SET ends_at='2000-01-01T00:00:00.000Z' WHERE id=?")
+    .bind(expired.taskId)
+    .run();
+  for (const status of ["accepted", "rejected", "withdrawn"])
+    await assert.rejects(
+      () =>
+        db
+          .prepare("UPDATE applications SET status=? WHERE id=?")
+          .bind(status, expired.id)
+          .run(),
+      /application_task_ended/,
+    );
+  const stale = await request(
+    `/applications/${expired.id}/decision`,
+    identity,
+    { status: "accepted", response: "通过" },
+  );
+  assert.equal(stale.status, 409);
+  assert.match(stale.data.error, /已过期/);
+  assert.equal(
+    (
+      await request<OrganizerApplication>(
+        `/applications/${expired.id}`,
+        identity,
+      )
+    ).data.status,
+    "expired",
+  );
+  await db
+    .prepare("UPDATE tasks SET deadline='2000-01-01T00:00:00.000Z' WHERE id=?")
+    .bind(reviewable.taskId)
+    .run();
+  assert.equal(
+    (
+      await request(`/applications/${reviewable.id}/decision`, identity, {
+        status: "accepted",
+        response: "欢迎参与",
+      })
+    ).status,
+    200,
+  );
+});
+
+test("unscoped scheduled expiry handles ended tasks without expiring later tasks", async () => {
+  const identity = await demo();
+  const pending = (
+    await request<ApplicationPage>("/applications?status=pending", identity)
+  ).data.items;
+  const taskId = pending[0].taskId;
+  const expected = pending.filter((item) => item.taskId === taskId).length;
+  await db
+    .prepare(
+      "UPDATE tasks SET ends_at='2000-01-01T00:00:00.000Z',paused=1 WHERE id=?",
+    )
+    .bind(taskId)
+    .run();
+  await (await mf.getWorker()).scheduled({ cron: "*/5 * * * *" });
+  const result = (await request<ApplicationPage>("/applications", identity))
+    .data;
+  assert.equal(result.counts.expired, expected);
+  assert.equal(result.counts.pending, pending.length - expected);
+  assert.equal(
+    (await workspace(identity)).tasks.find((task) => task.id === taskId)!.state,
+    "closed",
+  );
+});
+
+test("expired-only applications keep consent requirements locked and allow archiving", async () => {
+  const identity = await demo();
+  const original = (await workspace(identity)).tasks.find(
+    (task) => task.pending > 0,
+  )!;
+  await db
+    .prepare("DELETE FROM applications WHERE task_id=? AND status!='pending'")
+    .bind(original.id)
+    .run();
+  await db
+    .prepare(
+      "UPDATE tasks SET starts_at='2000-01-01T00:00:00.000Z',ends_at='2000-01-02T00:00:00.000Z',deadline='2000-01-01T00:00:00.000Z' WHERE id=?",
+    )
+    .bind(original.id)
+    .run();
+  const task = (await workspace(identity)).tasks.find(
+    (task) => task.id === original.id,
+  )!;
+  assert.equal(task.expired, original.pending);
+  assert.equal(
+    task.pending + task.accepted + task.rejected + task.withdrawn,
+    0,
+  );
+  const edit = await request(
+    `/tasks/${task.id}`,
+    identity,
+    { ...taskInput(task), requiredFields: ["username"] },
+    "PUT",
+  );
+  assert.equal(edit.status, 409);
+  assert.match(edit.data.error, /授权要求已锁定/);
+  assert.equal(
+    (
+      await request(`/tasks/${task.id}/state`, identity, {
+        state: "archived",
+        version: task.version,
+      })
+    ).status,
+    200,
+  );
+  const expired = await request<ApplicationPage>(
+    `/applications?taskId=${task.id}&status=expired`,
+    identity,
+  );
+  assert.equal(expired.data.total, original.pending);
+});
+
 test("withdrawal wins over stale organizer review and never releases contacts", async () => {
   const identity = await demo();
   const pending = (

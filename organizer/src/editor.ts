@@ -94,7 +94,13 @@ export function mountEditor(
     ? "自动保存已启用"
     : "已发布任务的更改需要手动保存";
   const requirementsLocked =
-    !!task && task.pending + task.accepted + task.rejected + task.withdrawn > 0;
+    !!task &&
+    task.pending +
+      task.accepted +
+      task.rejected +
+      task.withdrawn +
+      task.expired >
+      0;
   const fields = source?.requiredFields || ["realName", "region"];
   const contacts = source?.contactFields || ["phone"];
   const requirementOptions = (
@@ -105,7 +111,7 @@ export function mountEditor(
     keys
       .map(
         (key) =>
-          `<label class="requirement-option"><input class="sr-only" type="checkbox" name="${name}" value="${key}" ${selected.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span>${fieldLabels[key]}</span></label>`,
+          `<label class="requirement-option"><input class="sr-only" type="checkbox" name="${name}" value="${key}" ${selected.includes(key) ? "checked" : ""} ${requirementsLocked ? "disabled" : ""}><span class="multi-select-option">${fieldLabels[key]}</span></label>`,
       )
       .join("");
   const fieldGroups: [string, string[]][] = [

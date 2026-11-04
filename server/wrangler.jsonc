@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "triggers": { "crons": ["*/5 * * * *", "27 * * * *"] },
   "assets": {
     "directory": "../organizer/build",
     "binding": "ASSETS",
@@ -32,7 +33,7 @@
   "env": {
     "staging": {
       "name": "firelink-demo",
-      "triggers": { "crons": ["27 * * * *"] },
+      "triggers": { "crons": ["*/5 * * * *", "27 * * * *"] },
       "vars": {
         "APP_ENV": "staging",
         "ORGANIZER_DEMO": "true",
@@ -59,6 +60,7 @@
     },
     "production": {
       "name": "firelink-production",
+      "triggers": { "crons": ["*/5 * * * *", "27 * * * *"] },
       "vars": {
         "APP_ENV": "production",
         "ORGANIZER_DEMO": "false",

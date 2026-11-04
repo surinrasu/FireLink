@@ -70,14 +70,19 @@ export function notificationText(
       ? "application_accepted"
       : status === "rejected"
         ? "application_rejected"
-        : null;
+        : status === "expired"
+          ? "application_expired"
+          : null;
   if (!key || notice.title !== translate("zh-Hans", key)) return notice;
   return {
     title: translate(language, key),
     body:
-      response === null &&
-      notice.body === translate("zh-Hans", "application_updated")
-        ? translate(language, "application_updated")
-        : notice.body,
+      status === "expired" &&
+      notice.body === translate("zh-Hans", "application_expired_body")
+        ? translate(language, "application_expired_body")
+        : response === null &&
+            notice.body === translate("zh-Hans", "application_updated")
+          ? translate(language, "application_updated")
+          : notice.body,
   };
 }

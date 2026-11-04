@@ -46,7 +46,7 @@ try {
   await page
     .getByRole("button", { name: "进入演示工作台", exact: true })
     .click();
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.screenshot({
     path: "../.artifacts/organizer/desktop-dashboard.png",
     fullPage: true,
@@ -57,7 +57,7 @@ try {
     "6",
   );
   await page.getByRole("link", { name: "草稿 1", exact: true }).click();
-  await page.getByRole("heading", { name: "任务管理", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
   assert.equal(await page.locator(".task-card").count(), 1);
   assert.equal(await page.locator(".task-card .status-draft").count(), 1);
   // Give each ordering a distinct result, including a task with no deadline.
@@ -86,9 +86,13 @@ try {
     { times: 1 },
   );
   await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
-  const taskTitles = () =>
-    page.locator("#dashboard-tasks .task-info > a").allTextContents();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
+  const taskTitles = async () => {
+    // The optional map changes how many task rows fit in the first viewport.
+    while (await page.locator("#dashboard-more").isVisible())
+      await page.locator("#dashboard-more").click();
+    return page.locator("#dashboard-tasks .task-info > a").allTextContents();
+  };
   assert.deepEqual(await taskTitles(), [
     "安置点物资整理",
     "临时服务点信息登记",
@@ -127,7 +131,7 @@ try {
   await page.locator(".filter-chips a").filter({ hasText: "已通过" }).click();
   await page.locator(".contact-row").first().waitFor();
   await page.locator('.sidebar a[href="#/tasks"]').click();
-  await page.getByRole("heading", { name: "任务管理", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
   await page
     .getByRole("searchbox", { name: "搜索任务", exact: true })
     .fill("运输");
@@ -211,7 +215,7 @@ try {
     .fill("browser-test-password-2026");
   await reviewer.getByRole("button", { name: "接受邀请并进入" }).click();
   await reviewer
-    .getByRole("heading", { name: "工作台", exact: true })
+    .getByRole("heading", { name: "开始", exact: true })
     .waitFor();
   assert.equal(
     await reviewer.getByRole("link", { name: "新建任务", exact: true }).count(),
@@ -219,7 +223,7 @@ try {
   );
   await reviewer.locator('.sidebar a[href="#/tasks"]').click();
   await reviewer
-    .getByRole("heading", { name: "任务管理", exact: true })
+    .getByRole("heading", { name: "任务", exact: true })
     .waitFor();
   assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
     "物资运输协助",
@@ -240,7 +244,7 @@ try {
     .fill("browser-test-password-2026");
   await reviewer.getByRole("button", { name: "登录工作台" }).click();
   await reviewer
-    .getByRole("heading", { name: "工作台", exact: true })
+    .getByRole("heading", { name: "开始", exact: true })
     .waitFor();
   await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.reload();
@@ -281,7 +285,7 @@ try {
   await reviewer.reload();
   await reviewer.locator('.sidebar a[href="#/tasks"]').click();
   await reviewer
-    .getByRole("heading", { name: "任务管理", exact: true })
+    .getByRole("heading", { name: "任务", exact: true })
     .waitFor();
   assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
     "安置点物资整理",
@@ -296,7 +300,9 @@ try {
   );
   await page.getByRole("button", { name: "取消", exact: true }).click();
   await page.locator('.sidebar a[href="#/incidents"]').click();
-  await page.getByRole("heading", { name: "活跃事件", exact: true }).waitFor();
+  await page
+    .getByRole("heading", { name: "事件", exact: true, level: 1 })
+    .waitFor();
   await page.locator('.sidebar a[href="#/notices"]').click();
   await page
     .getByRole("heading", { name: "已发送通知", exact: true })
@@ -309,14 +315,14 @@ try {
   await page.getByRole("radio", { name: "更大字号", exact: true }).check();
   await page.keyboard.press("Escape");
   await page.locator('.sidebar .side-link[href="#/dashboard"]').click();
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.screenshot({
     path: "../.artifacts/organizer/dark-large-text.png",
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -351,7 +357,7 @@ try {
     "320px large text layout must fit",
   );
   await page.goto(`${url}/#/dashboard`);
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -360,7 +366,7 @@ try {
   );
   await page.setViewportSize({ width: 834, height: 1112 });
   await page.goto(`${url}/#/dashboard`);
-  await page.getByRole("heading", { name: "工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.screenshot({
     path: "../.artifacts/organizer/tablet-dashboard.png",
     fullPage: true,

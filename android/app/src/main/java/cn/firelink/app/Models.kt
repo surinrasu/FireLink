@@ -153,6 +153,7 @@ data class ApplicationRecord(
                 "accepted" to R.string.application_accepted,
                 "rejected" to R.string.application_rejected,
                 "withdrawn" to R.string.application_withdrawn,
+                "expired" to R.string.application_expired,
             )[status]
 }
 

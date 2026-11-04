@@ -82,6 +82,8 @@
 "application_accepted" = "Accepted";
 "application_rejected" = "Not accepted";
 "application_withdrawn" = "Withdrawn";
+"application_expired" = "Expired";
+"application_expired_reason" = "The task has ended. Your application was not confirmed and has expired automatically.";
 "username" = "Username";
 "pronouns" = "Pronouns";
 "real_name" = "Full name";

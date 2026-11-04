@@ -451,7 +451,9 @@ struct ApplicationHistoryView: View {
           }
           LabeledContent(L10n.text("status"), value: item.statusLabel)
           Text(item.organizerName).font(.caption).foregroundStyle(.secondary)
-          if let response = item.response { Text(response) }
+          if item.status == "expired" {
+            Text("application_expired_reason")
+          } else if let response = item.response { Text(response) }
           Text(
             item.contactsReleased
               ? L10n.text(

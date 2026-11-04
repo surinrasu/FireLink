@@ -27,6 +27,7 @@ import {
   preferences,
   renderBlocks,
   select,
+  searchField,
   setBusy,
   stateLabels,
   textarea,
@@ -35,6 +36,12 @@ import {
 } from "./ui";
 import { mountEditor, type EditorHandle } from "./editor";
 import { bindHuePicker, huePicker } from "./hue-picker";
+import {
+  attachEventFilter,
+  dashboardIncidents,
+  dashboardState,
+  eventFilterMarkup,
+} from "./dashboard-events";
 
 const root = document.querySelector<HTMLDivElement>("#app")!;
 const routeStatus = document.createElement("div");
@@ -64,8 +71,10 @@ let workspace: Workspace;
 let currentOrg = "";
 let generation = 0;
 let taskView: "cards" | "compact" = "cards";
-let dashboardSort: "updated" | "pending" | "deadline" = "updated";
 let disposeDashboardTasks: (() => void) | null = null;
+let disposeDashboardEvents: (() => void) | null = null;
+const currentDashboard = () =>
+  dashboardState(`${session!.account.id}:${currentOrg}`);
 const dashboardSortOptions = [
   ["updated", "最近更新"],
   ["pending", "待审核人数"],
@@ -104,10 +113,10 @@ const roles = {
   reviewer: "任务审核员",
 };
 const destinations = [
-  ["dashboard", "space_dashboard", "工作台"],
-  ["tasks", "assignment", "任务管理"],
+  ["dashboard", "space_dashboard", "开始"],
+  ["tasks", "assignment", "任务"],
   ["applications", "fact_check", "报名审核"],
-  ["incidents", "explore", "活跃事件"],
+  ["incidents", "explore", "事件"],
   ["notices", "notifications", "已发送通知"],
   ["settings", "settings", "组织设置"],
 ];
@@ -159,7 +168,7 @@ function shell(body: string, section: string) {
       "",
     )}<button class="${["incidents", "notices", "settings"].includes(section) ? "active" : ""}" data-action="more">${icon("more_horiz")}<span>更多</span></button></nav>`;
   positionOrganizationSwitcher();
-  document.title = `${destinations.find(([id]) => id === section)?.[2] || "工作台"} · FireLink`;
+  document.title = `${destinations.find(([id]) => id === section)?.[2] || "开始"} · FireLink`;
   root
     .querySelector<HTMLSelectElement>("#org-switch")
     ?.addEventListener("change", async (event) => {
@@ -174,19 +183,20 @@ function shell(body: string, section: string) {
     });
 }
 function dashboardTasks() {
-  const attention = workspace.tasks.filter((task) => task.pending > 0);
-  const tasks = attention.length
-    ? attention
-    : workspace.tasks.filter((task) => task.state === "open");
+  const { selected, sort } = currentDashboard();
+  const tasks = workspace.tasks.filter(
+    (task) =>
+      (task.pending > 0 || task.state === "open") &&
+      (selected === null || selected.has(task.incidentId)),
+  );
   const deadline = (task: OrganizerTask) => {
     const value = Date.parse(task.deadline);
     return Number.isNaN(value) ? Infinity : value;
   };
   return tasks.sort((a, b) => {
     const updated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-    if (dashboardSort === "pending") return b.pending - a.pending || updated;
-    if (dashboardSort === "deadline")
-      return deadline(a) - deadline(b) || updated;
+    if (sort === "pending") return b.pending - a.pending || updated;
+    if (sort === "deadline") return deadline(a) - deadline(b) || updated;
     return updated;
   });
 }
@@ -195,7 +205,7 @@ function dashboardTaskRow(task: OrganizerTask) {
     task.deadline && !Number.isNaN(Date.parse(task.deadline))
       ? `<time datetime="${h(task.deadline)}">${formatDate(task.deadline)}</time> 截止`
       : "未设置截止时间";
-  return `<div class="task-row"><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a><p>${h(task.incidentTitle)}</p><p class="task-deadline">${deadline}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
+  return `<div class="task-row"><div class="task-info"><a href="${taskLink(task)}">${h(task.title)}</a>${currentDashboard().selected?.size === 1 ? "" : `<p class="task-incident">${h(task.incidentTitle)}</p>`}<p class="task-deadline">${deadline}</p></div><div class="task-row-end">${badge(task.state)}<small>${task.pending ? `<a href="${applicationsLink(task.id)}">${task.pending} 份待审核 →</a>` : `已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""}`}</small></div></div>`;
 }
 function attachDashboardTasks() {
   const list = root.querySelector<HTMLElement>("#dashboard-tasks")!;
@@ -236,12 +246,31 @@ function attachDashboardTasks() {
   const reset = () => {
     tasks = dashboardTasks();
     shown = 0;
+    const selected = currentDashboard().selected;
+    const filtered = selected !== null;
+    const noneSelected = selected?.size === 0;
+    root.querySelector<HTMLElement>("#dashboard-task-results")!.textContent =
+      `${filtered ? "所选事件" : "全部事件"}有 ${tasks.length} 个需要关注的任务`;
     list.innerHTML = tasks.length
       ? ""
       : empty(
-          "暂无任务",
-          "",
-          canEdit() ? '<a class="button" href="#/tasks/new">创建任务</a>' : "",
+          noneSelected
+            ? "请选择事件"
+            : filtered
+              ? "所选事件暂无需要关注的任务"
+              : workspace.tasks.length
+                ? "暂无需要关注的任务"
+                : "暂无任务",
+          noneSelected
+            ? "选择上方事件，或查看全部事件的任务。"
+            : workspace.tasks.length
+              ? "这里显示有待审报名或正在招募的任务。"
+              : "",
+          filtered
+            ? '<button type="button" class="border" data-action="clear-dashboard-events">查看全部事件的任务</button>'
+            : canEdit()
+              ? '<a class="button" href="#/tasks/new">创建任务</a>'
+              : "",
           "add_task",
         );
     fill();
@@ -267,13 +296,19 @@ function attachDashboardTasks() {
   return reset;
 }
 function attachDashboardSort() {
+  disposeDashboardEvents = attachEventFilter(
+    root,
+    dashboardIncidents(workspace),
+    currentDashboard(),
+    () => resetTasks(),
+  );
   const resetTasks = attachDashboardTasks();
   const control = root.querySelector<HTMLElement>("#dashboard-sort")!;
   const buttons = Array.from(
     control.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
   );
   const choose = (index: number) => {
-    dashboardSort = dashboardSortOptions[index][0];
+    currentDashboard().sort = dashboardSortOptions[index][0];
     control.style.setProperty("--sort-index", String(index));
     buttons.forEach((button, i) => {
       button.setAttribute("aria-checked", String(i === index));
@@ -299,6 +334,8 @@ function attachDashboardSort() {
   });
 }
 function dashboard() {
+  const state = currentDashboard();
+  const events = eventFilterMarkup(workspace, state);
   const draftCount = workspace.tasks.filter(
     (task) => task.state === "draft",
   ).length;
@@ -308,15 +345,15 @@ function dashboard() {
     weekday: "long",
     timeZone: "Asia/Shanghai",
   }).format(new Date());
-  return `${heading("工作台", "", canEdit() ? `<a class="button border" href="#/tasks?state=draft">${icon("edit_note")}<span>草稿 ${draftCount}</span></a><a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
-  <div class="dashboard-grid"><div><section class="panel"><div class="panel-header dashboard-task-header"><h2>需要关注的任务</h2><a href="#/tasks">全部任务 ${icon("arrow_forward")}</a><div id="dashboard-sort" class="dashboard-sort" role="radiogroup" aria-label="排序方式" style="--sort-index:${dashboardSortOptions.findIndex(([value]) => value === dashboardSort)}">${dashboardSortOptions
+  return `${heading("开始", "", canEdit() ? `<a class="button border" href="#/tasks?state=draft">${icon("edit_note")}<span>草稿 ${draftCount}</span></a><a class="button" href="#/tasks/new">${icon("add")}<span>新建任务</span></a>` : "", today)}
+  ${events}<div class="dashboard-grid"><div><section class="panel"><div class="panel-header dashboard-task-header"><h2>需要关注的任务</h2><a href="#/tasks">全部任务 ${icon("arrow_forward")}</a><div id="dashboard-sort" class="segmented-control dashboard-sort" role="radiogroup" aria-label="排序方式" style="--sort-index:${dashboardSortOptions.findIndex(([value]) => value === state.sort)}">${dashboardSortOptions
     .map(
       ([value, label]) =>
-        `<button type="button" role="radio" aria-label="按${label}" aria-checked="${value === dashboardSort}" aria-controls="dashboard-tasks" tabindex="${value === dashboardSort ? 0 : -1}">${label}</button>`,
+        `<button type="button" role="radio" aria-label="按${label}" aria-checked="${value === state.sort}" aria-controls="dashboard-tasks" tabindex="${value === state.sort ? 0 : -1}">${label}</button>`,
     )
     .join(
       "",
-    )}</div></div><div id="dashboard-tasks"></div><button type="button" class="border dashboard-more" id="dashboard-more" aria-controls="dashboard-tasks" hidden>显示更多任务</button></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
+    )}</div></div><p class="sr-only" role="status" id="dashboard-task-results"></p><div id="dashboard-tasks"></div><button type="button" class="border dashboard-more" id="dashboard-more" aria-controls="dashboard-tasks" hidden>显示更多任务</button></section></div><aside class="dashboard-aside"><section class="panel"><div class="panel-header"><h2>最近动态</h2></div>${timeline(workspace.activities.slice(0, 5))}</section>${!workspace.organization.verified ? `<section class="panel"><h2>完成组织认证</h2><p class="muted">认证后可发布招募。</p><a class="button border" href="#/settings">完善组织资料</a></section>` : ""}</aside></div>`;
 }
 function taskCard(task: OrganizerTask) {
   return `<article class="task-card" data-search="${h(`${task.title} ${task.incidentTitle} ${task.ownerName}`.toLowerCase())}"><div class="task-card-top">${badge(task.state)}</div><h2><a href="${taskLink(task)}">${h(task.title)}</a></h2>${task.summary ? `<p class="summary">${h(task.summary)}</p>` : ""}<div class="task-meta"><div class="meta-line task-event">${icon("location_on")}${h(task.incidentTitle)}</div><div class="meta-line task-deadline">${icon("schedule")}${task.deadline ? `${formatDate(task.deadline)} 截止` : "未设置截止时间"}</div></div>${taskProgress(task)}<footer><span class="muted" style="font-size:.78rem">${h(task.ownerName)}</span><a href="${task.state === "draft" && canEdit() ? `${taskLink(task)}/edit` : taskLink(task)}">${task.state === "draft" && canEdit() ? "继续编辑" : "查看任务"} ${icon("arrow_forward")}</a></footer></article>`;
@@ -332,10 +369,10 @@ function tasksPage(params: URLSearchParams) {
           !!t.deadline &&
           Date.parse(t.deadline) - Date.now() < 3 * 86400000)),
   );
-  return `${heading("任务管理", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
+  return `${heading("任务", "", canEdit() ? `<a class="button" href="#/tasks/new">${icon("add")}新建任务</a>` : "")}
   <div class="filter-chips" aria-label="任务状态">${["all", "open", "draft", "paused", "closed", "archived"].map((s) => `<a href="#/tasks${s === "all" ? "" : `?state=${s}`}" class="${s === state && !ending ? "active" : ""}" ${s === state && !ending ? 'aria-current="true"' : ""}>${s === "all" ? "全部任务" : stateLabels[s as keyof typeof stateLabels]} <span>${workspace.tasks.filter((t) => s === "all" || t.state === s).length}</span></a>`).join("")}${ending ? '<a href="#/tasks?ending=1" class="active" aria-current="true">72 小时内截止</a>' : ""}</div>
-  <div class="toolbar task-toolbar"><div class="field border prefix search">${icon("search")}<input id="task-search" type="search" value="${h(params.get("q") || "")}" placeholder="搜索任务、事件或负责人" aria-label="搜索任务"></div>${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
-  <div class="task-view-controls" role="group" aria-label="任务视图"><button type="button" class="border" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" class="border" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
+  <div class="toolbar task-toolbar">${searchField("task-search", "搜索任务", { value: params.get("q") || "", placeholder: "搜索任务、事件或负责人", className: "search" })}${select("incident-filter", "所属事件", [["", "全部事件"], ...workspace.incidents.map((i) => [i.id, i.title] as [string, string])], params.get("incident") || "")}</div>
+  <div class="segmented-control task-view-controls" role="group" aria-label="任务视图"><button type="button" data-task-view="cards" aria-pressed="${taskView === "cards"}">卡片</button><button type="button" data-task-view="compact" aria-pressed="${taskView === "compact"}">列表</button></div><div class="task-grid ${taskView === "compact" ? "compact" : ""}" id="task-grid">${visible.map(taskCard).join("")}</div><div id="task-empty" ${visible.length ? "hidden" : ""}>${empty(workspace.tasks.length ? "无匹配任务" : "暂无任务", workspace.tasks.length ? "清除筛选后可查看全部任务。" : "", workspace.tasks.length ? '<button class="border" type="button" id="clear-task-filters">清除筛选</button>' : canEdit() ? '<a class="button border" href="#/tasks/new">新建任务</a>' : "", "assignment")}</div>`;
 }
 function attachTaskSearch() {
   root
@@ -532,7 +569,7 @@ function applicationDetail(item: OrganizerApplication, back: string) {
           )}</div><p class="muted" style="font-size:.78rem;margin-top:12px">仅用于本任务沟通。</p>`
       : `<div class="info-note" style="margin-top:12px">${icon("lock")}<div>${item.status === "accepted" ? "无查看权限，请联系管理员。" : item.status === "pending" ? `通过后向获授权成员开放：${item.contactFields.map((f) => fieldLabels[f] || f).join("、")}。` : "本次报名未开放联系方式。"}</div></div>`
   }
-  ${item.status === "pending" ? `<hr class="section-divider"><form id="review-form"><details id="review-fields"><summary>添加回应或内部备注（可选）</summary>${textarea("response", "给志愿者的回应", "", 'maxlength="1000"')}${textarea("note", "内部备注（不发送给志愿者）", item.note, 'maxlength="2000"')}</details><p class="help">已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""} 人${task.capacity ? "" : " · 不限人数"}</p><div class="review-actions"><button class="border" type="button" data-decision="rejected">不通过</button><button type="button" data-decision="accepted">${icon("check")}通过并通知</button></div></form>` : `<hr class="section-divider"><h3>审核结果</h3><p class="preserve-lines" style="margin-top:12px">${h(item.response || (item.status === "withdrawn" ? "志愿者已撤回本次报名。" : "暂无附加回应。"))}</p><p class="muted" style="font-size:.78rem;margin-top:12px">${item.reviewerName ? `${h(item.reviewerName)} · ` : ""}${formatDate(item.updatedAt, true)}</p>${item.note ? `<h3 style="margin-top:20px">内部备注</h3><p class="preserve-lines">${h(item.note)}</p>` : ""}`}`;
+  ${item.status === "pending" ? `<hr class="section-divider"><form id="review-form"><details id="review-fields"><summary>添加回应或内部备注（可选）</summary>${textarea("response", "给志愿者的回应", "", 'maxlength="1000"')}${textarea("note", "内部备注（不发送给志愿者）", item.note, 'maxlength="2000"')}</details><p class="help">已通过 ${task.accepted}${task.capacity ? ` / ${task.capacity}` : ""} 人${task.capacity ? "" : " · 不限人数"}</p><div class="review-actions"><button class="border" type="button" data-decision="rejected">不通过</button><button type="button" data-decision="accepted">${icon("check")}通过并通知</button></div></form>` : `<hr class="section-divider"><h3>报名结果</h3><p class="preserve-lines" style="margin-top:12px">${h(item.status === "expired" ? "任务已结束，报名未获确认，已自动过期。" : item.response || (item.status === "withdrawn" ? "志愿者已撤回本次报名。" : "暂无附加回应。"))}</p><p class="muted" style="font-size:.78rem;margin-top:12px">${item.reviewerName ? `${h(item.reviewerName)} · ` : ""}${formatDate(item.updatedAt, true)}</p>${item.note ? `<h3 style="margin-top:20px">内部备注</h3><p class="preserve-lines">${h(item.note)}</p>` : ""}`}`;
 }
 async function applicationsPage(params: URLSearchParams, turn: number) {
   const taskId = params.get("task") || "",
@@ -570,8 +607,8 @@ async function applicationsPage(params: URLSearchParams, turn: number) {
       ? ""
       : `<nav class="review-navigation" aria-label="逐份审核">${selectedIndex > 0 ? `<a class="button border" data-review-step="previous" aria-keyshortcuts="Alt+ArrowUp" title="上一份（Alt + ↑）" href="${link(status, filtered[selectedIndex - 1].id)}">上一份</a>` : ""}${selectedIndex + 1 < filtered.length ? `<a class="button border" data-review-step="next" aria-keyshortcuts="Alt+ArrowDown" title="下一份（Alt + ↓）" href="${link(status, filtered[selectedIndex + 1].id)}">下一份</a>` : ""}</nav>`;
   const body = `${heading(status === "accepted" ? "已通过报名" : "报名审核", task ? task.title : "", '<button class="border" data-action="refresh">' + icon("refresh") + "刷新</button>")}${outcome}
-  <form class="toolbar" id="application-filter">${select("application-task", "所属任务", [["", "全部任务"], ...workspace.tasks.map((t) => [t.id, t.title] as [string, string])], taskId)}<div class="field border round prefix search">${icon("search")}<input id="application-search" name="q" value="${h(searchTerm)}" type="search" placeholder="搜索姓名、昵称或地区" aria-label="搜索报名资料"></div><button class="border" type="submit">搜索</button></form>
-  <div class="filter-chips" aria-label="报名状态">${["pending", "accepted", "rejected", "withdrawn", "all"].map((s) => `<a href="${link(s)}" class="${s === status ? "active" : ""}" ${s === status ? 'aria-current="true"' : ""}>${s === "all" ? "全部" : stateLabels[s as keyof typeof stateLabels]} <span>${s === "all" ? Object.values(page.counts).reduce((a, b) => a + b, 0) : page.counts[s as keyof typeof page.counts]}</span></a>`).join("")}</div>
+  <form class="toolbar" id="application-filter">${select("application-task", "所属任务", [["", "全部任务"], ...workspace.tasks.map((t) => [t.id, t.title] as [string, string])], taskId)}${searchField("application-search", "搜索报名资料", { value: searchTerm, name: "q", placeholder: "搜索姓名、昵称或地区", className: "search" })}<button class="border" type="submit">搜索</button></form>
+  <div class="filter-chips" aria-label="报名状态">${["pending", "accepted", "rejected", "withdrawn", "expired", "all"].map((s) => `<a href="${link(s)}" class="${s === status ? "active" : ""}" ${s === status ? 'aria-current="true"' : ""}>${s === "all" ? "全部" : stateLabels[s as keyof typeof stateLabels]} <span>${s === "all" ? Object.values(page.counts).reduce((a, b) => a + b, 0) : page.counts[s as keyof typeof page.counts]}</span></a>`).join("")}</div>
   ${filtered.length || selected ? `<div class="review-layout ${explicitId && selected ? "has-selection" : ""}"><div class="application-list" aria-label="报名列表">${filtered.map((a) => `<a class="application-row ${a.id === selected?.id ? "active" : ""}" href="${link(status, a.id)}" data-search="${h(`${applicationName(a)} ${a.profile.region ?? ""}`.toLowerCase())}" ${a.id === selected?.id ? 'aria-current="true"' : ""}><div class="row"><strong>${h(applicationName(a))}</strong>${badge(a.status)}</div><p>${h(a.taskTitle)}</p><small>${formatDate(a.createdAt)} 提交</small></a>`).join("")}<p id="application-search-empty" hidden class="muted">没有匹配的报名资料。</p></div><section class="review-detail" aria-label="报名详情" id="review-detail">${selected ? '<p role="status">正在加载授权资料…</p>' : empty("选择报名查看资料", "", "", "person_search")}</section></div>` : empty("无匹配报名", "", "", "fact_check")}`;
   const pagination =
     page.total > page.pageSize || pageNumber > 1
@@ -722,7 +759,7 @@ function requestHistory(kind: "incident" | "verification") {
   return `<section class="panel" style="margin-top:24px"><h2>申请记录</h2>${records.map((r) => `<article class="notice"><div class="notice-body"><p class="preserve-lines">${h(r.content)}</p><small>${formatDate(r.createdAt, true)}</small></div><span class="status">${labels[r.status] || h(r.status)}</span></article>`).join("")}</section>`;
 }
 function incidentsPage() {
-  return `${heading("活跃事件", "", canEdit() ? '<button data-action="incident-request" class="border">' + icon("add_location_alt") + "新增事件 / 信息纠错</button>" : "")}<div class="incident-grid">${workspace.incidents
+  return `${heading("事件", "", canEdit() ? '<button data-action="incident-request" class="border">' + icon("add_location_alt") + "新增事件 / 信息纠错</button>" : "")}<div class="incident-grid">${workspace.incidents
     .map((incident) => {
       const tasks = workspace.tasks.filter((t) => t.incidentId === incident.id);
       return `<section class="panel"><div class="incident-header"><h2>${h(incident.title)}</h2></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
@@ -1314,6 +1351,8 @@ async function renderRoute() {
   }
 }
 async function renderPage(turn: number) {
+  disposeDashboardEvents?.();
+  disposeDashboardEvents = null;
   disposeDashboardTasks?.();
   disposeDashboardTasks = null;
   editor?.dispose();

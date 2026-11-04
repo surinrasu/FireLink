@@ -69,6 +69,8 @@
     <string name="application_accepted">"已通過"</string>
     <string name="application_rejected">"未通過"</string>
     <string name="application_withdrawn">"已撤回"</string>
+    <string name="application_expired">"已過期"</string>
+    <string name="application_expired_reason">"任務已結束，報名未獲確認，已自動過期。"</string>
     <string name="username">"使用者名稱"</string>
     <string name="pronouns">"稱呼代名詞"</string>
     <string name="real_name">"姓名"</string>
