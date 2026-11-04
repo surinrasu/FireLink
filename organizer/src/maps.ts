@@ -11,6 +11,8 @@ import {
 } from "../../shared/maps";
 import { h } from "./html";
 import { MAP_INK } from "./theme";
+import type { LocationResult } from "../../shared/locations";
+import { lookupLocations } from "./locations";
 export { validCoordinates } from "../../shared/maps";
 
 export function mapPreview(
@@ -37,6 +39,7 @@ class LocationMap extends HTMLElement {
     "label",
     "center-lat",
     "center-lng",
+    "region-code",
   ];
   private map?: L.Map;
   private layers?: L.LayerGroup;
@@ -49,11 +52,17 @@ class LocationMap extends HTMLElement {
   private selectedPoint?: number;
   private localChange = false;
   private drawing = false;
+  private searchRequest?: AbortController;
+  private searchResults: LocationResult[] = [];
   constructor() {
     super();
     this.root.addEventListener("click", (event) => this.controlClick(event));
-    // Coordinate entry is explicitly applied, independently of the enclosing task form.
-    this.root.addEventListener("input", (event) => event.stopPropagation());
+    // Searching must not dirty or submit the enclosing task form.
+    this.root.addEventListener("input", (event) => {
+      event.stopPropagation();
+      if ((event.target as HTMLInputElement).name === "address-search")
+        this.cancelSearch();
+    });
     this.root.addEventListener("change", (event) => event.stopPropagation());
     this.root.addEventListener("keydown", (event) => {
       if (
@@ -61,7 +70,8 @@ class LocationMap extends HTMLElement {
         event.target instanceof HTMLInputElement
       ) {
         event.preventDefault();
-        this.enterCoordinate(this.selectedPoint !== undefined);
+        event.stopPropagation();
+        void this.search();
       }
     });
   }
@@ -106,17 +116,18 @@ class LocationMap extends HTMLElement {
       a{color:var(--primary,#445e91);text-underline-offset:3px}.external{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center}
       .canvas{height:240px;isolation:isolate;background:var(--map-background,#e9e7ec);color:#1a1b20;font:14px/1.5 system-ui,sans-serif}
       :host([editable]) .canvas{height:300px;cursor:crosshair}.status,.hint{padding:9px 14px;font-size:.78rem;line-height:1.6;margin:0}.status:empty{display:none}.hint{color:var(--on-surface-variant,#44474f)}
-      .tools,.coordinate-actions{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px}.tools button{flex:1}.tools [data-action=finish]{flex-basis:100%}
+      .tools{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px}.tools button{flex:1}.tools [data-action=finish]{flex-basis:100%}
       button,input{font:inherit;color:inherit}button{min-height:var(--control-height,44px);max-width:100%;font-size:var(--font-control,.9rem);font-weight:var(--weight-control,550);line-height:1.4;border:1px solid var(--outline-variant,#c4c6d0);border-radius:var(--radius-action,999px);padding:8px 16px;background:transparent;cursor:pointer;overflow-wrap:anywhere}
       button[aria-pressed=true]{background:var(--primary,#445e91);color:var(--on-primary,#fff);border-color:var(--primary,#445e91);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;font-weight:650}button:disabled{opacity:.5;cursor:not-allowed}
       button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:var(--focus-width,3px) solid var(--primary,#445e91);outline-offset:var(--focus-offset,3px)}
       .annotation-list{padding:0 14px}.annotation-row{display:flex;gap:8px;margin-top:8px}.annotation-row>button:first-child{flex:1;text-align:left}.vertices{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.vertices button{min-width:44px}.selection{margin:12px 14px 0;font-size:.8rem}.selection button{margin-top:8px}
-      .precise{margin:12px 14px}.precise summary{min-height:44px;display:list-item;padding:10px 0;cursor:pointer;font-size:.82rem}.coordinates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.coordinates label{font-size:.8rem;min-width:0}.coordinates input{display:block;width:100%;min-height:var(--field-height,3rem);margin-top:6px;border:1px solid var(--outline,#75777f);border-radius:var(--radius-field,12px);padding:8px;background:var(--surface,#f9f9ff)}.coordinate-actions{padding:0}.coordinate-actions button{flex:1}
+      .search{padding:14px}.search label{display:block;font-size:.82rem;margin-bottom:8px}.search-row{display:flex;gap:8px;align-items:center}.search input{min-width:0;flex:1;min-height:var(--field-height,3rem);border:1px solid var(--outline,#75777f);border-radius:var(--radius-field,12px);padding:10px 12px;background:var(--surface,#f9f9ff);caret-color:var(--primary,#445e91)}.search input::placeholder{color:var(--on-surface-variant,#44474f)}
+      .search-status,.search-attribution{font-size:.78rem;line-height:1.6;margin:8px 0 0;overflow-wrap:anywhere}.search-status:empty{display:none}.search-results{list-style:none;padding:0;margin:8px 0 0}.search-results button{display:block;width:100%;text-align:left;border-radius:var(--radius-field,12px);margin-top:8px}.search-results strong,.search-results span{display:block}.search-results span{font-size:.8rem;line-height:1.5;margin-top:4px;color:var(--on-surface-variant,#44474f)}button:hover:not(:disabled){background:var(--surface-container-high,#e7e7ef)}button[aria-pressed=true]:hover{background:var(--primary,#445e91)}::selection{background:var(--primary-container,#d8e2ff);color:var(--on-primary-container,#001a41)}
       .leaflet-control-zoom a,.leaflet-touch .leaflet-bar a{width:44px;height:44px;line-height:44px;color:#1a1b20;background:#fff}.leaflet-control-attribution{font:10px/1.5 system-ui,sans-serif;max-width:100%;color:#333}.leaflet-control-attribution a{color:#0f448e}
       .pin{display:grid;place-items:center;width:24px;height:24px;background:var(--map-ink,#0f448e);color:white;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px #0005;font:650 11px/1 system-ui,sans-serif}.pin>span{transform:rotate(45deg)}
       .vertex{display:grid;place-items:center;width:24px;height:24px;background:var(--map-ink,#0f448e);color:white;border:2px solid white;border-radius:50%;font:600 12px/1 system-ui,sans-serif;box-shadow:0 2px 6px #0003}
       .location-marker:is([data-selected=true],:focus-visible)::after{content:"";position:absolute;inset:-6px;border:2px solid #1a1b20;outline:2px solid white;border-radius:50%;pointer-events:none}
-      @media(max-width:360px){.coordinates{grid-template-columns:1fr}.tools,.coordinate-actions{gap:6px}.tools button{padding-inline:8px}}
+      @media(max-width:360px){.tools{gap:6px}.tools button{padding-inline:8px}}
       @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
       @media(forced-colors:active){.pin,.vertex{background:Highlight;color:HighlightText;border-color:Canvas;forced-color-adjust:none}.frame{border-color:CanvasText}button[aria-pressed=true]{border:3px double Highlight}.location-marker:is([data-selected=true],:focus-visible)::after{border-color:CanvasText;outline-color:Canvas}.location-outline{stroke:Canvas;forced-color-adjust:none}.location-path,.location-area{stroke:CanvasText;forced-color-adjust:none}}
     </style><div class="frame"><div class="heading"><span class="label"></span><a class="external" target="_blank" rel="noopener noreferrer"></a></div>${
@@ -132,7 +143,7 @@ class LocationMap extends HTMLElement {
               "",
             )}<button type="button" data-action="finish" hidden>完成绘制</button></div><p class="hint" role="status"></p>`
         : ""
-    }<div class="canvas" role="region"></div><p class="status" role="status"></p>${editable ? `<div class="annotation-list" role="group" aria-label="地图标注"></div><div class="selection"></div><details class="precise"><summary>输入坐标</summary><div class="coordinates"><label>纬度<input name="latitude" type="number" min="-90" max="90" step="any" required></label><label>经度<input name="longitude" type="number" min="-180" max="180" step="any" required></label></div><div class="coordinate-actions"><button type="button" data-action="add-coordinate">添加点位</button><button type="button" data-action="update-coordinate" hidden>更新所选点</button></div></details>` : ""}</div>`;
+    }<div class="canvas" role="region"></div><p class="status" role="status"></p>${editable ? `<div class="search"><label for="address-search">搜索地址</label><div class="search-row"><input id="address-search" name="address-search" type="search" maxlength="150" placeholder="搜索街道或建筑" autocomplete="off"><button type="button" data-action="search">搜索</button></div><p class="search-status" role="status" aria-live="polite"></p><ul class="search-results" aria-label="地址搜索结果" hidden></ul><p class="search-attribution">地址搜索 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> · Nominatim</p></div><div class="annotation-list" role="group" aria-label="地图标注"></div><div class="selection"></div>` : ""}</div>`;
     this.updateText();
     this.updateControls();
     const styles = new Promise<void>((resolve) => {
@@ -155,6 +166,7 @@ class LocationMap extends HTMLElement {
       this.observer?.disconnect();
       this.observer = undefined;
       this.resize?.disconnect();
+      this.cancelSearch();
       clearTimeout(this.fallbackTimer);
       this.map?.remove();
       this.map = undefined;
@@ -167,8 +179,11 @@ class LocationMap extends HTMLElement {
     next: string | null,
   ) {
     if (previous === next) return;
+    if (name === "region-code" || name.startsWith("center-"))
+      this.cancelSearch();
     this.updateText();
     if (
+      name === "region-code" ||
       name === "label" ||
       ((name === "latitude" || name === "longitude") &&
         this.hasAttribute("annotations"))
@@ -186,7 +201,7 @@ class LocationMap extends HTMLElement {
       ?.setAttribute(
         "aria-label",
         this.hasAttribute("editable")
-          ? `${label}，点击选点绘制位置、路径或范围，也可使用下方坐标输入`
+          ? `${label}，点击选点绘制位置、路径或范围，也可使用下方地址搜索`
           : `${label}地图`,
       );
     const link = this.root.querySelector<HTMLAnchorElement>(".external");
@@ -231,7 +246,7 @@ class LocationMap extends HTMLElement {
     const count = active?.coordinates.length ?? 0;
     this.root.querySelector(".hint")!.textContent =
       this.mode === "point"
-        ? "点击地图添加位置，可添加多个位置。拖动标记可调整坐标。"
+        ? "点击地图或选择搜索结果添加位置。拖动标记可调整位置。"
         : `依次点击地图选点，至少 ${mapMinimumPoints[this.mode]} 个${this.mode === "area" ? "不共线的" : "不同"}点${this.mode === "area" ? "围成范围" : "连成路径"}。${count ? `已选 ${count} 个点，完成后可继续添加其他标注。` : ""}`;
     this.root.querySelector(".annotation-list")!.innerHTML = marks
       .map(
@@ -242,16 +257,6 @@ class LocationMap extends HTMLElement {
     this.root.querySelector(".selection")!.innerHTML = active
       ? `<div>选中${mapAnnotationLabels[active.type]} ${this.active! + 1}${this.selectedPoint === undefined ? "" : `，第 ${this.selectedPoint + 1} 个点`}</div><div class="vertices" role="group" aria-label="选取顶点">${active.coordinates.map((_, index) => `<button type="button" data-point="${index}" aria-label="选择第 ${index + 1} 个点" aria-pressed="${index === this.selectedPoint}">${index + 1}</button>`).join("")}</div>${this.selectedPoint === undefined ? "" : '<button type="button" data-action="remove-point">删除所选点</button>'}`
       : "";
-    const point =
-      this.selectedPoint === undefined
-        ? undefined
-        : active?.coordinates[this.selectedPoint];
-    for (const name of ["latitude", "longitude"] as const)
-      this.root.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value =
-        point ? String(point[name]) : "";
-    this.root.querySelector<HTMLButtonElement>(
-      '[data-action="update-coordinate"]',
-    )!.hidden = !point;
     this.updateMarkerSelection();
   }
   private updateMarkerSelection() {
@@ -269,6 +274,27 @@ class LocationMap extends HTMLElement {
       "button",
     );
     if (!button || button.disabled) return;
+    if (button.dataset.action === "search") {
+      void this.search();
+      return;
+    }
+    if (button.dataset.place !== undefined) {
+      const place = this.searchResults[Number(button.dataset.place)];
+      if (!place) return;
+      if (
+        !this.addPoint({ latitude: place.latitude, longitude: place.longitude })
+      )
+        return;
+      this.map?.setView([place.latitude, place.longitude], 16, {
+        animate: false,
+      });
+      this.cancelSearch();
+      this.searchMessage(`已选：${place.address}`);
+      this.root
+        .querySelector<HTMLElement>(".canvas")
+        ?.focus({ preventScroll: true });
+      return;
+    }
     const marks = this.annotations;
     if (button.dataset.mode) {
       this.mode = button.dataset.mode as MapAnnotation["type"];
@@ -314,12 +340,6 @@ class LocationMap extends HTMLElement {
         .querySelector<HTMLButtonElement>(`[data-mode="${this.mode}"]`)
         ?.focus();
       return;
-    } else if (
-      button.dataset.action === "add-coordinate" ||
-      button.dataset.action === "update-coordinate"
-    ) {
-      this.enterCoordinate(button.dataset.action === "update-coordinate");
-      return;
     } else return;
     this.updateControls();
     for (const key of ["select", "point"] as const) {
@@ -331,37 +351,96 @@ class LocationMap extends HTMLElement {
           ?.focus({ preventScroll: true });
     }
   }
-  private enterCoordinate(update: boolean) {
-    const lat = this.root.querySelector<HTMLInputElement>('[name="latitude"]')!,
-      lng = this.root.querySelector<HTMLInputElement>('[name="longitude"]')!;
-    if (!lat.reportValidity() || !lng.reportValidity()) return;
-    const point = { latitude: Number(lat.value), longitude: Number(lng.value) };
-    if (
-      update &&
-      this.active !== undefined &&
-      this.selectedPoint !== undefined
-    ) {
-      const marks = this.annotations;
-      marks[this.active].coordinates[this.selectedPoint] = point;
-      this.commit(marks);
-    } else this.addPoint(point);
-    this.map?.panTo([point.latitude, point.longitude], { animate: false });
+  private searchMessage(text: string) {
+    const status = this.root.querySelector(".search-status");
+    if (status) status.textContent = text;
+  }
+  private cancelSearch() {
+    this.searchRequest?.abort();
+    this.searchResults = [];
+    const results = this.root.querySelector<HTMLElement>(".search-results");
+    if (results) {
+      results.replaceChildren();
+      results.hidden = true;
+    }
+    const button = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="search"]',
+    );
+    if (button) button.disabled = false;
+    this.searchMessage("");
+  }
+  private async search() {
+    const input = this.root.querySelector<HTMLInputElement>(
+      '[name="address-search"]',
+    );
+    const query = input?.value.trim();
+    if (!query) {
+      input?.focus();
+      return;
+    }
+    this.cancelSearch();
+    const request = new AbortController();
+    this.searchRequest = request;
+    const button = this.root.querySelector<HTMLButtonElement>(
+      '[data-action="search"]',
+    )!;
+    button.disabled = true;
+    this.searchMessage("正在搜索地址…");
+    try {
+      const places = await lookupLocations(
+        {
+          kind: "search",
+          query,
+          regionCode: this.getAttribute("region-code") || undefined,
+        },
+        request.signal,
+      );
+      if (request.signal.aborted || !this.isConnected) return;
+      this.searchResults = places;
+      const results = this.root.querySelector<HTMLElement>(".search-results")!;
+      results.innerHTML = places
+        .map(
+          (place, index) =>
+            `<li><button type="button" data-place="${index}"><strong>${h(place.name)}</strong><span>${h(place.address)}</span></button></li>`,
+        )
+        .join("");
+      results.hidden = !places.length;
+      this.searchMessage(
+        places.length
+          ? `找到 ${places.length} 个地址，选择后添加点位。`
+          : "未找到地址，请换个关键词，或点击地图选点。",
+      );
+    } catch (error) {
+      if (!request.signal.aborted && this.isConnected)
+        this.searchMessage(
+          error instanceof Error
+            ? error.message
+            : "搜索暂不可用，请稍后重试或点击地图选点。",
+        );
+    } finally {
+      if (!request.signal.aborted) button.disabled = false;
+    }
   }
   private addPoint(point: MapCoordinate) {
     this.drawing = true;
     const marks = this.annotations;
     if (this.mode === "point" || this.active === undefined) {
-      if (marks.length >= MAX_MAP_ANNOTATIONS)
-        return this.message(`每张地图最多添加 ${MAX_MAP_ANNOTATIONS} 组标注`);
+      if (marks.length >= MAX_MAP_ANNOTATIONS) {
+        this.message(`每张地图最多添加 ${MAX_MAP_ANNOTATIONS} 组标注`);
+        return false;
+      }
       marks.push({ type: this.mode, coordinates: [point] });
       this.active = marks.length - 1;
     } else {
-      if (marks[this.active].coordinates.length >= MAX_MAP_POINTS)
-        return this.message(`每组标注最多添加 ${MAX_MAP_POINTS} 个点`);
+      if (marks[this.active].coordinates.length >= MAX_MAP_POINTS) {
+        this.message(`每组标注最多添加 ${MAX_MAP_POINTS} 个点`);
+        return false;
+      }
       marks[this.active].coordinates.push(point);
     }
     this.selectedPoint = marks[this.active].coordinates.length - 1;
     this.commit(marks);
+    return true;
   }
   private message(text: string) {
     const status = this.root.querySelector(".status");

@@ -14,6 +14,7 @@ export type MemberRow = {
   can_view_contacts: number;
   active: number;
   organization_name: string;
+  demo_expires_at?: number | null;
 };
 export type OrganizerEnv = {
   Bindings: Env;

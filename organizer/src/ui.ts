@@ -131,7 +131,7 @@ export function openDialog(title: string, body: string, wide = false) {
       ? document.activeElement
       : null;
   dialogElement.classList.toggle("wide", wide);
-  dialogElement.innerHTML = `<header class="dialog-header"><h2 id="dialog-title">${h(title)}</h2><button class="transparent circle" type="button" data-close-dialog aria-label="关闭">${icon("close")}</button></header>${body}`;
+  dialogElement.innerHTML = `<div class="dialog-header"><h2 id="dialog-title">${h(title)}</h2><button class="transparent circle" type="button" data-close-dialog aria-label="关闭">${icon("close")}</button></div>${body}`;
   dialogElement.showModal();
   dialogElement
     .querySelectorAll("[data-close-dialog]")

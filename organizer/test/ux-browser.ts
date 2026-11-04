@@ -8,6 +8,7 @@ import type {
   Workspace,
 } from "../../shared/organizer";
 import { isolateLocalDemo } from "./local-demo";
+import type { LocationQuery } from "../../shared/locations";
 import AxeBuilder from "@axe-core/playwright";
 
 const base = process.env.TEST_URL || "http://127.0.0.1:8787/mng-dash";
@@ -26,6 +27,14 @@ const browser = await chromium.launch({
   ...(executablePath ? { executablePath } : {}),
 });
 const selected = process.env.UX_CASE?.split(",");
+async function demoIncidentId(page: Page, sourceId: string) {
+  const response = await page.request.get(
+    new URL("/api/organizer/auth/session", base).href,
+  );
+  const session = (await response.json()) as Session;
+  return `${session.memberships[0].organizationId}:${sourceId}`;
+}
+
 async function reviewFields(page: Page) {
   const details = page.locator("#review-fields");
   if (
@@ -37,6 +46,12 @@ async function reviewFields(page: Page) {
 async function review(page: Page) {
   await page.locator('.sidebar a[href="#/applications"]').click();
   await page.locator("#review-form").waitFor();
+}
+async function confirmInitialIncident(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "选择事件", exact: true });
+  await dialog.waitFor();
+  await dialog.locator('.task-picker-option[aria-pressed="true"]').click();
+  await dialog.waitFor({ state: "hidden" });
 }
 async function expandEditorSection(page: Page, id: string) {
   const section = page.locator(`#${id}`);
@@ -130,6 +145,7 @@ const cases: Record<
     await aligned("#application-task, #application-search");
     assert.deepEqual(await fieldAppearance("#application-search"), search);
     await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await confirmInitialIncident(page);
     await page.locator(".requirement-option").first().waitFor();
     assert.deepEqual(
       await appearance(".requirement-option > input:checked + span", true),
@@ -363,11 +379,20 @@ const cases: Record<
     const ownerButton = page.locator("#ownerId-picker");
     const dialog = page.getByRole("dialog");
     const options = page.locator(".task-picker-list button");
+    await dialog.waitFor();
     assert.equal(
-      await page
-        .getByRole("button", { name: "待选择事件", exact: true })
-        .count(),
-      1,
+      await page.locator("#incidentId").inputValue(),
+      original!.incidents[0].id,
+    );
+    assert.equal(await options.first().getAttribute("aria-pressed"), "true");
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/new-task-incident-dialog.png",
+    });
+    // Closing the initial picker keeps its default event.
+    await page.keyboard.press("Escape");
+    assert.equal(
+      await page.locator("#incidentId").inputValue(),
+      original!.incidents[0].id,
     );
     assert.equal(
       await page.locator(".page-heading #save-status").innerText(),
@@ -430,7 +455,7 @@ const cases: Record<
     await dialog.waitFor({ state: "hidden" });
     assert.equal(
       await page.locator("#incidentId").inputValue(),
-      "incident-nanjing",
+      await demoIncidentId(page, "incident-nanjing"),
     );
     assert.match(await eventButton.innerText(), /南京鼓楼区火情/);
     assert.equal(
@@ -457,7 +482,7 @@ const cases: Record<
     await page.keyboard.press("Escape");
     assert.equal(
       await page.locator("#incidentId").inputValue(),
-      "incident-nanjing",
+      await demoIncidentId(page, "incident-nanjing"),
     );
     await ownerButton.click();
     const ownerSearch = page.getByRole("searchbox", { name: "搜索负责人" });
@@ -500,7 +525,7 @@ const cases: Record<
     await eventButton.waitFor();
     assert.equal(
       await page.locator("#incidentId").inputValue(),
-      "incident-nanjing",
+      await demoIncidentId(page, "incident-nanjing"),
     );
     assert.equal(
       await page.locator("#ownerId").inputValue(),
@@ -559,34 +584,13 @@ const cases: Record<
     emptyChoices = true;
     await page.goto(`${base}/#/tasks/new`);
     await page
-      .getByRole("heading", { name: "新建任务", exact: true })
+      .getByRole("heading", { name: "暂无可选事件", exact: true })
       .waitFor();
+    assert.equal(await page.locator("#task-form").count(), 0);
     assert.equal(
-      await page
-        .getByRole("button", { name: "待选择事件", exact: true })
-        .count(),
+      await page.getByRole("link", { name: "查看事件", exact: true }).count(),
       1,
     );
-    assert.equal(
-      await page
-        .getByRole("button", { name: "待选择负责人", exact: true })
-        .count(),
-      1,
-    );
-    await eventButton.click();
-    assert.match(await dialog.innerText(), /暂无可选事件/);
-    await page.keyboard.press("Escape");
-    await ownerButton.click();
-    assert.match(await dialog.innerText(), /暂无可选负责人/);
-    await page.keyboard.press("Escape");
-    await page.getByLabel("任务标题", { exact: true }).fill("未选择事件");
-    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
-    await page.getByRole("dialog", { name: "选择事件" }).waitFor();
-    assert.match(
-      await page.locator("#save-status").innerText(),
-      /请先选择事件/,
-    );
-    assert.equal(await page.locator("#publish-task").isDisabled(), true);
   },
   "select-menus": async (page) => {
     const menu = page.locator(".select-popover:popover-open");
@@ -612,18 +616,27 @@ const cases: Record<
     await menu
       .getByRole("option", { name: "南京鼓楼区火情", exact: true })
       .click();
-    assert.equal(await incident.inputValue(), "incident-nanjing");
+    assert.equal(
+      await incident.inputValue(),
+      await demoIncidentId(page, "incident-nanjing"),
+    );
     assert.equal(await page.locator(".task-card:visible").count(), 2);
     await page.keyboard.press("Space");
     await page.keyboard.press("Home");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
-    assert.equal(await incident.inputValue(), "incident-hangzhou");
+    assert.equal(
+      await incident.inputValue(),
+      await demoIncidentId(page, "incident-hangzhou"),
+    );
     assert.equal(await page.locator(".task-card:visible").count(), 4);
     await page.keyboard.press("Space");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Escape");
-    assert.equal(await incident.inputValue(), "incident-hangzhou");
+    assert.equal(
+      await incident.inputValue(),
+      await demoIncidentId(page, "incident-hangzhou"),
+    );
     await incident.click();
     await page.getByRole("heading", { name: "任务", exact: true }).click();
     await menu.waitFor({ state: "hidden" });
@@ -638,6 +651,353 @@ const cases: Record<
     await menu.getByRole("option", { name: "任务管理员", exact: true }).click();
     assert.equal(await role.inputValue(), "manager");
     await page.getByRole("button", { name: "取消", exact: true }).click();
+  },
+  "incident-editing": async (page) => {
+    const lookups: LocationQuery[] = [];
+    let dragged: { latitude: number; longitude: number } | undefined;
+    await page.route("**/api/organizer/locations", async (route) => {
+      const query = route.request().postDataJSON() as LocationQuery;
+      lookups.push(query);
+      if (query.kind === "reverse") dragged = query;
+      await route.fulfill({
+        json: [
+          {
+            name: query.kind === "search" ? "西湖图书馆" : "西湖区",
+            address:
+              query.kind === "search"
+                ? "杭州市西湖区图书馆"
+                : query.kind === "reverse"
+                  ? "地图拖动位置的地址"
+                  : "浙江省杭州市西湖区",
+            latitude:
+              query.kind === "reverse" ? query.latitude + 0.01 : 30.2741,
+            longitude:
+              query.kind === "reverse" ? query.longitude + 0.01 : 120.1551,
+          },
+        ],
+      });
+    });
+    await page.goto(`${base}/#/incidents`);
+    await page
+      .getByRole("heading", { name: "事件", exact: true, level: 1 })
+      .waitFor();
+    assert.equal(
+      await page.getByText("新增事件 / 信息纠错", { exact: true }).count(),
+      0,
+    );
+    await page.getByRole("button", { name: "新增事件", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("事件名称", { exact: true }).fill("新建协作事件");
+    assert.equal(await dialog.getByLabel("搜索地址").isVisible(), false);
+    await dialog.getByLabel("省 / 直辖市", { exact: true }).selectOption("33");
+    await dialog.getByLabel("城市", { exact: true }).selectOption("3301");
+    await dialog.getByLabel("区 / 县", { exact: true }).selectOption("330106");
+    await dialog.locator(".location-map").waitFor();
+    assert.equal(await dialog.getByLabel("纬度", { exact: true }).count(), 0);
+    assert.equal(await dialog.getByLabel("经度", { exact: true }).count(), 0);
+    assert.equal(
+      await dialog
+        .getByText("填写事件位置的经纬度，并在地图上核对。", { exact: true })
+        .count(),
+      0,
+    );
+    const count = lookups.length;
+    await dialog.getByRole("searchbox", { name: "搜索地址" }).fill("图书馆");
+    assert.equal(lookups.length, count);
+    await dialog.getByRole("searchbox", { name: "搜索地址" }).press("Enter");
+    await dialog.getByRole("button", { name: /西湖图书馆/ }).click();
+    await dialog
+      .getByRole("button", { name: "确认此位置", exact: true })
+      .click();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incident-create-desktop.png",
+      fullPage: true,
+    });
+    await dialog.getByRole("button", { name: "创建事件", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "新建协作事件", exact: true })
+      .waitFor();
+    const session = (await (
+      await page.request.get(new URL("/api/organizer/auth/session", base).href)
+    ).json()) as Session;
+    const headers = {
+      "X-FireLink-Request": "organizer",
+      "X-Organization-Id": session.memberships[0].organizationId,
+    };
+    const readWorkspace = async () =>
+      (await (
+        await page.request.get(new URL("/api/organizer/workspace", base).href, {
+          headers,
+        })
+      ).json()) as Workspace;
+    const created = (await readWorkspace()).incidents.find(
+      (item) => item.title === "新建协作事件",
+    )!;
+    assert.ok(created);
+    await page
+      .getByRole("button", { name: "编辑事件：新建协作事件", exact: true })
+      .click();
+    assert.equal(
+      await dialog.getByLabel("区 / 县", { exact: true }).inputValue(),
+      "330106",
+    );
+    assert.match(
+      await dialog.locator(".location-address").innerText(),
+      /已确认.*图书馆/,
+    );
+    await dialog
+      .getByLabel("事件名称", { exact: true })
+      .fill("修改后的协作事件");
+    const canvas = dialog.locator(".location-map");
+    await canvas.scrollIntoViewIfNeeded();
+    const bounds = (await canvas.boundingBox())!;
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      bounds.x + bounds.width / 2 + 70,
+      bounds.y + bounds.height / 2 + 30,
+      { steps: 8 },
+    );
+    await page.mouse.up();
+    await dialog
+      .locator(".location-address")
+      .filter({ hasText: "地图拖动位置的地址" })
+      .waitFor();
+    await dialog
+      .getByRole("button", { name: "确认此位置", exact: true })
+      .click();
+    await dialog.getByRole("button", { name: "保存修改", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "修改后的协作事件", exact: true })
+      .waitFor();
+    await page.reload();
+    await page
+      .getByRole("button", { name: "编辑事件：修改后的协作事件", exact: true })
+      .click();
+    const moved = (await readWorkspace()).incidents.find(
+      (item) => item.id === created.id,
+    )!;
+    assert.ok(dragged);
+    assert.equal(moved.latitude, dragged.latitude);
+    assert.equal(moved.longitude, dragged.longitude);
+    assert.equal(moved.address, "地图拖动位置的地址");
+    assert.match(
+      await dialog.locator(".location-address").innerText(),
+      /已确认.*地图拖动位置的地址/,
+    );
+    await dialog.getByLabel("事件名称", { exact: true }).fill("尚未保存的修改");
+    const latest = (await readWorkspace()).incidents.find(
+      (item) => item.id === created.id,
+    )!;
+    const concurrent = await page.request.put(
+      new URL(`/api/organizer/incidents/${created.id}`, base).href,
+      { headers, data: { ...latest, title: "另一位管理员已更新" } },
+    );
+    assert.equal(concurrent.status(), 200);
+    await dialog.getByRole("button", { name: "保存修改", exact: true }).click();
+    await dialog
+      .getByRole("alert")
+      .filter({ hasText: "事件已被其他管理员更新" })
+      .waitFor();
+    assert.equal(
+      await dialog.getByLabel("事件名称", { exact: true }).inputValue(),
+      "尚未保存的修改",
+    );
+    await dialog
+      .getByRole("button", { name: "载入最新版本", exact: true })
+      .click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLInputElement>("#incident-title")?.value ===
+        "另一位管理员已更新",
+    );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incident-edit-mobile.png",
+      fullPage: true,
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+    );
+    const audit = await new AxeBuilder({ page }).include("dialog").analyze();
+    assert.deepEqual(
+      audit.violations.map((issue) => issue.id),
+      [],
+    );
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await page.reload();
+    await page
+      .getByRole("heading", { name: "另一位管理员已更新", exact: true })
+      .waitFor();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incidents-mobile.png",
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "主题", exact: true }).click();
+    await page.getByRole("radio", { name: "深色", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "文字大小", exact: true }).click();
+    await page.getByRole("radio", { name: "更大字号", exact: true }).check();
+    await page.keyboard.press("Escape");
+    await page.setViewportSize({ width: 320, height: 740 });
+    await page
+      .getByRole("button", {
+        name: "编辑事件：另一位管理员已更新",
+        exact: true,
+      })
+      .click();
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/incident-edit-mobile-dark-large.png",
+      fullPage: true,
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      false,
+    );
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    for (const role of ["manager", "reviewer"] as const) {
+      await page.route(
+        "**/api/organizer/workspace",
+        async (route) => {
+          const response = await route.fetch();
+          const data = (await response.json()) as Workspace;
+          data.membership.role = role;
+          await route.fulfill({ response, json: data });
+        },
+        { times: 1 },
+      );
+      await page.reload();
+      await page
+        .getByRole("heading", { name: "事件", exact: true, level: 1 })
+        .waitFor();
+      assert.equal(
+        await page
+          .getByRole("button", { name: "新增事件", exact: true })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page.getByRole("button", { name: /^编辑事件/ }).count(),
+        0,
+      );
+    }
+  },
+  "incident-location-states": async (page) => {
+    let releaseOld: (() => void) | undefined;
+    let searches = 0;
+    await page.route("**/api/organizer/locations", async (route) => {
+      const query = route.request().postDataJSON() as LocationQuery;
+      if (query.kind === "region" && query.regionCode === "110101") {
+        await new Promise<void>((resolve) => {
+          releaseOld = resolve;
+        });
+        await route
+          .fulfill({
+            json: [
+              {
+                name: "东城区",
+                address: "北京市东城区",
+                latitude: 39.92,
+                longitude: 116.42,
+              },
+            ],
+          })
+          .catch(() => {});
+      } else if (query.kind === "search") {
+        searches++;
+        await route.fulfill(
+          searches === 1
+            ? { json: [] }
+            : {
+                status: 503,
+                json: { error: "地址查询暂不可用，请稍后重试。" },
+              },
+        );
+      } else {
+        await route.fulfill({
+          json: [
+            {
+              name: "西湖区",
+              address: "浙江省杭州市西湖区",
+              latitude: 30.27,
+              longitude: 120.15,
+            },
+          ],
+        });
+      }
+    });
+    await page.goto(`${base}/#/incidents`);
+    await page.getByRole("button", { name: "新增事件", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("事件名称", { exact: true }).fill("切换地区测试");
+    await dialog.getByLabel("省 / 直辖市", { exact: true }).selectOption("11");
+    assert.equal(
+      await dialog.getByLabel("城市", { exact: true }).isVisible(),
+      false,
+    );
+    const oldRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/locations") &&
+        request.postDataJSON().regionCode === "110101",
+    );
+    await dialog.getByLabel("区 / 县", { exact: true }).selectOption("110101");
+    await oldRequest;
+    await dialog.getByLabel("省 / 直辖市", { exact: true }).selectOption("33");
+    assert.equal(
+      await dialog.getByLabel("区 / 县", { exact: true }).inputValue(),
+      "",
+    );
+    assert.equal(await dialog.locator(".location-map").isVisible(), false);
+    await dialog.getByLabel("城市", { exact: true }).selectOption("3301");
+    await dialog.getByLabel("区 / 县", { exact: true }).selectOption("330106");
+    await dialog
+      .locator(".location-address")
+      .filter({ hasText: "杭州市西湖区" })
+      .waitFor();
+    assert.ok(releaseOld);
+    releaseOld();
+    await dialog.getByRole("button", { name: "创建事件", exact: true }).click();
+    await dialog
+      .getByRole("alert")
+      .filter({ hasText: "请在地图上确认事件位置" })
+      .waitFor();
+    await dialog
+      .getByRole("searchbox", { name: "搜索地址" })
+      .fill("不存在的地址");
+    await dialog.getByRole("button", { name: "搜索", exact: true }).click();
+    await dialog
+      .getByRole("status")
+      .filter({ hasText: "未找到地址" })
+      .waitFor();
+    await dialog.getByRole("button", { name: "搜索", exact: true }).click();
+    await dialog
+      .getByRole("status")
+      .filter({ hasText: "地址查询暂不可用" })
+      .waitFor();
+    assert.equal(await dialog.locator(".location-map").isVisible(), true);
+    await dialog
+      .getByRole("button", { name: "确认此位置", exact: true })
+      .click();
+    const saved = page.waitForRequest(
+      (request) =>
+        request.url().endsWith("/incidents") && request.method() === "POST",
+    );
+    await dialog.getByRole("button", { name: "创建事件", exact: true }).click();
+    const body = (await saved).postDataJSON();
+    assert.equal(body.region, "浙江省 杭州市 西湖区");
+    assert.equal(body.latitude, 30.27);
+    assert.equal(body.longitude, 120.15);
+    await page
+      .getByRole("heading", { name: "切换地区测试", exact: true })
+      .waitFor();
   },
   "incident-tasks": async (page) => {
     const incidents = () => page.goto(`${base}/#/incidents`);
@@ -672,7 +1032,7 @@ const cases: Record<
     await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(
       await page.getByLabel("所属事件", { exact: true }).inputValue(),
-      "incident-hangzhou",
+      await demoIncidentId(page, "incident-hangzhou"),
     );
     assert.equal(await visibleTasks.count(), 4);
     assert.ok(
@@ -691,11 +1051,11 @@ const cases: Record<
     assert.equal(await visibleTasks.count(), 1);
     assert.equal(
       await page.getByLabel("所属事件", { exact: true }).inputValue(),
-      "incident-hangzhou",
+      await demoIncidentId(page, "incident-hangzhou"),
     );
     await page
       .getByLabel("所属事件", { exact: true })
-      .selectOption("incident-nanjing");
+      .selectOption(await demoIncidentId(page, "incident-nanjing"));
     await page
       .getByRole("heading", { name: "无匹配任务", exact: true })
       .waitFor();
@@ -725,7 +1085,7 @@ const cases: Record<
       .fill("");
     await page
       .getByLabel("所属事件", { exact: true })
-      .selectOption("incident-hangzhou");
+      .selectOption(await demoIncidentId(page, "incident-hangzhou"));
     await page.reload();
     await page.getByRole("heading", { name: "任务", exact: true }).waitFor();
     assert.equal(await visibleTasks.count(), 4);
@@ -1940,7 +2300,7 @@ const cases: Record<
     await search.fill("物资");
     await page
       .getByLabel("所属事件", { exact: true })
-      .selectOption("incident-hangzhou");
+      .selectOption(await demoIncidentId(page, "incident-hangzhou"));
     await page.locator(".filter-chips a").filter({ hasText: "招募中" }).click();
     await page.locator('.filter-chips a.active[href*="state=open"]').waitFor();
     await page.waitForFunction(
@@ -1951,7 +2311,7 @@ const cases: Record<
     );
     assert.equal(
       await page.getByLabel("所属事件", { exact: true }).inputValue(),
-      "incident-hangzhou",
+      await demoIncidentId(page, "incident-hangzhou"),
     );
     assert.equal(await page.locator(".task-card:visible").count(), 2);
     await page.reload();
@@ -2042,6 +2402,7 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await confirmInitialIncident(page);
     await page.locator("#task-form").waitFor();
     await expandEditorSection(page, "task-schedule");
     await expandEditorSection(page, "task-details");
@@ -2169,6 +2530,7 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await confirmInitialIncident(page);
     await page.locator("#task-form").waitFor();
     await expandEditorSection(page, "task-schedule");
     await expandEditorSection(page, "task-details");
@@ -2264,11 +2626,172 @@ const cases: Record<
       .waitFor();
     await page.locator(".contact-row").first().waitFor();
   },
+  "task-map-search": async (page) => {
+    let workspace: Workspace | undefined;
+    const queries: LocationQuery[] = [];
+    await page.route("**/api/organizer/workspace", async (route) => {
+      const response = await route.fetch();
+      workspace = await response.json();
+      await route.fulfill({ response });
+    });
+    await page.route("**/api/organizer/locations", async (route) => {
+      const query = route.request().postDataJSON() as LocationQuery;
+      queries.push(query);
+      if (query.kind !== "search") throw new Error("Expected explicit search");
+      if (query.query === "失败")
+        return route.fulfill({
+          status: 503,
+          json: { error: "搜索暂不可用，请重试。" },
+        });
+      if (query.query === "无结果") return route.fulfill({ json: [] });
+      await route.fulfill({
+        json: [
+          {
+            name: "社区服务中心",
+            address: "浙江省 杭州市 西湖区 社区服务中心",
+            latitude: 30.27,
+            longitude: 120.13,
+          },
+        ],
+      });
+    });
+    await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await confirmInitialIncident(page);
+    await page.locator("#task-form").waitFor();
+    await expandEditorSection(page, "task-details");
+    await page.getByRole("button", { name: "添加地图", exact: true }).click();
+    const map = page.locator("#blocks firelink-map");
+    await map.locator(".leaflet-container").waitFor();
+    const chooseIncident = async (index: number) => {
+      await page.locator("#incidentId-picker").click();
+      await page.locator(".task-picker-list button").nth(index).click();
+    };
+    const annotations = async () =>
+      JSON.parse(
+        (await map.getAttribute("annotations")) || "[]",
+      ) as MapAnnotation[];
+    const centerPoint = async () => {
+      const box = (await map.locator(".canvas").boundingBox())!;
+      await map
+        .locator(".canvas")
+        .click({ position: { x: box.width / 2, y: box.height / 2 } });
+      return (await annotations()).at(-1)!.coordinates[0];
+    };
+    const initialPoint = await centerPoint();
+    assert.ok(
+      Math.abs(initialPoint.latitude - workspace!.incidents[0].latitude) <
+        0.0001,
+    );
+    assert.ok(
+      Math.abs(initialPoint.longitude - workspace!.incidents[0].longitude) <
+        0.0001,
+    );
+    await map.getByRole("button", { name: "删除位置 1", exact: true }).click();
+    // Selecting or changing the incident moves an empty map to its location.
+    for (const index of [0, 1]) {
+      await chooseIncident(index);
+      const point = await centerPoint();
+      assert.ok(
+        Math.abs(point.latitude - workspace!.incidents[index].latitude) <
+          0.0001,
+      );
+      assert.ok(
+        Math.abs(point.longitude - workspace!.incidents[index].longitude) <
+          0.0001,
+      );
+      await map
+        .getByRole("button", { name: "删除位置 1", exact: true })
+        .click();
+    }
+    assert.equal(
+      await map.locator('.precise, input[type="number"]').count(),
+      0,
+    );
+    const search = map.getByRole("searchbox", { name: "搜索地址" });
+    const button = map.getByRole("button", { name: "搜索", exact: true });
+    const canvasBox = (await map.locator(".canvas").boundingBox())!;
+    assert.ok(
+      (await search.boundingBox())!.y >= canvasBox.y + canvasBox.height,
+    );
+    await search.fill("社区服务中心");
+    assert.equal(queries.length, 0, "Typing must not autocomplete");
+    await search.press("Enter");
+    const result = map.locator(".search-results button");
+    await result.waitFor();
+    assert.equal(queries.length, 1);
+    assert.equal(
+      (queries[0] as { regionCode: string }).regionCode,
+      await map.getAttribute("region-code"),
+    );
+    assert.equal(
+      (await annotations()).length,
+      0,
+      "Searching must not change saved annotations",
+    );
+    await page.setViewportSize({ width: 320, height: 844 });
+    await result.focus();
+    await page.waitForFunction(() => {
+      const button = document
+        .querySelector("#blocks firelink-map")
+        ?.shadowRoot?.querySelector(".search-results button");
+      const footer = document.querySelector(".editor-footer")!;
+      return (
+        button &&
+        button.getBoundingClientRect().bottom <=
+          footer.getBoundingClientRect().top
+      );
+    });
+    await map.locator(".search").screenshot({
+      path: "../.artifacts/organizer/ux/task-map-search-mobile.png",
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await result.click();
+    const selected = await annotations();
+    assert.deepEqual(selected, [
+      { type: "point", coordinates: [{ latitude: 30.27, longitude: 120.13 }] },
+    ]);
+    await chooseIncident(0);
+    assert.deepEqual(
+      await annotations(),
+      selected,
+      "Changing incident preserves saved marks",
+    );
+    for (const [query, message] of [
+      ["无结果", "未找到地址"],
+      ["失败", "搜索暂不可用"],
+    ]) {
+      await search.fill(query);
+      await button.click();
+      await map
+        .locator(".search-status")
+        .filter({ hasText: message })
+        .waitFor();
+      assert.equal(await button.isEnabled(), true);
+      assert.deepEqual(await annotations(), selected);
+    }
+    await search.fill("社区服务中心");
+    await button.click();
+    await result.waitFor();
+    // Editing the query clears stale results without changing map annotations.
+    await search.fill("新的地址");
+    assert.equal(await result.count(), 0);
+    assert.equal(queries.length, 4);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await map.screenshot({
+      path: "../.artifacts/organizer/ux/task-map-search-desktop.png",
+    });
+  },
   "map-annotations": async (page) => {
     await page
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await confirmInitialIncident(page);
     await expandEditorSection(page, "task-schedule");
     await expandEditorSection(page, "task-details");
     await page.getByLabel("任务标题", { exact: true }).fill("地图标注验证");
@@ -2373,11 +2896,20 @@ const cases: Record<
     await map
       .getByRole("button", { name: "选择第 2 个点", exact: true })
       .click();
-    await map.locator(".precise summary").click();
-    await map.getByLabel("纬度", { exact: true }).fill("30.275");
-    await map.getByRole("button", { name: "更新所选点", exact: true }).click();
-    assert.equal((await annotations())[2].coordinates[1].latitude, 30.275);
-    await map.locator(".precise summary").click();
+    await map.locator(".canvas").scrollIntoViewIfNeeded();
+    const vertex = map.locator(
+      '.location-marker[data-annotation="2"][data-point="1"]',
+    );
+    const vertexBox = (await vertex.boundingBox())!;
+    const beforeVertexDrag = (await annotations())[2].coordinates[1];
+    await page.mouse.move(vertexBox.x + 12, vertexBox.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(vertexBox.x + 36, vertexBox.y + 24, { steps: 8 });
+    await page.mouse.up();
+    assert.notDeepEqual(
+      (await annotations())[2].coordinates[1],
+      beforeVertexDrag,
+    );
     await map.getByRole("button", { name: "完成路径", exact: true }).click();
     const expected = await annotations();
     await page.getByRole("button", { name: "保存草稿", exact: true }).click();
@@ -2447,6 +2979,7 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await confirmInitialIncident(page);
     const start = page.getByLabel("任务开始时间", { exact: true });
     const end = page.getByLabel("任务结束时间", { exact: true });
     const deadline = page.getByLabel("报名截止时间", { exact: true });
@@ -2490,6 +3023,7 @@ const cases: Record<
     ]) {
       await page.clock.setFixedTime(new Date(now));
       await page.reload();
+      await confirmInitialIncident(page);
       await expandEditorSection(page, "task-schedule");
       await start.waitFor();
       assert.equal(await start.inputValue(), startsAt);
@@ -2563,6 +3097,7 @@ const cases: Record<
     await page.getByRole("link", { name: "返回任务", exact: false }).click();
     await card.locator("h2 a").click();
     await page.getByRole("button", { name: "复制", exact: true }).click();
+    await confirmInitialIncident(page);
     await expandEditorSection(page, "task-schedule");
     await start.waitFor();
     assert.equal(
@@ -2594,6 +3129,7 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .last()
       .click();
+    await confirmInitialIncident(page);
     await expandEditorSection(page, "task-schedule");
     await expandEditorSection(page, "task-details");
     const publish = page.locator("#publish-task");
@@ -2607,11 +3143,8 @@ const cases: Record<
     await page
       .getByLabel("工作内容与能力要求摘要", { exact: true })
       .fill("整理社区物资");
-    assert.equal(await publish.innerText(), "发布招募 (9/9)");
-    assert.equal(await publish.isDisabled(), true);
-    assert.match((await publish.getAttribute("title")) || "", /请选择事件/);
-    await page.locator("#incidentId-picker").click();
-    await page.locator(".task-picker-list button").first().click();
+    assert.equal(await publish.innerText(), "发布招募");
+    assert.equal(await publish.isEnabled(), true);
     await page
       .getByLabel("工作内容与能力要求摘要", {
         exact: true,
@@ -2676,6 +3209,7 @@ const cases: Record<
       .getByRole("link", { name: "新建任务", exact: true })
       .first()
       .click();
+    await confirmInitialIncident(page);
     await publish.waitFor();
     assert.equal(await publish.innerText(), "发布招募 (5/9)");
     assert.equal(await publish.isDisabled(), true);
@@ -2696,6 +3230,7 @@ const cases: Record<
       await route.fulfill({ response, json: data });
     });
     await page.locator('.sidebar a[href="#/tasks/new"]').click();
+    await confirmInitialIncident(page);
     const publish = page.locator("#publish-task");
     await page.getByLabel("任务标题", { exact: true }).fill("负责人必填检查");
     await page
@@ -2703,7 +3238,6 @@ const cases: Record<
       .fill("检查发布条件");
     assert.equal(await publish.innerText(), "发布招募 (9/9)");
     assert.equal(await publish.isDisabled(), true);
-    assert.match((await publish.getAttribute("title")) || "", /请选择事件/);
     assert.match((await publish.getAttribute("title")) || "", /请选择负责人/);
     await page.locator("#incidentId-picker").click();
     await page.locator(".task-picker-list button").first().click();

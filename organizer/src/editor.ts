@@ -9,6 +9,7 @@ import { api, uploadMedia } from "./api";
 import { mediaTypes } from "../../shared/media";
 import { mapPreview, updatePreview } from "./maps";
 import { completeMap, mapAnnotations } from "../../shared/maps";
+import { regionSelection } from "../../shared/regions";
 import { openTaskPicker, type TaskChoice } from "./task-picker";
 import {
   closeDialog,
@@ -137,9 +138,12 @@ export function mountEditor(
       title: member.name,
       detail: member.email,
     }));
-  const selectedIncident = incidentChoices.find(
-    (choice) => choice.id === (incidentId || source?.incidentId),
-  );
+  // Workspace incidents arrive in descending update order. Explicit event links
+  // and copied tasks keep their event; ordinary creation defaults to the latest.
+  const selectedIncident =
+    incidentChoices.find(
+      (choice) => choice.id === (incidentId || source?.incidentId),
+    ) || (!task ? incidentChoices[0] : undefined);
   const selectedOwner =
     ownerChoices.find(
       (choice) => choice.id === (source?.ownerId || workspace.membership.id),
@@ -232,8 +236,11 @@ export function mountEditor(
           (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight),
           footer.getBoundingClientRect().top,
         ) - 12;
+      let control: Element = focused;
+      while (control.shadowRoot?.activeElement)
+        control = control.shadowRoot.activeElement;
       const bounds = (
-        focused.closest(".field") || focused
+        control.closest(".field") || control
       ).getBoundingClientRect();
       const delta =
         bounds.top < top || bounds.height > bottom - top
@@ -485,7 +492,7 @@ export function mountEditor(
       block.latitude,
       block.longitude,
       block.text || "地图",
-      `editable id="block-map-${index}" tabindex="-1" data-map-index="${index}" ${incident ? `center-lat="${incident.latitude}" center-lng="${incident.longitude}"` : ""}`,
+      `editable id="block-map-${index}" tabindex="-1" data-map-index="${index}" ${incident ? `center-lat="${incident.latitude}" center-lng="${incident.longitude}" region-code="${regionSelection(incident.region).at(-1)?.code || ""}"` : ""}`,
       mapAnnotations(block),
     );
   }
@@ -677,6 +684,13 @@ export function mountEditor(
       if (incident) {
         map.setAttribute("center-lat", String(incident.latitude));
         map.setAttribute("center-lng", String(incident.longitude));
+        map.setAttribute(
+          "region-code",
+          regionSelection(incident.region).at(-1)?.code || "",
+        );
+      } else {
+        for (const name of ["center-lat", "center-lng", "region-code"])
+          map.removeAttribute(name);
       }
     });
   }
@@ -841,6 +855,11 @@ export function mountEditor(
     dirty = true;
     revision++;
     status.textContent = "副本尚未保存，请重新确认日期和地点。";
+  }
+  if (!task) {
+    const picker = form.querySelector<HTMLButtonElement>("#incidentId-picker")!;
+    picker.focus({ preventScroll: true });
+    picker.click();
   }
   return {
     dirty: () =>

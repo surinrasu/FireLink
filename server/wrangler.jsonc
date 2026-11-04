@@ -13,6 +13,7 @@
     "run_worker_first": ["/api/*", "/v1/*", "/health", "/.well-known/*"],
   },
   "vars": {
+    "GEOCODER_URL": "https://nominatim.openstreetmap.org",
     "APP_ENV": "local",
     "ORGANIZER_DEMO": "true",
     "MOCK_AUTH": "true",
@@ -35,6 +36,7 @@
       "name": "firelink-demo",
       "triggers": { "crons": ["*/5 * * * *", "27 * * * *"] },
       "vars": {
+        "GEOCODER_URL": "https://nominatim.openstreetmap.org",
         "APP_ENV": "staging",
         "ORGANIZER_DEMO": "true",
         "MOCK_AUTH": "false",
@@ -62,6 +64,7 @@
       "name": "firelink-production",
       "triggers": { "crons": ["*/5 * * * *", "27 * * * *"] },
       "vars": {
+        "GEOCODER_URL": "https://nominatim.openstreetmap.org",
         "APP_ENV": "production",
         "ORGANIZER_DEMO": "false",
         "MOCK_AUTH": "false",

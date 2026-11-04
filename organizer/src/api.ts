@@ -56,6 +56,7 @@ export async function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   let response: Response;
   try {
@@ -68,9 +69,12 @@ export async function api<T>(
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(25000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(25000)])
+        : AbortSignal.timeout(25000),
     });
   } catch {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     throw new APIError(
       navigator.onLine
         ? "连接超时。若刚才提交了操作，请先刷新确认结果，再重试。"

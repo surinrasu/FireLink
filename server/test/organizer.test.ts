@@ -6,6 +6,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import type {
   ApplicationPage,
   ContentBlock,
+  Incident,
   OrganizerApplication,
   OrganizerTask,
   Session,
@@ -15,8 +16,11 @@ import type {
 import { cleanupOrganizerData } from "../src/organizer-maintenance.ts";
 import { expireApplications } from "../src/application-expiry.ts";
 import type { UploadedMedia } from "../../shared/media";
+import type { LocationResult } from "../../shared/locations";
 
 let mf: Miniflare, db: D1Database, base: string;
+const locationRequests: URL[] = [];
+let locationProviderFailure = false;
 type Identity = { cookie: string; org: string };
 beforeAll(async () => {
   await mkdir(".artifacts", { recursive: true });
@@ -42,6 +46,39 @@ beforeAll(async () => {
           compatibilityFlags: ["nodejs_compat"],
           d1Databases: { DB: "organizer-test-db" },
           r2Buckets: ["FILES"],
+          outboundService: {
+            node: (req, res) => {
+              const url = new URL(
+                req.url!,
+                "https://nominatim.openstreetmap.org",
+              );
+              locationRequests.push(url);
+              assert.match(String(req.headers["user-agent"]), /FireLink/);
+              res.setHeader("Content-Type", "application/json");
+              if (locationProviderFailure) {
+                res.statusCode = 503;
+                res.end("{}");
+                return;
+              }
+              const place = {
+                lat: "30.2616958",
+                lon: "120.1256628",
+                name: "西湖区",
+                display_name: "西湖区, 杭州市, 浙江省, 中国",
+                boundingbox: ["30.07", "30.36", "119.99", "120.18"],
+                address: { country_code: "cn" },
+              };
+              res.end(
+                JSON.stringify(
+                  url.pathname.endsWith("reverse")
+                    ? place
+                    : url.searchParams.get("q")?.includes("无结果")
+                      ? []
+                      : [place],
+                ),
+              );
+            },
+          },
           bindings: {
             APP_ENV: "local",
             ORGANIZER_DEMO: "true",
@@ -109,6 +146,18 @@ async function workspace(identity: Identity) {
   const result = await request<Workspace>("/workspace", identity);
   assert.equal(result.status, 200);
   return result.data;
+}
+async function makeRealOrganization(identity: Identity) {
+  await db.batch([
+    db
+      .prepare("UPDATE organizations SET demo_expires_at=NULL WHERE id=?")
+      .bind(identity.org),
+    db
+      .prepare(
+        "UPDATE incidents SET demo_organization_id=NULL WHERE demo_organization_id=?",
+      )
+      .bind(identity.org),
+  ]);
 }
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
@@ -987,10 +1036,7 @@ test("new organizer scheduling fields reach existing mobile clients through cont
   const identity = await demo(),
     ws = await workspace(identity),
     task = ws.tasks.find((t) => t.state === "open")!;
-  await db
-    .prepare("UPDATE organizations SET demo_expires_at=NULL WHERE id=?")
-    .bind(identity.org)
-    .run();
+  await makeRealOrganization(identity);
   const response = await fetch(new URL(`/v1/tasks/${task.id}`, base));
   assert.equal(response.status, 200);
   const detail = (await response.json()) as {
@@ -1144,10 +1190,7 @@ test("media uploads validate identity, format, actual length, quota and tenant r
     200,
   );
   // A draft attachment remains private even for a real organization.
-  await db
-    .prepare("UPDATE organizations SET demo_expires_at=NULL WHERE id=?")
-    .bind(owner.org)
-    .run();
+  await makeRealOrganization(owner);
   assert.equal((await readMedia(media)).status, 404);
   await db
     .prepare("UPDATE tasks SET publication_status='published' WHERE id=?")
@@ -1361,10 +1404,7 @@ test("map annotations round-trip, publish all geometry types and reject incomple
     ).status,
     200,
   );
-  await db
-    .prepare("UPDATE organizations SET demo_expires_at=NULL WHERE id=?")
-    .bind(identity.org)
-    .run();
+  await makeRealOrganization(identity);
   const published = (await (
     await fetch(new URL(`/v1/tasks/${created.data.id}`, base))
   ).json()) as { blocks: ContentBlock[] };
@@ -1496,4 +1536,405 @@ test("publishing requires complete media and map blocks, while draft coordinates
     ).status,
     200,
   );
+});
+
+const incidentFields = {
+  title: "社区火情",
+  region: "浙江省 杭州市 西湖区",
+  address: "西湖区社区服务中心",
+  latitude: 30.2741,
+  longitude: 120.1551,
+};
+test("organization admins can create and edit events created by another real organization", async () => {
+  const first = await demo(),
+    second = await demo();
+  await makeRealOrganization(first);
+  await makeRealOrganization(second);
+  const created = await request<{ id: string }>(
+    "/incidents",
+    first,
+    incidentFields,
+  );
+  assert.equal(created.status, 201);
+  const incident = (await workspace(second)).incidents.find(
+    (item) => item.id === created.data.id,
+  )!;
+  assert.equal(incident.version, 1);
+  const task = (await workspace(first)).tasks[0];
+  await db
+    .prepare("UPDATE tasks SET incident_id=? WHERE id=?")
+    .bind(incident.id, task.id)
+    .run();
+  const changed = {
+    ...incidentFields,
+    title: "社区火情信息更新",
+    latitude: 31,
+    longitude: 121,
+    region: "上海市 黄浦区",
+  };
+  assert.equal(
+    (
+      await request(
+        `/incidents/${incident.id}`,
+        second,
+        { ...changed, version: 1 },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+  const updated = await workspace(first);
+  assert.equal(
+    updated.incidents[0].id,
+    incident.id,
+    "The most recently updated event is first for new task defaults",
+  );
+  assert.deepEqual(
+    updated.incidents.find((item) => item.id === incident.id),
+    { ...changed, id: incident.id, status: "active", version: 2 },
+  );
+  assert.equal(
+    updated.tasks.find((item) => item.id === task.id)?.incidentTitle,
+    changed.title,
+  );
+  assert.ok(
+    (await workspace(second)).activities.some(
+      (item) => item.action === "更新事件" && item.subject === changed.title,
+    ),
+  );
+  const publicIncidents = (await (
+    await fetch(new URL("/v1/incidents", base))
+  ).json()) as Incident[];
+  assert.equal(
+    publicIncidents.find((item) => item.id === incident.id)?.title,
+    changed.title,
+  );
+});
+test("event mutations require an active organization admin and validated fields", async () => {
+  const identity = await demo(),
+    ws = await workspace(identity);
+  const incident = ws.incidents[0];
+  assert.equal(
+    (await request("/incidents", undefined, incidentFields)).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request(
+        `/incidents/${incident.id}`,
+        undefined,
+        { ...incidentFields, version: 1 },
+        "PUT",
+      )
+    ).status,
+    401,
+  );
+  for (const invalid of [
+    { title: "   " },
+    { title: "字".repeat(101) },
+    { region: "" },
+    { region: "不存在的地区" },
+    { region: "浙江省" },
+    { region: "字".repeat(201) },
+    { latitude: 91 },
+    { latitude: -91 },
+    { longitude: 181 },
+    { longitude: -181 },
+    { latitude: null },
+    { longitude: "120" },
+  ]) {
+    assert.equal(
+      (await request("/incidents", identity, { ...incidentFields, ...invalid }))
+        .status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(
+          `/incidents/${incident.id}`,
+          identity,
+          { ...incidentFields, version: 1, ...invalid },
+          "PUT",
+        )
+      ).status,
+      400,
+    );
+  }
+  assert.equal(
+    (
+      await request(
+        `/incidents/${incident.id}`,
+        identity,
+        incidentFields,
+        "PUT",
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request(
+        "/incidents/missing",
+        identity,
+        { ...incidentFields, version: 1 },
+        "PUT",
+      )
+    ).status,
+    404,
+  );
+  const backupAdmin = await demo();
+  await db
+    .prepare(
+      "INSERT INTO organization_members SELECT ?,?,account_id,'admin',1,1 FROM organization_members WHERE organization_id=? LIMIT 1",
+    )
+    .bind(crypto.randomUUID(), identity.org, backupAdmin.org)
+    .run();
+  for (const role of ["manager", "reviewer"]) {
+    await db
+      .prepare("UPDATE organization_members SET role=? WHERE id=?")
+      .bind(role, ws.membership.id)
+      .run();
+    assert.equal(
+      (await request("/incidents", identity, incidentFields)).status,
+      403,
+    );
+    assert.equal(
+      (
+        await request(
+          `/incidents/${incident.id}`,
+          identity,
+          { ...incidentFields, version: 1 },
+          "PUT",
+        )
+      ).status,
+      403,
+    );
+  }
+  await db
+    .prepare("UPDATE organization_members SET role='admin',active=0 WHERE id=?")
+    .bind(ws.membership.id)
+    .run();
+  assert.equal(
+    (await request("/incidents", identity, incidentFields)).status,
+    403,
+  );
+});
+test("concurrent event edits cannot overwrite each other or create misleading activity", async () => {
+  const identity = await demo(),
+    ws = await workspace(identity);
+  const incident = ws.incidents[0];
+  const results = await Promise.all(
+    ["更新甲", "更新乙"].map((title) =>
+      request(
+        `/incidents/${incident.id}`,
+        identity,
+        { ...incidentFields, title, version: incident.version },
+        "PUT",
+      ),
+    ),
+  );
+  assert.deepEqual(results.map((result) => result.status).sort(), [200, 409]);
+  const updated = await workspace(identity);
+  assert.equal(
+    updated.incidents.find((item) => item.id === incident.id)?.version,
+    incident.version + 1,
+  );
+  assert.equal(
+    updated.activities.filter((item) => item.action === "更新事件").length,
+    1,
+  );
+});
+test("demo events and edits stay isolated from other demos, real events, and public listings", async () => {
+  const first = await demo(),
+    second = await demo();
+  const before = await workspace(second),
+    own = await workspace(first);
+  assert.ok(
+    own.incidents.every(
+      (item) => !before.incidents.some((other) => item.id === other.id),
+    ),
+  );
+  const created = await request<{ id: string }>(
+    "/incidents",
+    first,
+    incidentFields,
+  );
+  assert.equal(created.status, 201);
+  const update = { ...incidentFields, title: "仅当前演示", version: 1 };
+  assert.equal(
+    (await request(`/incidents/${own.incidents[0].id}`, first, update, "PUT"))
+      .status,
+    200,
+  );
+  assert.deepEqual((await workspace(second)).incidents, before.incidents);
+  for (const id of [before.incidents[0].id, "incident-hangzhou"]) {
+    assert.equal(
+      (await request(`/incidents/${id}`, first, update, "PUT")).status,
+      404,
+    );
+    assert.equal(
+      (
+        await request("/tasks", first, {
+          ...taskInput(own.tasks[0]),
+          incidentId: id,
+        })
+      ).status,
+      400,
+    );
+  }
+  assert.equal(
+    (await request(`/incidents/${created.data.id}`, second, update, "PUT"))
+      .status,
+    404,
+  );
+  const publicIncidents = (await (
+    await fetch(new URL("/v1/incidents", base))
+  ).json()) as Incident[];
+  assert.ok(
+    !publicIncidents.some(
+      (item) =>
+        item.id === created.data.id ||
+        own.incidents.some((demo) => demo.id === item.id),
+    ),
+  );
+  await db
+    .prepare("UPDATE organizations SET demo_expires_at=1 WHERE id=?")
+    .bind(first.org)
+    .run();
+  await cleanupOrganizerData(db);
+  assert.equal(
+    await db
+      .prepare("SELECT id FROM incidents WHERE demo_organization_id=?")
+      .bind(first.org)
+      .first(),
+    null,
+  );
+});
+
+test("address lookup requires an editor, caches results and serializes requests across organizations", async () => {
+  const first = await demo(),
+    second = await demo();
+  const query = { kind: "region", regionCode: "330106" };
+  assert.equal((await request("/locations", undefined, query)).status, 401);
+  assert.equal(
+    (await request("/locations", first, { ...query, regionCode: "33" })).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request("/locations", first, {
+        kind: "search",
+        regionCode: "330106",
+        query: " ",
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await request("/locations", first, {
+        kind: "reverse",
+        latitude: 91,
+        longitude: 120,
+      })
+    ).status,
+    400,
+  );
+  const before = locationRequests.length;
+  const found = await request<LocationResult[]>("/locations", first, query);
+  assert.equal(found.status, 200);
+  assert.equal(found.data[0].name, "西湖区");
+  assert.equal(locationRequests.length, before + 1);
+  assert.equal(locationRequests.at(-1)!.searchParams.get("countrycodes"), "cn");
+  assert.equal(
+    locationRequests.at(-1)!.searchParams.get("q"),
+    "西湖区, 杭州市, 浙江省",
+  );
+  assert.deepEqual(
+    (await request<LocationResult[]>("/locations", second, query)).data,
+    found.data,
+  );
+  assert.equal(locationRequests.length, before + 1);
+  const blocked = await request("/locations", second, {
+    kind: "search",
+    regionCode: "330106",
+    query: "浙江大学",
+  });
+  assert.equal(blocked.status, 429);
+  assert.equal(blocked.headers.get("retry-after"), "2");
+  await db
+    .prepare("DELETE FROM organizer_rate_limits WHERE id='geocoder:upstream'")
+    .run();
+  const concurrent = await Promise.all(
+    [first, second].map((identity, index) =>
+      request("/locations", identity, {
+        kind: "search",
+        regionCode: "330106",
+        query: `社区中心${index}`,
+      }),
+    ),
+  );
+  assert.deepEqual(
+    concurrent.map((result) => result.status).sort(),
+    [200, 429],
+  );
+  assert.equal(locationRequests.length, before + 2);
+  // Task editors can search; cached entries still enforce membership roles.
+  const ws = await workspace(first);
+  await db
+    .prepare(
+      "INSERT INTO organization_members SELECT ?,?,account_id,'admin',1,1 FROM organization_members WHERE organization_id=? LIMIT 1",
+    )
+    .bind(crypto.randomUUID(), first.org, second.org)
+    .run();
+  for (const role of ["manager", "reviewer"]) {
+    await db
+      .prepare("UPDATE organization_members SET role=? WHERE id=?")
+      .bind(role, ws.membership.id)
+      .run();
+    assert.equal(
+      (await request("/locations", first, query)).status,
+      role === "manager" ? 200 : 403,
+    );
+  }
+});
+test("address lookup handles empty results, reverse lookup and provider outages without leaking upstream errors", async () => {
+  const identity = await demo();
+  const unlock = () =>
+    db
+      .prepare("DELETE FROM organizer_rate_limits WHERE id='geocoder:upstream'")
+      .run();
+  await unlock();
+  assert.deepEqual(
+    (
+      await request<LocationResult[]>("/locations", identity, {
+        kind: "search",
+        regionCode: "330106",
+        query: "无结果",
+      })
+    ).data,
+    [],
+  );
+  await unlock();
+  const reverse = await request<LocationResult[]>("/locations", identity, {
+    kind: "reverse",
+    latitude: 30.27,
+    longitude: 120.15,
+  });
+  assert.equal(reverse.status, 200);
+  assert.equal(locationRequests.at(-1)!.searchParams.get("lat"), "30.270000");
+  assert.equal(reverse.data[0].address, "西湖区, 杭州市, 浙江省, 中国");
+  await unlock();
+  locationProviderFailure = true;
+  try {
+    const failed = await request("/locations", identity, {
+      kind: "search",
+      regionCode: "330106",
+      query: "服务中断",
+    });
+    assert.equal(failed.status, 503);
+    assert.equal(failed.data.error, "地址查询暂不可用，请稍后重试。");
+  } finally {
+    locationProviderFailure = false;
+  }
 });

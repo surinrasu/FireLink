@@ -1,8 +1,10 @@
 import { mapPreview } from "./maps";
+import { mountIncidentLocation } from "./incident-location";
 import "./selects";
 import type {
   Activity,
   ApplicationPage,
+  Incident,
   Member,
   OrganizerApplication,
   OrganizerTask,
@@ -759,22 +761,94 @@ function requestHistory(kind: "incident" | "verification") {
   return `<section class="panel" style="margin-top:24px"><h2>申请记录</h2>${records.map((r) => `<article class="notice"><div class="notice-body"><p class="preserve-lines">${h(r.content)}</p><small>${formatDate(r.createdAt, true)}</small></div><span class="status">${labels[r.status] || h(r.status)}</span></article>`).join("")}</section>`;
 }
 function incidentsPage() {
-  return `${heading("事件", "", canEdit() ? '<button data-action="incident-request" class="border">' + icon("add_location_alt") + "新增事件 / 信息纠错</button>" : "")}<div class="incident-grid">${workspace.incidents
-    .map((incident) => {
-      const tasks = workspace.tasks.filter((t) => t.incidentId === incident.id);
-      return `<section class="panel"><div class="incident-header"><h2>${h(incident.title)}</h2></div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
-        tasks.length
-          ? tasks
-              .slice(0, 2)
-              .map(
-                (t) =>
-                  `<div class="task-row"><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a></div>${badge(t.state)}</div>`,
-              )
-              .join("")
-          : '<p class="muted">暂无关联任务。</p>'
-      }</section>`;
-    })
-    .join("")}</div>${requestHistory("incident")}`;
+  return `${heading("事件", "各组织管理员可共同维护事件信息。", isAdmin() ? '<button data-action="incident-new">' + icon("add_location_alt") + "新增事件</button>" : "")}${
+    !workspace.incidents.length
+      ? empty(
+          "暂无事件",
+          isAdmin()
+            ? "新增事件后，即可为它创建招募任务。"
+            : "请联系组织管理员新增事件。",
+          "",
+          "explore",
+        )
+      : `<div class="incident-grid">${workspace.incidents
+          .map((incident) => {
+            const tasks = workspace.tasks.filter(
+              (t) => t.incidentId === incident.id,
+            );
+            return `<section class="panel"><div class="incident-header"><h2>${h(incident.title)}</h2>${isAdmin() ? `<button class="transparent" data-action="incident-edit" data-id="${h(incident.id)}" aria-label="编辑事件：${h(incident.title)}">${icon("edit")}编辑事件</button>` : ""}</div>${mapPreview(incident.latitude, incident.longitude, incident.region)}<div class="panel-header"><h3>${tasks.length} 个当前组织关联任务</h3><a href="#/tasks?incident=${encodeURIComponent(incident.id)}">显示全部 ${icon("arrow_forward")}</a></div>${
+              tasks.length
+                ? tasks
+                    .slice(0, 2)
+                    .map(
+                      (t) =>
+                        `<div class="task-row"><div class="task-info"><a href="${taskLink(t)}">${h(t.title)}</a></div>${badge(t.state)}</div>`,
+                    )
+                    .join("")
+                : '<p class="muted">暂无关联任务。</p>'
+            }</section>`;
+          })
+          .join("")}</div>`
+  }`;
+}
+function incidentDialog(incident?: Incident) {
+  if (!isAdmin()) return;
+  const dialog = openDialog(
+    incident ? "编辑事件" : "新增事件",
+    `<form id="incident-form"><p class="dialog-copy">${workspace.organization.demo ? "更改仅保存在当前演示工作台。" : "事件由各组织共同维护，保存后立即生效。"}</p>${input("incident-title", "事件名称", incident?.title, 'required maxlength="100"')}<div id="incident-location"></div><div class="dialog-actions"><button class="border" type="button" data-close-dialog>取消</button><button class="border" type="button" id="incident-reload" hidden>载入最新版本</button><button type="submit">${incident ? "保存修改" : "创建事件"}</button></div></form>`,
+  );
+  const form = dialog.querySelector<HTMLFormElement>("form")!;
+  const location = mountIncidentLocation(
+    form.querySelector<HTMLElement>("#incident-location")!,
+    incident,
+  );
+  const reload = form.querySelector<HTMLButtonElement>("#incident-reload")!;
+  reload.addEventListener("click", async () => {
+    setBusy(form, true);
+    try {
+      const latest = await api<Workspace>("/workspace");
+      const updated = latest.incidents.find((item) => item.id === incident?.id);
+      if (!updated) throw new Error("事件已不可用，请关闭窗口并刷新页面。");
+      incidentDialog(updated);
+    } catch (error) {
+      formError(form, errorText(error));
+    } finally {
+      setBusy(form, false);
+    }
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (form.getAttribute("aria-busy") === "true") return;
+    const data = new FormData(form);
+    setBusy(form, true);
+    try {
+      await api(
+        incident
+          ? `/incidents/${encodeURIComponent(incident.id)}`
+          : "/incidents",
+        incident ? "PUT" : "POST",
+        {
+          title: String(data.get("incident-title")).trim(),
+          ...location.value(),
+          ...(incident ? { version: incident.version } : {}),
+        },
+      );
+      closeDialog();
+      toast(incident ? "事件已更新。" : "事件已创建，可为它创建任务。");
+      await renderRoute();
+    } catch (error) {
+      const conflict = error instanceof APIError && error.status === 409;
+      reload.hidden = !conflict;
+      formError(
+        form,
+        conflict
+          ? "事件已被其他管理员更新。你填写的内容仍保留在表单中；载入最新版本会替换当前内容，请先复制需要保留的修改。"
+          : errorText(error),
+      );
+    } finally {
+      setBusy(form, false);
+    }
+  });
 }
 async function noticesPage(turn: number) {
   const notices = await api<ResultNotice[]>("/notices");
@@ -977,10 +1051,10 @@ function memberDialog(member?: Member) {
     }
   });
 }
-function requestDialog(kind: "incident" | "verification") {
+function verificationDialog() {
   const dialog = openDialog(
-    kind === "incident" ? "新增事件 / 信息纠错" : "提交组织认证",
-    `<form><p class="dialog-copy">${kind === "incident" ? "填写事件名称、地区、需求及来源；纠错请注明对应事件。" : "填写机构登记信息、公开链接及联系人。"}</p>${textarea("request-content", "申请说明", "", 'required minlength="10" maxlength="5000"')}<div class="dialog-actions"><button class="border" type="button" data-close-dialog>取消</button><button type="submit">提交申请</button></div></form>`,
+    "提交组织认证",
+    `<form><p class="dialog-copy">填写机构登记信息、公开链接及联系人。</p>${textarea("request-content", "申请说明", "", 'required minlength="10" maxlength="5000"')}<div class="dialog-actions"><button class="border" type="button" data-close-dialog>取消</button><button type="submit">提交申请</button></div></form>`,
   );
   const form = dialog.querySelector<HTMLFormElement>("form")!;
   form.addEventListener("submit", async (event) => {
@@ -988,7 +1062,7 @@ function requestDialog(kind: "incident" | "verification") {
     setBusy(form, true);
     try {
       await api("/requests", "POST", {
-        kind,
+        kind: "verification",
         content: new FormData(form).get("request-content"),
       });
       closeDialog();
@@ -1211,11 +1285,18 @@ root.addEventListener("click", (event) => {
     case "member":
       memberDialog(workspace.members.find((m) => m.id === target.dataset.id));
       break;
-    case "incident-request":
-      requestDialog("incident");
+    case "incident-new":
+      incidentDialog();
       break;
+    case "incident-edit": {
+      const incident = workspace.incidents.find(
+        (item) => item.id === target.dataset.id,
+      );
+      if (incident) incidentDialog(incident);
+      break;
+    }
     case "verification":
-      requestDialog("verification");
+      verificationDialog();
       break;
     case "more": {
       const dialog = openDialog(
@@ -1405,6 +1486,19 @@ async function renderPage(turn: number) {
       if (path !== "/tasks/new" && !task) {
         shell(
           empty("任务不存在", "任务可能已移除，或你没有访问权限。"),
+          "tasks",
+        );
+        return;
+      }
+      if (path === "/tasks/new" && !workspace.incidents.length) {
+        shell(
+          empty(
+            "暂无可选事件",
+            workspace.membership.role === "admin"
+              ? "请先创建事件，再新建任务。"
+              : "请联系组织管理员创建事件，再新建任务。",
+            '<a class="button border" href="#/incidents">查看事件</a>',
+          ),
           "tasks",
         );
         return;

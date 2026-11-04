@@ -17,6 +17,8 @@ import {
 import { createDemo } from "./organizer-demo";
 import { expireApplications } from "./application-expiry";
 import { uploadMedia, validateMedia } from "./organizer-media";
+import { findLocations } from "./organizer-locations";
+import { isCompleteRegion, regionSelection } from "../../shared/regions";
 import {
   completeMap,
   MAX_MAP_ANNOTATIONS,
@@ -94,7 +96,7 @@ organizerAPI.use("*", async (c, next) => {
   const orgId = c.req.header("X-Organization-Id");
   if (!orgId) deny(400, "请先选择组织。");
   const member = await c.env.DB.prepare(
-    "SELECT m.*,o.name AS organization_name FROM organization_members m JOIN organizations o ON o.id=m.organization_id WHERE m.account_id=? AND m.organization_id=? AND m.active=1 AND (o.demo_expires_at IS NULL OR o.demo_expires_at>?)",
+    "SELECT m.*,o.name AS organization_name,o.demo_expires_at FROM organization_members m JOIN organizations o ON o.id=m.organization_id WHERE m.account_id=? AND m.organization_id=? AND m.active=1 AND (o.demo_expires_at IS NULL OR o.demo_expires_at>?)",
   )
     .bind(account.id, orgId, Date.now())
     .first<MemberRow>();
@@ -114,6 +116,7 @@ organizerAPI.use("*", async (c, next) => {
 });
 
 organizerAPI.post("/media", uploadMedia);
+organizerAPI.post("/locations", findLocations);
 
 function audit(
   c: OrgContext,
@@ -195,6 +198,79 @@ async function findTask(c: OrgContext, id: string) {
   if (!task) deny(404, "任务不存在或你没有访问权限。");
   return task;
 }
+function incidentDemoOrganization(c: OrgContext) {
+  const member = c.get("member");
+  return member.demo_expires_at == null ? null : member.organization_id;
+}
+const incidentInput = z.object({
+  title: z.string().trim().min(1, "请填写事件名称。").max(100),
+  region: z
+    .string()
+    .trim()
+    .max(200)
+    .refine(
+      (value) => isCompleteRegion(regionSelection(value)),
+      "请从行政区划中完整选择所在地区。",
+    ),
+  address: z.string().trim().max(500).default(""),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+organizerAPI.post("/incidents", async (c) => {
+  requireRole(c, "admin");
+  const input = incidentInput.parse(await readJSON(c));
+  const id = crypto.randomUUID();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "INSERT INTO incidents(id,title,region,latitude,longitude,status,updated_at,demo_organization_id,address) VALUES (?,?,?,?,?,'active',?,?,?)",
+    ).bind(
+      id,
+      input.title,
+      input.region,
+      input.latitude,
+      input.longitude,
+      timestamp(),
+      incidentDemoOrganization(c),
+      input.address,
+    ),
+    audit(c, "新增事件", input.title),
+  ]);
+  return c.json({ id }, 201);
+});
+organizerAPI.put("/incidents/:id", async (c) => {
+  requireRole(c, "admin");
+  const input = incidentInput
+    .extend({ version: z.number().int().min(1) })
+    .parse(await readJSON(c));
+  const id = c.req.param("id");
+  const scope = incidentDemoOrganization(c);
+  const old = await c.env.DB.prepare(
+    "SELECT id FROM incidents WHERE id=? AND demo_organization_id IS ?",
+  )
+    .bind(id, scope)
+    .first();
+  if (!old) deny(404, "事件不存在或你没有访问权限。");
+  // Real events are shared: any organization's admin may edit them.
+  const [result] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE incidents SET title=?,region=?,latitude=?,longitude=?,address=?,updated_at=?,version=version+1 WHERE id=? AND demo_organization_id IS ? AND version=?",
+    ).bind(
+      input.title,
+      input.region,
+      input.latitude,
+      input.longitude,
+      input.address,
+      timestamp(),
+      id,
+      scope,
+      input.version,
+    ),
+    audit(c, "更新事件", input.title, null, true),
+  ]);
+  if (!result.meta.changes)
+    deny(409, "事件已被其他管理员更新，请重新打开编辑后再保存。");
+  return c.json({ ok: true });
+});
 organizerAPI.get("/workspace", async (c) => {
   const member = c.get("member"),
     scope = taskScope(c);
@@ -209,8 +285,10 @@ organizerAPI.get("/workspace", async (c) => {
         .bind(member.organization_id, ...scope.values)
         .all(),
       c.env.DB.prepare(
-        "SELECT id,title,region,latitude,longitude,status FROM incidents ORDER BY updated_at DESC",
-      ).all<Workspace["incidents"][number]>(),
+        "SELECT id,title,region,latitude,longitude,status,version,address FROM incidents WHERE demo_organization_id IS ? ORDER BY updated_at DESC,id",
+      )
+        .bind(incidentDemoOrganization(c))
+        .all<Workspace["incidents"][number]>(),
       c.env.DB.prepare(
         `SELECT id,actor,action,subject,task_id AS taskId,created_at AS createdAt FROM organizer_activity WHERE organization_id=? ${member.role === "admin" ? "" : "AND task_id IN (SELECT task_id FROM member_tasks WHERE member_id=?)"} ORDER BY created_at DESC LIMIT 30`,
       )
@@ -358,9 +436,9 @@ async function validateTaskRelations(
 ) {
   await validateMedia(c, input.blocks);
   const incident = await c.env.DB.prepare(
-    "SELECT id FROM incidents WHERE id=? AND status='active'",
+    "SELECT id FROM incidents WHERE id=? AND status='active' AND demo_organization_id IS ?",
   )
-    .bind(input.incidentId)
+    .bind(input.incidentId, incidentDemoOrganization(c))
     .first();
   if (!incident) deny(400, "请选择有效的事件。");
   if (input.ownerId) {

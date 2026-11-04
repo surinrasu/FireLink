@@ -21,6 +21,7 @@ export async function cleanupOrganizerData(
       await files.delete(credential.object_key);
   }
   await db.batch([
+    db.prepare("DELETE FROM location_cache WHERE expires_at<=?").bind(now),
     db.prepare("DELETE FROM organizer_sessions WHERE expires_at<=?").bind(now),
     db
       .prepare("DELETE FROM organizer_rate_limits WHERE expires_at<=?")
