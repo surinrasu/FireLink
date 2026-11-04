@@ -68,6 +68,7 @@ data class RescueTask(
     val blocks: List<ContentBlock>,
     val requiredFields: List<String>,
     val contactFields: List<String>,
+    val customFields: List<String> = emptyList(),
 )
 
 @Serializable

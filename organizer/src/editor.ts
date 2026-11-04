@@ -6,6 +6,10 @@ import type {
   Workspace,
 } from "../../shared/organizer";
 import { api, uploadMedia } from "./api";
+import {
+  MAX_CUSTOM_FIELDS,
+  MAX_CUSTOM_FIELD_NAME,
+} from "../../shared/custom-fields";
 import { mediaTypes } from "../../shared/media";
 import { mapPreview, updatePreview } from "./maps";
 import { completeMap, mapAnnotations } from "../../shared/maps";
@@ -167,10 +171,66 @@ export function mountEditor(
           `<button class="border" type="button" data-add-block="${type}" aria-label="添加${label}">${icon("add")}${label}</button>`,
       )
       .join("")}</div></details>
-    <section class="panel editor-section"><h2><span class="step-number">4</span>志愿者上传资料</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" tabindex="-1" style="border:0;padding:0;margin-top:20px"><legend>报名必填资料</legend>${requirements}<div id="contact-fields" class="requirement-group" role="group" aria-labelledby="contact-fields-label" tabindex="-1"><span id="contact-fields-label" class="requirement-label">联系方式</span><div class="requirement-options">${requirementOptions("contactFields", ["phone", "wechat", "email"], contacts)}</div></div></fieldset></section>
+    <section class="panel editor-section"><h2><span class="step-number">4</span>志愿者上传资料</h2>${requirementsLocked ? '<div class="info-note" style="margin-top:14px">已有报名，授权要求不可修改。如需更改，请复制为新任务。</div>' : ""}<fieldset id="required-fields" aria-label="报名必填资料" tabindex="-1" style="border:0;padding:0;margin-top:20px">${requirements}<div id="contact-fields" class="requirement-group" role="group" aria-labelledby="contact-fields-label" tabindex="-1"><span id="contact-fields-label" class="requirement-label">联系方式</span><div class="requirement-options">${requirementOptions("contactFields", ["phone", "wechat", "email"], contacts)}</div></div><div class="requirement-group" role="group" aria-labelledby="custom-fields-label"><span id="custom-fields-label" class="requirement-label">自定义资料</span><div class="custom-requirements"><div id="custom-fields"></div><button class="border" type="button" id="add-custom-field" ${requirementsLocked ? "disabled" : ""}>${icon("add")}添加项目</button><p class="help">志愿者报名时逐项填写文字，每项最多 1000 字。</p></div></div></fieldset></section>
     </div><aside class="editor-preview"><p class="preview-label">志愿者端内容预览</p><div class="preview-phone" id="live-preview"></div></aside></div>
     <footer class="editor-footer"><div class="editor-pickers" role="group" aria-label="任务事件与负责人">${pickerButton("incidentId", "事件", "explore", selectedIncident)}${pickerButton("ownerId", "负责人", "person", selectedOwner)}</div><div class="actions"><button class="border" type="button" id="preview-task">${icon("visibility")}预览</button><button class="border" type="submit">保存${draft ? "草稿" : "更改"}</button>${draft ? '<button type="button" id="publish-task">发布招募</button>' : ""}</div></footer></form>`;
   const form = host.querySelector<HTMLFormElement>("#task-form")!;
+  const customHost = form.querySelector<HTMLElement>("#custom-fields")!;
+  const addCustomButton =
+    form.querySelector<HTMLButtonElement>("#add-custom-field")!;
+  let customFieldId = 0;
+  const customInputs = () =>
+    Array.from(customHost.querySelectorAll<HTMLInputElement>("input"));
+  function validateCustomFields() {
+    const fields = customInputs();
+    for (const field of fields) {
+      const name = field.value.trim();
+      field.setCustomValidity(
+        !name
+          ? "请填写资料名称，或删除此项目。"
+          : fields.some(
+                (other) => other !== field && other.value.trim() === name,
+              )
+            ? "资料名称已存在，请使用不同的名称。"
+            : "",
+      );
+    }
+    addCustomButton.disabled =
+      requirementsLocked || fields.length >= MAX_CUSTOM_FIELDS;
+  }
+  function appendCustomField(name = "") {
+    const row = document.createElement("div");
+    row.className = "custom-requirement";
+    row.innerHTML = `${input(`custom-field-${customFieldId++}`, "资料名称", name, `data-custom-field required maxlength="${MAX_CUSTOM_FIELD_NAME}" ${requirementsLocked ? "disabled" : ""}`)}<button class="transparent circle" type="button" aria-label="删除自定义资料" ${requirementsLocked ? "disabled" : ""}>${icon("delete")}</button>`;
+    const field = row.querySelector<HTMLInputElement>("input")!;
+    const remove = row.querySelector<HTMLButtonElement>("button")!;
+    const updateRemoveLabel = () =>
+      remove.setAttribute(
+        "aria-label",
+        `删除自定义资料${field.value.trim() ? `：${field.value.trim()}` : ""}`,
+      );
+    field.addEventListener("input", updateRemoveLabel);
+    updateRemoveLabel();
+    remove.addEventListener("click", () => {
+      const next =
+        row.nextElementSibling?.querySelector<HTMLInputElement>("input") ||
+        row.previousElementSibling?.querySelector<HTMLInputElement>("input");
+      row.remove();
+      changed();
+      (next || addCustomButton).focus();
+    });
+    customHost.append(row);
+    return field;
+  }
+  for (const name of source?.customFields ?? []) appendCustomField(name);
+  validateCustomFields();
+  addCustomButton.addEventListener("click", () => {
+    if (requirementsLocked || customInputs().length >= MAX_CUSTOM_FIELDS)
+      return;
+    const field = appendCustomField();
+    changed();
+    field.focus();
+  });
   let pickerDialog: HTMLDialogElement | undefined;
   const bindPicker = (
     name: string,
@@ -410,7 +470,9 @@ export function mountEditor(
         field.id,
         field.id === "capacity"
           ? "人数上限须为 1 至 10000 的整数"
-          : `请检查${field.getAttribute("aria-label") || form.querySelector(`label[for="${field.id}"]`)?.textContent || "此项内容"}`,
+          : field.hasAttribute("data-custom-field")
+            ? field.validationMessage
+            : `请检查${field.getAttribute("aria-label") || form.querySelector(`label[for="${field.id}"]`)?.textContent || "此项内容"}`,
       );
     }
     return checks;
@@ -645,6 +707,7 @@ export function mountEditor(
           '[name="contactFields"]:checked',
         ),
       ).map((e) => e.value),
+      customFields: customInputs().map((field) => field.value.trim()),
       version,
     };
   }
@@ -767,6 +830,7 @@ export function mountEditor(
     await saving;
   }
   function changed(event?: Event) {
+    validateCustomFields();
     revision++;
     dirty = true;
     preview();

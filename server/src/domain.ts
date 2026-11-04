@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  MAX_CUSTOM_FIELDS,
+  MAX_CUSTOM_FIELD_NAME,
+  MAX_CUSTOM_FIELD_ANSWER,
+} from "../../shared/custom-fields";
 
 const normalizePhone = (value: string) =>
   value.replace(/[\s-]/g, "").replace(/^\+86/, "");
@@ -118,6 +123,13 @@ export const applySchema = z.object({
   fields: z.array(z.enum(shareFields)).min(1),
   contactFields: z.array(z.enum(["phone", "wechat", "email"])).min(1),
   consentVersion: z.literal(1),
+  customAnswers: z
+    .record(
+      z.string().min(1).max(MAX_CUSTOM_FIELD_NAME),
+      z.string().trim().max(MAX_CUSTOM_FIELD_ANSWER),
+    )
+    .refine((answers) => Object.keys(answers).length <= MAX_CUSTOM_FIELDS)
+    .default({}),
 });
 export const identities = {
   lin: { realName: "林晓", birthDate: "1998-06-18", gender: "女" },

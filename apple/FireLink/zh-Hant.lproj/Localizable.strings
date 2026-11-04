@@ -197,3 +197,6 @@
 
 "select_opportunity" = "選擇志願機會";
 "select_opportunity_hint" = "從列表中選擇事件或任務，查看詳細資訊。";
+
+"custom_fields" = "自訂資料";
+"custom_field_answer" = "請填寫，最多 1000 字";

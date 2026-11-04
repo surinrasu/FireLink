@@ -68,6 +68,7 @@ export interface OrganizerTask {
   blocks: ContentBlock[];
   requiredFields: string[];
   contactFields: string[];
+  customFields: string[];
   updatedAt: string;
   version: number;
   pending: number;
@@ -162,5 +163,6 @@ export interface TaskInput {
   blocks: ContentBlock[];
   requiredFields: string[];
   contactFields: string[];
+  customFields?: string[];
   version?: number;
 }
