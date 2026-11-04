@@ -12,7 +12,8 @@
 | [FireLink-结题汇报.pdf](FireLink-结题汇报.pdf) | 中文幻灯片，35 页 |
 | [FireLink-Final-Review-English.pdf](FireLink-Final-Review-English.pdf) | 英文幻灯片，35 页 |
 | [FireLink-演讲稿.html](FireLink-演讲稿.html) | 独立中文讲稿，包含逐页口述、操作提示、时间安排与备查回答 |
-| [FireLink-演讲稿.pdf](FireLink-演讲稿.pdf) | 可打印的中文讲稿，17 页 |
+| [FireLink-演讲稿.pdf](FireLink-演讲稿.pdf) | 可打印的中文讲稿，15 页 |
+| [FireLink-演讲稿.md](FireLink-演讲稿.md) | 仅含小标题和讲述正文的 Markdown，包含主体与答辩备查 |
 
 ## 快速播放
 
@@ -62,7 +63,7 @@ mise run presentation:final
 mise run presentation:build
 ```
 
-此任务使用 Bun 依次生成离线演示 HTML 和独立讲稿 HTML，无需安装第三方依赖。单独使用本目录时，运行 `bun build.mjs` 和 `bun speaker-script.mjs`。直接修改生成后的 HTML 会在下次重建时被覆盖。更新图片时，保持 `content.js` 中的文件名与 `assets/` 一致。
+此任务使用 Bun 依次生成离线演示 HTML、独立讲稿 HTML 和 Markdown，无需安装第三方依赖。单独使用本目录时，运行 `bun build.mjs` 和 `bun speaker-script.mjs`。直接修改生成后的 HTML 或 Markdown 会在下次重建时被覆盖。更新图片时，保持 `content.js` 中的文件名与 `assets/` 一致。
 
 PDF 需在 HTML 重建后重新导出：打开演示，选好语言后按 `P`，保存为对应 PDF，保留背景图形并关闭浏览器页眉页脚；讲稿使用其“打印讲稿”按钮。重建任务不会自动更新 PDF。
 
@@ -73,5 +74,7 @@ PDF 需在 HTML 重建后重新导出：打开演示，选好语言后按 `P`，
 本次交付记录：70 个桌面语言与页面组合检查通过；390px、700px 宽度的中英文布局检查未发现页面横向溢出；7 项交互检查通过，未记录外部网络请求或页面错误。相关后端 49 项测试与配色方案 4 项测试通过。新增自定义资料界面通过 `custom-requirements` 场景的桌面、手机布局及资料区域无障碍自动检查。检查范围和视觉交接说明保存在仓库 `.artifacts/final-report/`，属于本次范围内的验证记录。
 
 任务创建与审核截图已对应 `4afb122` 的自定义资料设计：用“可参与时段”和“相关支援经验”展示填写项与申请答案的关系。第 13、15、16、23 页、来源备查及对应讲稿同步说明自定义资料、答案快照、要求锁定和验证结果。
+
+PR #1 合并时按演讲者确认的 `034a36d` 同步重建全部交付材料。此次复跑后端 57 项、演示 15 项及配色 4 项测试，全部通过；中英文桌面、手机布局与 7 项交互检查通过，记录位于 `.artifacts/pr1-merge-validation/`。
 
 演练事件与人员资料为合成数据。内容以实现与机制为依据，研究假设和补充说明保留在讲稿中。范围约定见 [PRODUCT.md](PRODUCT.md)。
