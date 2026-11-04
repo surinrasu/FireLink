@@ -482,6 +482,59 @@ test("legacy equipment descriptions migrate once and never override deliberately
   assert.equal(cleared.data.equipmentDescription, "");
 });
 
+test("custom application answers are required and only requested answers reach organizers", async () => {
+  const user = await account("13900000914");
+  const customFields = ["证书编号", "可服务时间"];
+  await db
+    .prepare(
+      "INSERT INTO tasks(id,incident_id,organizer_id,title,summary,status,updated_at,blocks,required_fields,contact_fields,custom_fields) SELECT 'task-custom',incident_id,organizer_id,'自定义资料测试',summary,'open',updated_at,blocks,'[\"realName\"]','[\"phone\"]',? FROM tasks WHERE id='task-supply'",
+    )
+    .bind(JSON.stringify(customFields))
+    .run();
+  const detail = await call<{ customFields: string[] }>(
+    "/v1/tasks/task-custom",
+  );
+  assert.equal(detail.status, 200);
+  assert.deepEqual(detail.data.customFields, customFields);
+  const body = {
+    taskId: "task-custom",
+    fields: ["realName"],
+    contactFields: ["phone"],
+    consentVersion: 1,
+  };
+  for (const customAnswers of [
+    undefined,
+    { 证书编号: "A-123", 可服务时间: " \n " },
+    { 证书编号: "a".repeat(1001), 可服务时间: "周六" },
+  ]) {
+    const result = await call(
+      "/v1/applications",
+      { ...body, customAnswers },
+      user.token,
+      "POST",
+      "zh-Hans",
+    );
+    assert.equal(result.status, 400);
+  }
+  const submitted = await call<CreatedApplication>(
+    "/v1/applications",
+    {
+      ...body,
+      customAnswers: {
+        证书编号: " A-123 ",
+        可服务时间: "周六\n09:00–12:00",
+        未请求的资料: "不应保存",
+      },
+    },
+    user.token,
+  );
+  assert.equal(submitted.status, 201, JSON.stringify(submitted.data));
+  assert.deepEqual(
+    (await requiredApplication(submitted.data.id)).profile.customFields,
+    { 证书编号: "A-123", 可服务时间: "周六\n09:00–12:00" },
+  );
+});
+
 test("withdrawn and rejected applications never expose contacts", async () => {
   for (const [phone, status] of [
     ["13800000004", "withdrawn"],

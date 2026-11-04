@@ -61,6 +61,7 @@ struct RescueTask: Codable, Identifiable {
   let blocks: [ContentBlock]
   let requiredFields: [String]
   let contactFields: [String]
+  var customFields: [String]? = nil
 }
 struct Article: Codable, Identifiable {
   let id: String

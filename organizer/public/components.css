@@ -594,6 +594,39 @@ textarea:focus-visible {
   cursor: not-allowed;
   opacity: 0.6;
 }
+.custom-requirements,
+#custom-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+#custom-fields:empty {
+  display: none;
+}
+.custom-requirements > button {
+  align-self: flex-start;
+}
+.custom-requirement {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.custom-requirement .field {
+  min-width: 0;
+  margin: 0;
+}
+.custom-requirement > button {
+  grid-column: 2;
+  grid-row: 1;
+}
+.custom-requirement .field-error {
+  grid-column: 1 / -1;
+}
+.custom-requirements .help {
+  margin: 0;
+}
 
 /* Pickers and tables */
 .task-picker-search.field {

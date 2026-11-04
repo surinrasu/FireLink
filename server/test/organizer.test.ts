@@ -208,6 +208,7 @@ function taskInput(task: OrganizerTask): TaskInput {
     blocks,
     requiredFields,
     contactFields,
+    customFields,
     version,
   } = task;
   return {
@@ -224,6 +225,7 @@ function taskInput(task: OrganizerTask): TaskInput {
     blocks,
     requiredFields,
     contactFields,
+    customFields,
     version,
   };
 }
@@ -786,6 +788,94 @@ test("task drafts publish, pause and close with optimistic edit conflicts and lo
     409,
   );
 });
+test("custom requirements persist, validate names, copy, and lock with applications", async () => {
+  const identity = await demo();
+  const sample = (await workspace(identity)).tasks.find(
+    (task) => task.pending > 0,
+  )!;
+  const created = await request<{ id: string }>("/tasks", identity, {
+    ...taskInput(sample),
+    customFields: ["  证书编号  ", "可服务时间"],
+  });
+  assert.equal(created.status, 201);
+  const current = async () =>
+    (await workspace(identity)).tasks.find(
+      (task) => task.id === created.data.id,
+    )!;
+  let task = await current();
+  assert.deepEqual(task.customFields, ["证书编号", "可服务时间"]);
+  for (const customFields of [
+    [" "],
+    ["证书编号", " 证书编号 "],
+    ["字".repeat(51)],
+    Array.from({ length: 21 }, (_, i) => `资料${i}`),
+  ]) {
+    assert.equal(
+      (await request("/tasks", identity, { ...taskInput(task), customFields }))
+        .status,
+      400,
+    );
+  }
+  const { customFields: _, ...legacyInput } = taskInput(task);
+  assert.equal(
+    (await request(`/tasks/${task.id}`, identity, legacyInput, "PUT")).status,
+    200,
+  );
+  task = await current();
+  assert.deepEqual(
+    task.customFields,
+    ["证书编号", "可服务时间"],
+    "older editors cannot erase custom requirements",
+  );
+  assert.equal(
+    (
+      await request(
+        `/tasks/${task.id}`,
+        identity,
+        { ...taskInput(task), customFields: ["服务时段"] },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+  task = await current();
+  assert.deepEqual(task.customFields, ["服务时段"]);
+  const copy = await request<{ id: string }>(
+    "/tasks",
+    identity,
+    taskInput(task),
+  );
+  assert.equal(copy.status, 201);
+  assert.deepEqual(
+    (await workspace(identity)).tasks.find((item) => item.id === copy.data.id)!
+      .customFields,
+    ["服务时段"],
+  );
+  assert.equal(
+    (
+      await request(
+        `/tasks/${task.id}`,
+        identity,
+        { ...taskInput(task), customFields: [] },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+  assert.deepEqual((await current()).customFields, []);
+  assert.equal(
+    (
+      await request(
+        `/tasks/${sample.id}`,
+        identity,
+        { ...taskInput(sample), customFields: ["证书编号"] },
+        "PUT",
+      )
+    ).status,
+    409,
+  );
+});
+
 test("location descriptions are optional when publishing and editing published tasks", async () => {
   const identity = await demo();
   const sample = (await workspace(identity)).tasks.find(

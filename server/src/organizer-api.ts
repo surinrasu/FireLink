@@ -20,6 +20,10 @@ import { uploadMedia, validateMedia } from "./organizer-media";
 import { findLocations } from "./organizer-locations";
 import { isCompleteRegion, regionSelection } from "../../shared/regions";
 import {
+  MAX_CUSTOM_FIELDS,
+  MAX_CUSTOM_FIELD_NAME,
+} from "../../shared/custom-fields";
+import {
   completeMap,
   MAX_MAP_ANNOTATIONS,
   MAX_MAP_POINTS,
@@ -179,6 +183,7 @@ function taskDTO(row: Row): OrganizerTask {
     blocks: asJSON(row.blocks),
     requiredFields: asJSON(row.required_fields),
     contactFields: asJSON(row.contact_fields),
+    customFields: asJSON(row.custom_fields),
     updatedAt: String(row.updated_at),
     version: Number(row.version),
     pending: Number(row.pending),
@@ -402,6 +407,20 @@ const taskInput = z
     ownerId: z.string(),
     blocks: z.array(block).max(50),
     requiredFields: z.array(z.enum(shareFields)).max(10),
+    customFields: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1, "请填写自定义资料名称。")
+          .max(MAX_CUSTOM_FIELD_NAME),
+      )
+      .max(MAX_CUSTOM_FIELDS)
+      .refine(
+        (fields) => new Set(fields).size === fields.length,
+        "自定义资料名称不能重复。",
+      )
+      .optional(),
     contactFields: z
       .array(z.enum(["phone", "wechat", "email"]))
       .min(1)
@@ -459,7 +478,7 @@ organizerAPI.post("/tasks", async (c) => {
   const owner = input.ownerId || member.id;
   await c.env.DB.batch([
     c.env.DB.prepare(
-      "INSERT INTO tasks(id,incident_id,organizer_id,title,summary,status,updated_at,blocks,required_fields,contact_fields,publication_status,capacity,starts_at,ends_at,deadline,location,meeting_point,owner_id) VALUES (?,?,?,?,?,'closed',?,?,?,?,'draft',?,?,?,?,?,?,?)",
+      "INSERT INTO tasks(id,incident_id,organizer_id,title,summary,status,updated_at,blocks,required_fields,contact_fields,custom_fields,publication_status,capacity,starts_at,ends_at,deadline,location,meeting_point,owner_id) VALUES (?,?,?,?,?,'closed',?,?,?,?,?,'draft',?,?,?,?,?,?,?)",
     ).bind(
       id,
       input.incidentId,
@@ -470,6 +489,7 @@ organizerAPI.post("/tasks", async (c) => {
       JSON.stringify(input.blocks),
       JSON.stringify(input.requiredFields),
       JSON.stringify(input.contactFields),
+      JSON.stringify(input.customFields ?? []),
       input.capacity,
       input.startsAt,
       input.endsAt,
@@ -515,7 +535,11 @@ organizerAPI.put("/tasks/:id", async (c) => {
     JSON.stringify([...new Set(b)].sort());
   const consentChanged =
     !sameFields(input.requiredFields, asJSON(old.required_fields)) ||
-    !sameFields(input.contactFields, asJSON(old.contact_fields));
+    !sameFields(input.contactFields, asJSON(old.contact_fields)) ||
+    !sameFields(
+      input.customFields ?? asJSON(old.custom_fields),
+      asJSON(old.custom_fields),
+    );
   if (hasApplications && consentChanged)
     deny(409, "已有报名，资料授权要求已锁定。请复制任务设置新的授权要求。");
   if (
@@ -532,7 +556,7 @@ organizerAPI.put("/tasks/:id", async (c) => {
   const now = timestamp();
   const statements = [
     c.env.DB.prepare(
-      "UPDATE tasks SET incident_id=?,title=?,summary=?,blocks=?,required_fields=?,contact_fields=?,capacity=?,starts_at=?,ends_at=?,deadline=?,location=?,meeting_point=?,owner_id=?,updated_at=?,version=version+1 WHERE id=? AND organizer_id=? AND version=? AND (? IS NULL OR (SELECT COUNT(*) FROM applications WHERE task_id=tasks.id AND status='accepted')<=?) AND (?=0 OR NOT EXISTS (SELECT 1 FROM applications WHERE task_id=tasks.id))",
+      "UPDATE tasks SET incident_id=?,title=?,summary=?,blocks=?,required_fields=?,contact_fields=?,custom_fields=?,capacity=?,starts_at=?,ends_at=?,deadline=?,location=?,meeting_point=?,owner_id=?,updated_at=?,version=version+1 WHERE id=? AND organizer_id=? AND version=? AND (? IS NULL OR (SELECT COUNT(*) FROM applications WHERE task_id=tasks.id AND status='accepted')<=?) AND (?=0 OR NOT EXISTS (SELECT 1 FROM applications WHERE task_id=tasks.id))",
     ).bind(
       input.incidentId,
       input.title,
@@ -540,6 +564,7 @@ organizerAPI.put("/tasks/:id", async (c) => {
       JSON.stringify(input.blocks),
       JSON.stringify(input.requiredFields),
       JSON.stringify(input.contactFields),
+      JSON.stringify(input.customFields ?? asJSON(old.custom_fields)),
       input.capacity,
       input.startsAt,
       input.endsAt,

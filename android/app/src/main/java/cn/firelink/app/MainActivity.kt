@@ -811,6 +811,7 @@ fun ApplyScreen(id: String, model: AppModel, onLoaded: () -> Unit = {}, done: ()
     var task by remember { mutableStateOf<RescueTask?>(null) }
     var fields by remember { mutableStateOf(setOf<String>()) }
     var contacts by remember { mutableStateOf(setOf<String>()) }
+    var customAnswers by remember(id) { mutableStateOf(mapOf<String, String>()) }
     var consent by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     LaunchedEffect(task) { if (task != null) onLoaded() }
@@ -859,9 +860,27 @@ fun ApplyScreen(id: String, model: AppModel, onLoaded: () -> Unit = {}, done: ()
                 style = MaterialTheme.typography.bodySmall,
             )
             HorizontalDivider()
+            if (t.customFields.isNotEmpty()) {
+                SectionTitle(strings.getString(R.string.custom_fields))
+                t.customFields.forEach { field ->
+                    OutlinedTextField(
+                        value = customAnswers[field].orEmpty(),
+                        onValueChange = { customAnswers = customAnswers + (field to it) },
+                        label = { Text(field + strings.getString(R.string.required_suffix)) },
+                        placeholder = { Text(strings.getString(R.string.custom_field_answer)) },
+                        supportingText = { Text("${customAnswers[field].orEmpty().length}/1000") },
+                        isError = customAnswers[field].orEmpty().trim().length > 1000,
+                        minLines = 2,
+                        maxLines = 6,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
             CheckRow(strings.getString(R.string.confirm_consent), consent) { consent = it }
             Button(
-                enabled = consent && !busy,
+                enabled = consent && !busy && t.customFields.all {
+                    customAnswers[it].orEmpty().trim().length in 1..1000
+                },
                 onClick = {
                     scope.launch {
                         busy = true
@@ -877,6 +896,9 @@ fun ApplyScreen(id: String, model: AppModel, onLoaded: () -> Unit = {}, done: ()
                                             JsonArray(contacts.map { JsonPrimitive(it) }),
                                         )
                                         put("consentVersion", 1)
+                                        put("customAnswers", buildJsonObject {
+                                            t.customFields.forEach { put(it, customAnswers[it].orEmpty()) }
+                                        })
                                     }
                                     .toString(),
                             )

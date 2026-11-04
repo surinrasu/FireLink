@@ -197,3 +197,6 @@
 
 "select_opportunity" = "選擇義工機會";
 "select_opportunity_hint" = "從列表中選擇事件或任務，查看詳細資料。";
+
+"custom_fields" = "自訂資料";
+"custom_field_answer" = "請填寫，最多 1000 字";

@@ -77,6 +77,93 @@ const cases: Record<
   string,
   (page: Page, context: BrowserContext) => Promise<void>
 > = {
+  "custom-requirements": async (page) => {
+    await page.goto(`${base}#/tasks/new`);
+    await confirmInitialIncident(page);
+    assert.deepEqual(
+      await page.locator(".requirement-label").allTextContents(),
+      ["身份信息", "个人情况", "资质与资源", "联系方式", "自定义资料"],
+    );
+    await page.getByLabel("任务标题", { exact: true }).fill("自定义资料验证");
+    const add = page.getByRole("button", { name: "添加项目", exact: true });
+    await add.click();
+    const fields = page.locator("#custom-fields input");
+    assert.equal(
+      await fields
+        .first()
+        .evaluate((field) => field === document.activeElement),
+      true,
+    );
+    await fields.nth(0).fill("证书编号");
+    await add.click();
+    await fields.nth(1).fill(" 证书编号 ");
+    assert.equal(
+      await fields
+        .nth(1)
+        .evaluate((field: HTMLInputElement) => field.checkValidity()),
+      false,
+    );
+    await fields.nth(1).fill("可服务时间");
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await page.goto(`${base}#/tasks`);
+    await page
+      .locator(".task-card")
+      .filter({ hasText: "自定义资料验证" })
+      .getByRole("link", { name: "继续编辑", exact: true })
+      .click();
+    await fields.first().waitFor();
+    assert.deepEqual(
+      await fields.evaluateAll((inputs) =>
+        inputs.map((field) => (field as HTMLInputElement).value),
+      ),
+      ["证书编号", "可服务时间"],
+    );
+    await fields.nth(0).fill("急救证书编号");
+    await page
+      .getByRole("button", { name: "删除自定义资料：可服务时间", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保存草稿", exact: true }).click();
+    await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
+    await page.reload();
+    await fields.first().waitFor();
+    assert.deepEqual(
+      await fields.evaluateAll((inputs) =>
+        inputs.map((field) => (field as HTMLInputElement).value),
+      ),
+      ["急救证书编号"],
+    );
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/custom-requirements-desktop.png",
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await fields.first().focus();
+    await page.waitForFunction(() => {
+      const input = document
+        .querySelector("#custom-fields input")!
+        .getBoundingClientRect();
+      return (
+        input.top >= 0 &&
+        input.bottom <
+          document.querySelector(".editor-footer")!.getBoundingClientRect().top
+      );
+    });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.screenshot({
+      path: "../.artifacts/organizer/ux/custom-requirements-mobile.png",
+    });
+    const scan = await new AxeBuilder({ page })
+      .include("#required-fields")
+      .analyze();
+    assert.deepEqual(scan.violations, []);
+  },
   "component-consistency": async (page) => {
     const appearance = (selector: string, colors = false) =>
       page

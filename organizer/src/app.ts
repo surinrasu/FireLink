@@ -503,8 +503,10 @@ function taskDetail(task: OrganizerTask, tab: string) {
           ["任务负责人", task.ownerName],
           [
             "必需资料",
-            task.requiredFields.map((f) => fieldLabels[f] || f).join("、") ||
-              "未设置",
+            [
+              ...task.requiredFields.map((f) => fieldLabels[f] || f),
+              ...(task.customFields ?? []),
+            ].join("、") || "未设置",
           ],
           [
             "通过后开放",
@@ -558,6 +560,13 @@ function applicationDetail(item: OrganizerApplication, back: string) {
     .map(
       ([key, value]) =>
         `<div class="profile-item ${["equipment", "skills", "body"].includes(key) ? "wide" : ""}"><dt>${fieldLabels[key]}</dt><dd>${profileValue(key, value)}</dd></div>`,
+    )
+    .join("")}${Object.entries(
+    (item.profile.customFields || {}) as Record<string, string>,
+  )
+    .map(
+      ([label, value]) =>
+        `<div class="profile-item wide"><dt>${h(label)}</dt><dd>${h(value)}</dd></div>`,
     )
     .join("")}</dl><hr class="section-divider"><h3>联系方式</h3>${
     item.contacts

@@ -342,6 +342,7 @@ app.get("/v1/tasks/:id", async (c) => {
     blocks: volunteerTaskBlocks(row, c.get("language")),
     requiredFields: asJSON(row.required_fields),
     contactFields: asJSON(row.contact_fields),
+    customFields: asJSON(row.custom_fields),
   });
 });
 app.get("/v1/articles", async (c) =>
@@ -524,6 +525,23 @@ app.post("/v1/applications", async (c) => {
     fail(409, "applications_closed");
   const required = asJSON<string[]>(row.required_fields),
     contacts = asJSON<string[]>(row.contact_fields);
+  const customFields = asJSON<string[]>(row.custom_fields);
+  const missingCustom = customFields.filter(
+    (field) =>
+      !Object.hasOwn(choice.customAnswers, field) ||
+      !choice.customAnswers[field],
+  );
+  if (missingCustom.length)
+    return c.json(
+      {
+        error: fieldError(
+          c.get("language"),
+          "incomplete_profile",
+          missingCustom,
+        ),
+      },
+      400,
+    );
   const missingConsent = [
     ...required.filter(
       (f) => !choice.fields.includes(f as (typeof choice.fields)[number]),
@@ -588,6 +606,10 @@ app.post("/v1/applications", async (c) => {
     const v = all[f];
     profileSnapshot[f] = v;
   }
+  if (customFields.length)
+    profileSnapshot.customFields = Object.fromEntries(
+      customFields.map((field) => [field, choice.customAnswers[field]]),
+    );
   for (const f of choice.contactFields) {
     contactSnapshot[f] = p.contacts[f];
   }

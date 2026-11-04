@@ -364,6 +364,7 @@ struct ApplyView: View {
   @Environment(\.dismiss) var dismiss
   @State var fields: Set<String> = []
   @State var contacts: Set<String> = []
+  @State private var customAnswers: [String: String] = [:]
   @State var consent = false
   @State var busy = false
   @State var failure: String?
@@ -401,12 +402,15 @@ struct ApplyView: View {
       } footer: {
         Text(L10n.text("contact_consent_hint"))
       }
+      if let customFields = task.customFields, !customFields.isEmpty {
+        CustomApplicationFields(fields: customFields, answers: $customAnswers)
+      }
       Section { Toggle(L10n.text("confirm_consent"), isOn: $consent) }
       if let failure { Section { Text(failure).foregroundStyle(.red) } }
       Section {
         Button(busy ? L10n.text("submitting") : L10n.text("confirm_application")) {
           Task { await submit() }
-        }.disabled(!consent || busy)
+        }.disabled(!canSubmit)
       }
     }.navigationTitle(L10n.text("application_consent")).toolbar {
       ToolbarItem(placement: .cancellationAction) { Button(L10n.text("cancel")) { dismiss() } }
@@ -415,6 +419,13 @@ struct ApplyView: View {
       fields = Set(task.requiredFields)
       contacts = Set(task.contactFields)
     }
+  }
+  private var canSubmit: Bool {
+    consent && !busy
+      && (task.customFields ?? []).allSatisfy {
+        let answer = customAnswers[$0, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+        return !answer.isEmpty && answer.utf16.count <= 1000
+      }
   }
   func selection(_ key: String, in binding: Binding<Set<String>>) -> Binding<Bool> {
     Binding(
@@ -430,9 +441,36 @@ struct ApplyView: View {
         body: [
           "taskId": task.id, "fields": Array(fields), "contactFields": Array(contacts),
           "consentVersion": 1,
+          "customAnswers": customAnswers,
         ])
       try await model.refreshPrivate()
       dismiss()
     } catch { failure = error.localizedDescription }
+  }
+}
+
+private struct CustomApplicationFields: View {
+  let fields: [String]
+  @Binding var answers: [String: String]
+
+  var body: some View {
+    Section(L10n.text("custom_fields")) {
+      ForEach(fields, id: \.self) { field in
+        VStack(alignment: .leading) {
+          Text(field + L10n.text("required_suffix"))
+          TextField(
+            L10n.text("custom_field_answer"),
+            text: Binding(
+              get: { answers[field, default: ""] },
+              set: { answers[field] = $0 }
+            ), axis: .vertical
+          )
+          .lineLimit(2...6)
+          .accessibilityLabel(field + L10n.text("required_suffix"))
+          Text("\(answers[field, default: ""].utf16.count)/1000")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    }
   }
 }

@@ -197,3 +197,6 @@
 
 "select_opportunity" = "Choose an opportunity";
 "select_opportunity_hint" = "Select an incident or task to see its details.";
+
+"custom_fields" = "Custom information";
+"custom_field_answer" = "Enter up to 1000 characters";
