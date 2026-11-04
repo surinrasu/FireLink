@@ -37,21 +37,21 @@ const actions=[
  '停留在居中显示 FireLink 的结束页，致谢并等待提问。进入答辩时按 O 打开目录，选择对应备查页；右方向键在主体末页会停止。'
 ];
 const cautions={
-  3:'若被追问完整 UX Manual：原始简报列出该项要求，但本次没有收到完整手册。当前按简报的可用性与可靠性原则落实，后续可拿到手册后逐条核对。',
-  4:'若被追问调研方法：当前材料来自课程简报、双角色任务分析、原型与设计评审。没有提供正式访谈、问卷或用户实验结果，因此三类问题应称为设计假设。',
-  5:'若被追问为何不做现场调度：这是主动范围选择。组织已有渠道与现场方案，FireLink 专注招募与匹配，在可信交接处完成服务。不要把交接后的工作描述成待补功能。',
+  3:'若被问及 UX Manual：目前能够提供的依据是课程简报和实现材料，尚未取得完整手册，因此不能宣称完成其全部条目的核对。',
+  4:'这三类问题来自课程情境和双角色任务分析，是待验证的设计假设。没有正式访谈、问卷和用户实验结果时，不将其表述为已证实的用户痛点。',
+  5:'若被问及现场调度：说明本次原型专注外围支援的招募、审核与授权联系，后续现场工作仍需专业组织和现有机制负责。',
   12:'事件、组织和人员均是合成演练数据，地理底图是位置说明，不对应真实灾情。',
   16:'技能、装备与身份资料辅助组织者判断，不能把系统中的审核通过说成专业资质认证或火场准入。',
   18:'这些移动端图像来自仓库已有演示场景；它们展示相同产品流程，与本轮组织者演练截图不是同一组事件数据。',
   19:'已通过者的安排变化由组织通过既有渠道确认。当前实现对待审核申请发送任务更新通知；不要说成所有后续变化都由系统触达已通过者。',
-  21:'现有设计评审属于专家与工程检查。引用时说明具体检查对象，不说成真实用户实验。',
-  23:'49 项来自 server/test/organizer.test.ts 和 api.test.ts，4 项来自 organizer/test/theme.test.ts。自定义资料界面的检查来自 organizer/test/ux-browser.ts 的 custom-requirements 场景。通过范围是这些本地检查，不等同全部无障碍认证、真实灾害现场验证或完整产品认证。',
+  21:'现有材料包括设计评审和工程检查，不包含正式的目标用户可用性实验。说明检查范围和局限即可。',
+  23:'49 项对应 server/test/organizer.test.ts 与 api.test.ts 的相关测试；4 项对应 organizer/test/theme.test.ts。自定义资料的界面检查来自 organizer/test/ux-browser.ts。以上结果仅代表本地指定场景，不构成完整无障碍认证或真实灾害现场验证。',
   24:'试点、样本人数、机构合作与商业模式是下一步方案。没有真实合作与收入数据时，不增加客户、报价或效率提升百分比。'
 };
 let elapsed=0;
 const main=deck.slides.slice(0,deck.mainCount).map((s,i)=>{
  const start=elapsed;elapsed+=s.time;
- return `<section class="note" id="slide-${i+1}"><div class="note-top"><span>第 ${String(i+1).padStart(2,'0')} 页</span><span>${mmss(start)}–${mmss(elapsed)}　约 ${s.time} 秒</span></div><h2>${esc(s.title.zh).replaceAll('\n','')}</h2><div class="operation"><h3>操作</h3><p>${esc(actions[i])}</p></div><h3>照着讲</h3><p class="speech">${esc(s.notes)}</p>${cautions[i+1]?`<details><summary>答辩时可补充</summary><p>${esc(cautions[i+1])}</p></details>`:''}</section>`;
+ return `<section class="note" id="slide-${i+1}"><div class="note-top"><span>第 ${String(i+1).padStart(2,'0')} 页</span><span>${mmss(start)}–${mmss(elapsed)}　约 ${s.time} 秒</span></div><h2>${esc(s.title.zh).replaceAll('\n','')}</h2><div class="operation"><h3>操作</h3><p>${esc(actions[i])}</p></div><h3>讲述参考</h3><p class="speech">${esc(s.notes)}</p>${cautions[i+1]?`<details><summary>答辩时可补充</summary><p>${esc(cautions[i+1])}</p></details>`:''}</section>`;
 }).join('');
 const appendix=deck.slides.slice(deck.mainCount).map((s,i)=>`<section class="note appendix"><div class="note-top"><span>备查 A${i+1}　幻灯片第 ${i+deck.mainCount+1} 页</span><span>按需使用</span></div><h2>${esc(s.title.zh).replace('备查｜','')}</h2><div class="operation"><h3>操作</h3><p>按 O 打开目录，搜索“${esc(s.title.zh.replace('备查｜','').slice(0,6))}”或直接选备查 A${i+1}。关闭目录后讲解；需要回结论时再按 O，选择第 25 页。</p></div><h3>回答要点</h3><p class="speech">${esc(s.notes)}</p></section>`).join('');
 const html=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FireLink 结题演讲稿与操作提示</title><style>
