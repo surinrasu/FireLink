@@ -293,8 +293,10 @@ app.get("/v1/incidents", async (c) => {
   const visibility = taskVisibility(c);
   const incidents = (
     await c.env.DB.prepare(
-      "SELECT id,title,region,latitude,longitude,status,updated_at AS updatedAt FROM incidents ORDER BY updated_at DESC,id",
-    ).all()
+      "SELECT id,title,region,latitude,longitude,status,updated_at AS updatedAt FROM incidents WHERE demo_organization_id IS ? ORDER BY updated_at DESC,id",
+    )
+      .bind(c.get("demoOrganization") ?? null)
+      .all()
   ).results;
   const tasks = (
     await c.env.DB.prepare(

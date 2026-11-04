@@ -140,6 +140,7 @@ try {
     .getByRole("link", { name: "新建任务", exact: true })
     .last()
     .click();
+  await page.locator('.task-picker-option[aria-pressed="true"]').click();
   await page
     .getByLabel("任务标题", { exact: true })
     .fill("浏览器验证 · 社区物资整理");
@@ -214,17 +215,13 @@ try {
     .getByLabel("密码（至少 12 个字符）", { exact: true })
     .fill("browser-test-password-2026");
   await reviewer.getByRole("button", { name: "接受邀请并进入" }).click();
-  await reviewer
-    .getByRole("heading", { name: "开始", exact: true })
-    .waitFor();
+  await reviewer.getByRole("heading", { name: "开始", exact: true }).waitFor();
   assert.equal(
     await reviewer.getByRole("link", { name: "新建任务", exact: true }).count(),
     0,
   );
   await reviewer.locator('.sidebar a[href="#/tasks"]').click();
-  await reviewer
-    .getByRole("heading", { name: "任务", exact: true })
-    .waitFor();
+  await reviewer.getByRole("heading", { name: "任务", exact: true }).waitFor();
   assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
     "物资运输协助",
   ]);
@@ -243,9 +240,7 @@ try {
     .getByLabel("密码", { exact: true })
     .fill("browser-test-password-2026");
   await reviewer.getByRole("button", { name: "登录工作台" }).click();
-  await reviewer
-    .getByRole("heading", { name: "开始", exact: true })
-    .waitFor();
+  await reviewer.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.reload();
   await page
@@ -284,9 +279,7 @@ try {
   );
   await reviewer.reload();
   await reviewer.locator('.sidebar a[href="#/tasks"]').click();
-  await reviewer
-    .getByRole("heading", { name: "任务", exact: true })
-    .waitFor();
+  await reviewer.getByRole("heading", { name: "任务", exact: true }).waitFor();
   assert.deepEqual(await reviewer.locator(".task-card h2").allTextContents(), [
     "安置点物资整理",
   ]);

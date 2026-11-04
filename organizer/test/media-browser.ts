@@ -38,7 +38,7 @@ try {
     /noindex/,
   );
   assert.match(
-    await (await context.request.get(`${url}/robots.txt`)).text(),
+    await (await context.request.get(new URL("/robots.txt", url).href)).text(),
     /Disallow: \//,
   );
   await page
@@ -46,6 +46,7 @@ try {
     .click();
   await page.getByRole("heading", { name: "开始", exact: true }).waitFor();
   await page.goto(`${url}/#/tasks/new`);
+  await page.locator('.task-picker-option[aria-pressed="true"]').click();
   await page.getByLabel("任务标题", { exact: true }).fill("地图与附件验证");
   await page.locator("#incidentId-picker").click();
   await page.locator(".task-picker-list button").first().click();
@@ -55,20 +56,19 @@ try {
   await page.getByRole("button", { name: "添加地图", exact: true }).click();
   const map = page.locator("#blocks firelink-map");
   await map.locator(".leaflet-container").waitFor();
-  assert.equal(await page.getByLabel("纬度", { exact: true }).inputValue(), "");
+  assert.equal(await page.getByLabel("纬度", { exact: true }).count(), 0);
   assert.equal(await map.locator(".location-marker").count(), 0);
   await map.locator(".canvas").click({ position: { x: 230, y: 140 } });
-  const latitude = await page.getByLabel("纬度", { exact: true }).inputValue();
+  const latitude = await map.getAttribute("latitude");
   assert.ok(Number(latitude) > 20 && Number(latitude) < 40);
   assert.equal(await map.locator(".location-marker").count(), 1);
-  const markerBefore = await map
-    .locator(".location-marker")
-    .getAttribute("style");
-  await map.locator(".precise summary").click();
-  await page.getByLabel("纬度", { exact: true }).fill("30.275");
-  await map.getByRole("button", { name: "更新所选点", exact: true }).click();
-  assert.equal(await map.getAttribute("latitude"), "30.275");
-  assert.ok(markerBefore);
+  const marker = (await map.locator(".location-marker").boundingBox())!;
+  await page.mouse.move(marker.x + 12, marker.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(marker.x + 40, marker.y + 30, { steps: 8 });
+  await page.mouse.up();
+  const savedLatitude = Number(await map.getAttribute("latitude"));
+  assert.notEqual(savedLatitude, Number(latitude));
   await page
     .locator("#live-preview firelink-map")
     .evaluate(
@@ -140,11 +140,11 @@ try {
   await page.getByRole("button", { name: "保存草稿", exact: true }).click();
   await page.locator("#save-status").filter({ hasText: "已保存" }).waitFor();
   const session = await (
-    await context.request.get(`${url}/api/organizer/auth/session`)
+    await context.request.get(new URL("/api/organizer/auth/session", url).href)
   ).json();
   const org = session.memberships[0].organizationId;
   const ws = await (
-    await context.request.get(`${url}/api/organizer/workspace`, {
+    await context.request.get(new URL("/api/organizer/workspace", url).href, {
       headers: { "X-Organization-Id": org },
     })
   ).json();
@@ -154,7 +154,7 @@ try {
   assert.ok(task);
   assert.equal(
     task.blocks.find((b: { type: string }) => b.type === "map").latitude,
-    30.275,
+    savedLatitude,
   );
   assert.ok(
     task.blocks
@@ -173,16 +173,12 @@ try {
   await page.locator("#task-form").waitFor();
   await page.locator("#task-details > summary").click();
   await map.getByRole("button", { name: "位置 1", exact: true }).click();
-  await map.locator(".precise summary").click();
-  assert.equal(
-    await page.getByLabel("纬度", { exact: true }).inputValue(),
-    "30.275",
-  );
+  assert.equal(Number(await map.getAttribute("latitude")), savedLatitude);
   assert.equal(await page.locator(".media-upload-preview img").count(), 1);
   assert.equal(await page.locator(".media-upload-preview video").count(), 1);
   for (const width of [320, 390, 834, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
-    await page.getByLabel("纬度", { exact: true }).focus();
+    await map.getByRole("searchbox", { name: "搜索地址" }).focus();
     assert.ok(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth + 1,

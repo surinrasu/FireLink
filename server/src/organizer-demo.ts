@@ -52,6 +52,24 @@ export async function seedDemoWorkspace(db: D1Database) {
       .prepare("INSERT INTO organization_members VALUES (?,?,?,'admin',1,1)")
       .bind(memberId, orgId, accountId),
   ];
+  for (const incident of fixture.incidents) {
+    statements.push(
+      db
+        .prepare(
+          "INSERT INTO incidents(id,title,region,latitude,longitude,status,updated_at,demo_organization_id) VALUES (?,?,?,?,?,?,?,?)",
+        )
+        .bind(
+          `${orgId}:${incident.id}`,
+          incident.title,
+          incident.region,
+          incident.latitude,
+          incident.longitude,
+          incident.status,
+          incident.updatedAt,
+          orgId,
+        ),
+    );
+  }
   const records = [
     { source: 0, title: "安置点物资整理", state: "open", capacity: 8, days: 3 },
     { source: 1, title: "物资运输协助", state: "open", capacity: 4, days: 4 },
@@ -88,7 +106,7 @@ export async function seedDemoWorkspace(db: D1Database) {
         )
         .bind(
           taskIds[index],
-          task.incidentId,
+          `${orgId}:${task.incidentId}`,
           orgId,
           record.title,
           task.summary,

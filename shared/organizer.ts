@@ -101,9 +101,11 @@ export interface Incident {
   id: string;
   title: string;
   region: string;
+  address: string;
   latitude: number;
   longitude: number;
   status: string;
+  version: number;
 }
 export interface Member {
   id: string;
