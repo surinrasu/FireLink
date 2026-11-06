@@ -24,8 +24,8 @@
 
 PR 最初修改的是**生成源文件**。合并时已按演讲者确认的 `034a36d` 重建离线演示、独立讲稿、中英文幻灯片 PDF、讲稿 PDF 与下载包，并导出仅含小标题和讲述正文的 Markdown 演讲稿。修改后的源文件有：
 
-- `presentation/final/content.js`：中英文标题、少量说明文字、中文逐页讲述（`notes`）。
-- `presentation/final/speaker-script.mjs`：讲稿生成器的标签及答辩提示。
+- `presentation/final/content.ts`：中英文标题、少量说明文字、中文逐页讲述（`notes`）。
+- `presentation/final/speaker-script.ts`：讲稿生成器的标签及答辩提示。
 
 请先在仓库根目录运行：
 

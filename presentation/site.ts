@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildFinalApp } from "./final/bundle.ts";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const urls = (html: string, prefix: string) =>
@@ -60,13 +61,12 @@ export async function buildPresentations(siteRoot: string) {
   );
   for (const name of [
     "style.css",
-    "content.js",
-    "app.js",
     "FireLink-结题汇报.pdf",
     "FireLink-Final-Review-English.pdf",
     "FireLink-结题材料.zip",
   ])
     await cp(path.join(root, "final", name), path.join(final, name));
+  await writeFile(path.join(final, "app.js"), await buildFinalApp());
   for (const name of await readdir(path.join(root, "final/assets"))) {
     if (/\.(webp|svg)$/.test(name))
       await cp(

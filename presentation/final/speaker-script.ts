@@ -1,13 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import vm from 'node:vm';
+import { deck } from './content.ts';
 const root=path.dirname(fileURLToPath(import.meta.url));
-const context={window:{}};
-vm.runInNewContext(await readFile(path.join(root,'content.js'),'utf8'),context);
-const deck=context.window.FIRELINK_DECK;
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const mmss=s=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+const entities: Record<string, string> = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+const esc=(s: unknown)=>String(s).replace(/[&<>"']/g,c=>entities[c]);
+const mmss=(s: number)=>`${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 const actions=[
  '上台前打开封面，按 D 选择深浅色，按 F 隐藏底栏。开始讲述时看向听众，介绍两位成员。讲完按右方向键。',
  '保持整页显示，依次指向“需求说清楚”“匹配有依据”“联系有边界”。末句强调通过后的交接，再翻页。',
@@ -36,7 +34,7 @@ const actions=[
  '看向听众，慢一点讲总结。讲完按右方向键，进入 FireLink 结束页。',
  '停留在居中显示 FireLink 的结束页，致谢并等待提问。进入答辩时按 O 打开目录，选择对应备查页；右方向键在主体末页会停止。'
 ];
-const cautions={
+const cautions: Record<number, string>={
   3:'若被问及 UX Manual：目前能够提供的依据是课程简报和实现材料，尚未取得完整手册，因此不能宣称完成其全部条目的核对。',
   4:'这三类问题来自课程情境和双角色任务分析，是待验证的设计假设。没有正式访谈、问卷和用户实验结果时，不将其表述为已证实的用户痛点。',
   5:'若被问及现场调度：说明本次原型专注外围支援的招募、审核与授权联系，后续现场工作仍需专业组织和现有机制负责。',
@@ -50,7 +48,7 @@ const cautions={
 };
 let elapsed=0;
 const main=deck.slides.slice(0,deck.mainCount).map((s,i)=>{
- const start=elapsed;elapsed+=s.time;
+ const start=elapsed;elapsed+=s.time ?? 0;
  return `<section class="note" id="slide-${i+1}"><div class="note-top"><span>第 ${String(i+1).padStart(2,'0')} 页</span><span>${mmss(start)}–${mmss(elapsed)}　约 ${s.time} 秒</span></div><h2>${esc(s.title.zh).replaceAll('\n','')}</h2><div class="operation"><h3>操作</h3><p>${esc(actions[i])}</p></div><h3>讲述参考</h3><p class="speech">${esc(s.notes)}</p>${cautions[i+1]?`<details><summary>答辩时可补充</summary><p>${esc(cautions[i+1])}</p></details>`:''}</section>`;
 }).join('');
 const appendix=deck.slides.slice(deck.mainCount).map((s,i)=>`<section class="note appendix"><div class="note-top"><span>备查 A${i+1}　幻灯片第 ${i+deck.mainCount+1} 页</span><span>按需使用</span></div><h2>${esc(s.title.zh).replace('备查｜','')}</h2><div class="operation"><h3>操作</h3><p>按 O 打开目录，搜索“${esc(s.title.zh.replace('备查｜','').slice(0,6))}”或直接选备查 A${i+1}。关闭目录后讲解；需要回结论时再按 O，选择第 25 页。</p></div><h3>回答要点</h3><p class="speech">${esc(s.notes)}</p></section>`).join('');

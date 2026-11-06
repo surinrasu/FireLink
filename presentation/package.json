@@ -5,8 +5,9 @@
   "packageManager": "bun@1.4.3",
   "scripts": {
     "proposal": "bun run --cwd proposal start",
-    "final": "bun final/serve.mjs",
-    "final:build": "bun final/build.mjs && bun final/speaker-script.mjs",
+    "final": "bun final/serve.ts",
+    "final:build": "bun final/build.ts && bun final/speaker-script.ts",
+    "final:check": "bun run --bun ./proposal/node_modules/typescript/bin/tsc --noEmit -p final/tsconfig.json && bun run --bun ./proposal/node_modules/typescript/bin/tsc --noEmit -p final/tsconfig.browser.json",
     "start": "bun run proposal",
     "serve": "bun run --cwd proposal serve",
     "test": "bun run --cwd proposal test",
@@ -15,6 +16,6 @@
     "screenshots": "bun run --cwd proposal screenshots",
     "screenshots:update": "bun run --cwd proposal screenshots:update",
     "doctor": "bun run --cwd proposal doctor",
-    "check": "bun run --cwd proposal check"
+    "check": "bun run --cwd proposal check && bun run final:check"
   }
 }

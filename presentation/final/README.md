@@ -27,7 +27,7 @@
 mise run presentation:final
 ```
 
-打开 <http://127.0.0.1:4173>。此命令使用项目固定的 Bun 版本提供静态文件，按 `Ctrl+C` 结束。也可在 `presentation` 目录执行 `bun run final`，或在本目录执行 `bun serve.mjs`。
+打开 <http://127.0.0.1:4173>。此命令使用项目固定的 Bun 版本提供静态文件，按 `Ctrl+C` 结束。也可在 `presentation` 目录执行 `bun run final`，或在本目录执行 `bun serve.ts`。
 
 | 操作 | 快捷键或入口 |
 | --- | --- |
@@ -50,12 +50,12 @@ mise run presentation:final
 
 | 源文件 | 编辑内容 |
 | --- | --- |
-| [content.js](content.js) | 中英文文案、页面结构、图片名、逐页中文讲述 `notes` 与建议时长 `time` |
+| [content.ts](content.ts) | 中英文文案、页面结构、图片名、逐页中文讲述 `notes` 与建议时长 `time` |
 | [style.css](style.css) | 演示样式、手机重排、打印排版 |
-| [app.js](app.js) | 翻页、目录、语言切换、弹窗与快捷键 |
-| [index.html](index.html) | 开发版页面骨架，配合同目录样式、脚本及 `assets/` 使用 |
+| [app.ts](app.ts) | 翻页、目录、语言切换、弹窗与快捷键 |
+| [index.html](index.html) | 开发版页面骨架，通过本地预览服务器加载 TypeScript 构建的脚本及 `assets/` |
 | [assets/](assets/) | 静态界面截图与标志 |
-| [speaker-script.mjs](speaker-script.mjs) | 独立讲稿生成器，`actions` 为逐页操作，`cautions` 为答辩补充提示 |
+| [speaker-script.ts](speaker-script.ts) | 独立讲稿生成器，`actions` 为逐页操作，`cautions` 为答辩补充提示 |
 
 修改源文件后，从仓库根目录执行：
 
@@ -63,7 +63,9 @@ mise run presentation:final
 mise run presentation:build
 ```
 
-此任务使用 Bun 依次生成离线演示 HTML、独立讲稿 HTML 和 Markdown，无需安装第三方依赖。单独使用本目录时，运行 `bun build.mjs` 和 `bun speaker-script.mjs`。直接修改生成后的 HTML 或 Markdown 会在下次重建时被覆盖。更新图片时，保持 `content.js` 中的文件名与 `assets/` 一致。
+此任务使用 Bun 将 TypeScript 打包为浏览器脚本，依次生成离线演示 HTML、独立讲稿 HTML 和 Markdown，无需安装第三方运行时依赖。单独使用本目录时，运行 `bun build.ts` 和 `bun speaker-script.ts`。直接修改生成后的 HTML 或 Markdown 会在下次重建时被覆盖。更新图片时，保持 `content.ts` 中的文件名与 `assets/` 一致。
+
+执行 `mise run check:presentation` 会检查开题与结题演示的 TypeScript 类型，并运行演示测试。结题演示与开题演示共用 `proposal/` 中锁定的 TypeScript 和类型依赖，可通过 `mise run presentation:install` 安装。
 
 PDF 需在 HTML 重建后重新导出：打开演示，选好语言后按 `P`，保存为对应 PDF，保留背景图形并关闭浏览器页眉页脚；讲稿使用其“打印讲稿”按钮。重建任务不会自动更新 PDF。
 

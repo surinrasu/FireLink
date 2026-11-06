@@ -1,0 +1,7 @@
+{
+  "extends": "../proposal/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../proposal/node_modules/@types"]
+  },
+  "include": ["build.ts", "bundle.ts", "content.ts", "serve.ts", "speaker-script.ts", "types.ts"]
+}

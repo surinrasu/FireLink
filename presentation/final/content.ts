@@ -1,6 +1,7 @@
 /* Bilingual, audience-facing deck content. No runtime or network dependencies. */
-const B = (zh, en) => ({ zh, en });
-window.FIRELINK_DECK = {
+import type { Bilingual, Deck } from './types.ts';
+const B = (zh: string, en: string): Bilingual => ({ zh, en });
+export const deck: Deck = {
   title: B('FireLink　课程结题汇报', 'FireLink　Final Design Review'),
   authors: '邓雪意 24168119　朱禹杭 24168202',
   date: '2026.11',
