@@ -43,90 +43,96 @@ fun NotificationHistoryScreen(model: AppModel, go: (String) -> Unit, login: () -
         }
         return
     }
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(enabled = !loading, onClick = { scope.launch { reload() } }) {
-                    Icon(Icons.Outlined.Refresh, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (loading) strings.getString(R.string.refreshing)
-                        else strings.getString(R.string.refresh)
-                    )
+    ReadingColumn(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(enabled = !loading, onClick = { scope.launch { reload() } }) {
+                        Icon(Icons.Outlined.Refresh, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (loading) strings.getString(R.string.refreshing)
+                            else strings.getString(R.string.refresh)
+                        )
+                    }
                 }
             }
-        }
-        if (loading && model.notifications.isEmpty()) item { CircularProgressIndicator() }
-        if (!loading && model.notifications.isEmpty())
-            item {
-                if (failed)
-                    EmptyState(
-                        strings.getString(R.string.notifications_failed),
-                        strings.getString(R.string.tap_refresh_retry),
-                    )
-                else
-                    EmptyState(
-                        strings.getString(R.string.no_notifications),
-                        strings.getString(R.string.no_notifications_hint),
-                    )
-            }
-        items(model.notifications, key = { it.id }) { notice ->
-            Card(
-                onClick = {
-                    scope.launch {
-                        opening = notice.id
-                        try {
-                            model.markNotificationRead(notice.id)
-                            if (notice.applicationId != null) go("history")
-                        } catch (e: Exception) {
-                            model.report(e)
-                        } finally {
-                            opening = null
+            if (loading && model.notifications.isEmpty()) item { CircularProgressIndicator() }
+            if (!loading && model.notifications.isEmpty())
+                item {
+                    if (failed)
+                        EmptyState(
+                            strings.getString(R.string.notifications_failed),
+                            strings.getString(R.string.tap_refresh_retry),
+                        )
+                    else
+                        EmptyState(
+                            strings.getString(R.string.no_notifications),
+                            strings.getString(R.string.no_notifications_hint),
+                        )
+                }
+            items(model.notifications, key = { it.id }) { notice ->
+                Card(
+                    onClick = {
+                        scope.launch {
+                            opening = notice.id
+                            try {
+                                model.markNotificationRead(notice.id)
+                                if (notice.applicationId != null) go("history")
+                            } catch (e: Exception) {
+                                model.report(e)
+                            } finally {
+                                opening = null
+                            }
                         }
-                    }
-                },
-                enabled = opening == null,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    },
+                    enabled = opening == null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Icon(
-                            Icons.Outlined.Notifications,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            notice.title,
-                            Modifier.weight(1f),
-                            fontWeight =
-                                if (notice.readAt == null) FontWeight.Bold else FontWeight.Medium,
-                        )
-                        if (notice.readAt == null)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Notifications,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
                             Text(
-                                strings.getString(R.string.unread),
-                                style = MaterialTheme.typography.labelSmall,
+                                notice.title,
+                                Modifier.weight(1f),
+                                fontWeight =
+                                    if (notice.readAt == null) FontWeight.Bold
+                                    else FontWeight.Medium,
+                            )
+                            if (notice.readAt == null)
+                                Text(
+                                    strings.getString(R.string.unread),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                        }
+                        Text(notice.body)
+                        Text(
+                            displayTime(notice.createdAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (notice.applicationId != null)
+                            Text(
+                                strings.getString(R.string.view_applications),
+                                style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                     }
-                    Text(notice.body)
-                    Text(
-                        displayTime(notice.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (notice.applicationId != null)
-                        Text(
-                            strings.getString(R.string.view_applications),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
                 }
             }
         }

@@ -206,4 +206,5 @@
     <string name="enter_demo_client">"Enter demo client"</string>
     <string name="custom_fields">"Custom information"</string>
     <string name="custom_field_answer">"Enter up to 1000 characters"</string>
+    <string name="select_incident">Choose an incident to see its volunteer opportunities.</string>
 </resources>

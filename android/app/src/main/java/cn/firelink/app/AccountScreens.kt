@@ -27,8 +27,10 @@ fun LoginScreen(model: AppModel, demoDone: () -> Unit, done: () -> Unit) {
     val strings = localizedResources()
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
-    var challenge by remember { mutableStateOf<SMSResult?>(null) }
-    var registration by remember { mutableStateOf<String?>(null) }
+    var challenge by rememberSaveable(stateSaver = jsonSaver<SMSResult?>()) {
+        mutableStateOf<SMSResult?>(null)
+    }
+    var registration by rememberSaveable { mutableStateOf<String?>(null) }
     var realName by rememberSaveable { mutableStateOf("") }
     var idNumber by rememberSaveable { mutableStateOf("") }
     var consent by rememberSaveable { mutableStateOf(false) }
@@ -286,7 +288,7 @@ fun NavigationRow(title: String, description: String, onClick: () -> Unit) {
 @Composable
 fun ProfileScreen(model: AppModel, initial: Profile) {
     val strings = localizedResources()
-    var p by remember {
+    var p by rememberSaveable(initial.id, stateSaver = jsonSaver<Profile>()) {
         mutableStateOf(
             initial.copy(
                 equipmentDescription =
@@ -296,9 +298,9 @@ fun ProfileScreen(model: AppModel, initial: Profile) {
             )
         )
     }
-    var verify by remember { mutableStateOf(false) }
-    var realName by remember { mutableStateOf("") }
-    var idNumber by remember { mutableStateOf("") }
+    var verify by rememberSaveable { mutableStateOf(false) }
+    var realName by rememberSaveable { mutableStateOf("") }
+    var idNumber by rememberSaveable { mutableStateOf("") }
     var verifying by remember { mutableStateOf(false) }
     var verifyError by remember { mutableStateOf<String?>(null) }
     val notify = rememberAuthNotification()

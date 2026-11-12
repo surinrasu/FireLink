@@ -206,4 +206,5 @@
     <string name="enter_demo_client">"进入演示客户端"</string>
     <string name="custom_fields">"自定义资料"</string>
     <string name="custom_field_answer">"请填写，最多 1000 字"</string>
+    <string name="select_incident">选择一个事件，查看志愿服务机会。</string>
 </resources>
